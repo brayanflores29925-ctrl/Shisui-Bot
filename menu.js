@@ -15,7 +15,7 @@ function fechaHora() {
 
 const secciones = [
   ['⚙️ CONFIGURACIÓN', [
-    '#setmenu', '#setowner', '#delowner', '#activarbot / #desactivarbot',
+    '#setmenu', '#setowner', '#delowner', '#owners', '#activarbot / #desactivarbot',
     '#setnombre', '#setdespedida', '#setperfil', '#setban', '#setred',
     '#key', '#setprotect', '#setnsfw (activa o desactiva el contenido +18)', '#fix (actualiza todo)', '#setupdate (conectar GitHub)'
   ]],

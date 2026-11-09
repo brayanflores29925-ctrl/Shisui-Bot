@@ -122,6 +122,11 @@ function menuActual(nsfw) {
     .replace(/{hora}/g, ahora.toLocaleTimeString('es-HN', { timeZone: zona, hour12: false }))
 }
 
+function esDuenoPrincipal(m) {
+  const candidatos = [m.key.participant, m.key.participantAlt, m.key.remoteJid, m.key.remoteJidAlt].filter(Boolean)
+  return candidatos.some(j => DUENOS.includes(j.split('@')[0].split(':')[0]))
+}
+
 function esDueno(m) {
   const candidatos = [
     m.key.participant, m.key.participantAlt,
@@ -442,8 +447,8 @@ async function iniciar(opciones = {}) {
       }
 
       case 'setowner': {
-        if (!esDueno(m)) {
-          await responder('⛔ Solo el dueño del bot puede usar este comando.')
+        if (!esDuenoPrincipal(m)) {
+          await responder('⛔ Solo el dueño principal puede dar o quitar dueños.')
           break
         }
         const mencionados = m.message.extendedTextMessage?.contextInfo?.mentionedJid || []
@@ -466,8 +471,8 @@ async function iniciar(opciones = {}) {
         break
       }
       case 'delowner': {
-        if (!esDueno(m)) {
-          await responder('⛔ Solo el dueño del bot puede usar este comando.')
+        if (!esDuenoPrincipal(m)) {
+          await responder('⛔ Solo el dueño principal puede dar o quitar dueños.')
           break
         }
         const mencionadosDel = m.message.extendedTextMessage?.contextInfo?.mentionedJid || []
@@ -2387,6 +2392,22 @@ async function iniciar(opciones = {}) {
         cfgUp.updateRama = mt[2] || 'main'
         guardarConfig(cfgUp)
         await responder('✅ Repositorio guardado: ' + mt[1] + '@' + (mt[2] || 'main') + '\nAhora escribe #fix para bajar el código.')
+        break
+      }
+
+      case 'owners': {
+        if (!esDueno(m)) {
+          await responder('⛔ Solo los dueños del bot pueden usar este comando.')
+          break
+        }
+        const principales = DUENOS.filter(n => n.length <= 13).map(n => '+' + n)
+        const extrasOw = leerConfig().duenos || []
+        await responder(
+          '👑 *Dueños del bot*\n\n' +
+          'Principal: ' + principales.join(', ') + '\n' +
+          'Agregados (' + extrasOw.length + '):\n' +
+          (extrasOw.length ? extrasOw.map(n => '• +' + n).join('\n') : '• ninguno')
+        )
         break
       }
 
