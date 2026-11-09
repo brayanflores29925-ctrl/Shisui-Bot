@@ -19,3 +19,8 @@ estado-bot.js
 *.txt
 piti.audio
 foto.jpg
+
+# Copias locales que no se publican
+*.bak
+*.save
+*backup*.js
