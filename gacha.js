@@ -110,6 +110,15 @@ const ALIAS = {
   intercambiar: 'intercambiar', trade: 'intercambiar',
   aceptar: 'aceptar', rechazar: 'rechazar',
   addpj: 'addpj',
+  tiendagacha: 'tienda',
+  inventario: 'inventario',
+  usar: 'usar',
+  fusionar: 'fusionar',
+  favorito: 'favorito',
+  w: 'trabajar', trabajar: 'trabajar',
+  nivel: 'nivel', xp: 'xp',
+  topnivel: 'topnivel',
+  misiones: 'misiones', recompensas: 'recompensas',
   gachamenu: 'menu', ayudagacha: 'menu'
 }
 const COMANDOS_GACHA = Object.keys(ALIAS)
@@ -230,6 +239,13 @@ function ejecutar(comando, args, ctx) {
   const db = cargar()
   const ahora = Date.now()
   const u = obtenerUsuario(db, ctx.ids, ctx.jid, ctx.nombre)
+  u.xp = Number(u.xp) || 0
+  u.ultimoTrabajo = Number(u.ultimoTrabajo) || 0
+  u.trabajosFecha = u.trabajosFecha || ''
+  u.trabajosHoy = Number(u.trabajosHoy) || 0
+  u.recompensaFecha = u.recompensaFecha || ''
+  u.objetos = u.objetos || {}
+  u.favorito = u.favorito || ''
   const salida = (texto, mentions) => {
     guardar(db)
     return { texto, mentions: mentions || [] }
@@ -399,6 +415,204 @@ function ejecutar(comando, args, ctx) {
       }
       db.extras.push({ nombre: partes[0], serie: partes[1], rareza: rar })
       return salida('✅ Personaje agregado: ' + RAREZAS[rar].icono + ' ' + partes[0] + ' (' + partes[1] + ')')
+    }
+    case 'trabajar': {
+      const ahora = Date.now()
+      const espera = 30 * 60 * 1000
+      if (ahora - u.ultimoTrabajo < espera) {
+        return salida('⏳ Debes esperar ' + tiempo(espera - (ahora - u.ultimoTrabajo)) + ' para volver a trabajar.')
+      }
+
+      const trabajos = [
+        ['🍔 Trabajaste en un restaurante', 40, 80],
+        ['🚕 Trabajaste como conductor', 50, 100],
+        ['💻 Hiciste un trabajo de programación', 60, 120],
+        ['📦 Trabajaste repartiendo paquetes', 45, 90],
+        ['🏪 Ayudaste en una tienda', 40, 85],
+        ['🔧 Trabajaste como técnico', 55, 110]
+      ]
+      const trabajo = trabajos[Math.floor(Math.random() * trabajos.length)]
+      const ganancia = Math.floor(Math.random() * (trabajo[2] - trabajo[1] + 1)) + trabajo[1]
+      const experiencia = Math.floor(Math.random() * 16) + 15
+      const fecha = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Tegucigalpa',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date())
+
+      if (u.trabajosFecha !== fecha) {
+        u.trabajosFecha = fecha
+        u.trabajosHoy = 0
+      }
+
+      u.monedas += ganancia
+      u.xp += experiencia
+      u.ultimoTrabajo = ahora
+      u.trabajosHoy++
+
+      return salida(
+        trabajo[0] +
+        '\\n\\n💰 Ganancia: +' + ganancia + ' monedas' +
+        '\\n⭐ Experiencia: +' + experiencia + ' XP' +
+        '\\n📊 XP total: ' + u.xp +
+        '\\n💵 Saldo: ' + u.monedas +
+        '\\n📋 Misión diaria: ' + Math.min(u.trabajosHoy, 3) + '/3 trabajos'
+      )
+    }
+    case 'nivel': {
+      let nivel = 1
+      let restante = u.xp
+      while (restante >= nivel * 100) {
+        restante -= nivel * 100
+        nivel++
+      }
+      return salida(
+        '🏅 *TU NIVEL GACHA*\\n\\n' +
+        '👤 ' + (u.nombre || 'Jugador') +
+        '\\n⭐ Nivel: ' + nivel +
+        '\\n✨ XP: ' + restante + '/' + (nivel * 100) +
+        '\\n📈 XP total: ' + u.xp
+      )
+    }
+    case 'xp': {
+      return salida('✨ *EXPERIENCIA*\\n\\n⭐ XP acumulada: ' + u.xp)
+    }
+    case 'topnivel': {
+      const ranking = db.usuarios.slice().sort((a, b) =>
+        (Number(b.xp) || 0) - (Number(a.xp) || 0)
+      ).slice(0, 10)
+
+      if (!ranking.length) return salida('Todavía no hay jugadores en el ranking.')
+
+      const lineas = ranking.map((x, i) => {
+        let nivel = 1
+        let restante = Number(x.xp) || 0
+        while (restante >= nivel * 100) {
+          restante -= nivel * 100
+          nivel++
+        }
+        return (i + 1) + '. ' + (x.nombre || 'Jugador') +
+          ' — Nivel ' + nivel + ' (' + (Number(x.xp) || 0) + ' XP)'
+      })
+      return salida('🏆 *TOP 10 NIVELES*\\n\\n' + lineas.join('\\n'))
+    }
+    case 'misiones': {
+      const fecha = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Tegucigalpa',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date())
+
+      const trabajos = u.trabajosFecha === fecha ? u.trabajosHoy : 0
+      return salida(
+        '📋 *MISIONES DIARIAS*\\n\\n' +
+        (trabajos >= 3 ? '✅' : '🔲') +
+        ' Trabajar 3 veces: ' + Math.min(trabajos, 3) + '/3' +
+        '\\n\\n🎁 Recompensa: 150 monedas' +
+        '\\nUsa #recompensas cuando completes la misión.'
+      )
+    }
+    case 'recompensas': {
+      const fecha = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Tegucigalpa',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date())
+
+      const trabajos = u.trabajosFecha === fecha ? u.trabajosHoy : 0
+      if (trabajos < 3) {
+        return salida('❌ Necesitas completar 3 trabajos. Progreso: ' + trabajos + '/3.')
+      }
+      if (u.recompensaFecha === fecha) {
+        return salida('ℹ️ Ya reclamaste la recompensa de hoy.')
+      }
+
+      u.monedas += 150
+      u.recompensaFecha = fecha
+      return salida('🎁 *MISIÓN COMPLETADA*\\n\\n💰 Recibiste 150 monedas.\\n💵 Saldo: ' + u.monedas)
+    }
+    case 'tienda': {
+      const texto = sinTildes(limpiarTexto(ctx.cuerpo))
+      if (texto.startsWith('comprar ')) {
+        const objeto = texto.slice(8).trim()
+        if (objeto !== 'ticket' && objeto !== 'tickets') {
+          return salida('❌ Ese objeto no existe. Usa #tiendagacha.')
+        }
+        const precio = 250
+        if (u.monedas < precio) {
+          return salida('💸 Necesitas ' + precio + ' monedas. Tienes ' + u.monedas + '.')
+        }
+        u.monedas -= precio
+        u.objetos.ticket = (Number(u.objetos.ticket) || 0) + 1
+        return salida('🛒 ¡Compra realizada!\\n🎟️ Ticket: +1\\n💰 Saldo: ' + u.monedas)
+      }
+      return salida(
+        '🏪 *TIENDA GACHA*\\n\\n' +
+        '🎟️ Ticket de invocación\\n' +
+        '💰 Precio: 250 monedas\\n' +
+        '🛒 Compra: #tiendagacha comprar ticket\\n\\n' +
+        'Usa #inventario para ver tus objetos.'
+      )
+    }
+    case 'inventario': {
+      return salida(
+        '🎒 *TU INVENTARIO*\\n\\n' +
+        '🎟️ Tickets: ' + (Number(u.objetos.ticket) || 0) +
+        '\\n💰 Monedas: ' + u.monedas +
+        '\\n⭐ Favorito: ' +
+        (porClave(db, u.favorito) ? porClave(db, u.favorito).nombre : 'Ninguno')
+      )
+    }
+    case 'usar': {
+      const objeto = sinTildes(limpiarTexto(ctx.cuerpo))
+      if (objeto !== 'ticket' && objeto !== 'tickets') {
+        return salida('Uso: #usar ticket')
+      }
+      if ((Number(u.objetos.ticket) || 0) < 1) {
+        return salida('❌ No tienes tickets. Compra uno en #tiendagacha.')
+      }
+      u.objetos.ticket--
+      const p = sortear(db)
+      darUno(u, p.clave)
+      return salida(
+        '🎟️ *TICKET UTILIZADO*\\n\\n' +
+        nombreConIcono(db, p.clave) + '\\n📺 ' + p.serie +
+        '\\n\\n🎒 Tickets restantes: ' + u.objetos.ticket
+      )
+    }
+    case 'fusionar': {
+      const consulta = limpiarTexto(ctx.cuerpo)
+      const r = buscarEnColeccion(db, u, consulta)
+      if (r.error) return salida('❌ ' + r.error)
+      const cantidad = Number(u.pj[r.p.clave]) || 0
+      if (cantidad < 3) {
+        return salida(
+          '❌ Necesitas 3 copias de ' + r.p.nombre +
+          '.\\nTienes: ' + cantidad + '/3.'
+        )
+      }
+      quitarUno(u, r.p.clave)
+      quitarUno(u, r.p.clave)
+      quitarUno(u, r.p.clave)
+      u.objetos.ticket = (Number(u.objetos.ticket) || 0) + 1
+      return salida(
+        '✨ *FUSIÓN COMPLETADA*\\n\\n' +
+        r.p.nombre + ' x3 se fusionaron.\\n' +
+        '🎟️ Recibiste 1 ticket.\\n' +
+        '🎟️ Tickets disponibles: ' + u.objetos.ticket
+      )
+    }
+    case 'favorito': {
+      const consulta = limpiarTexto(ctx.cuerpo)
+      if (!consulta) {
+        const p = porClave(db, u.favorito)
+        return salida(
+          p
+            ? '⭐ *TU PERSONAJE FAVORITO*\\n\\n' + nombreConIcono(db, p.clave) + '\\n📺 ' + p.serie
+            : '⭐ Todavía no tienes un favorito.\\nUsa #favorito nombre.'
+        )
+      }
+      const r = buscarEnColeccion(db, u, consulta)
+      if (r.error) return salida('❌ ' + r.error)
+      u.favorito = r.p.clave
+      return salida('⭐ ¡' + r.p.nombre + ' ahora es tu personaje favorito!')
     }
     case 'menu': {
       return salida(
