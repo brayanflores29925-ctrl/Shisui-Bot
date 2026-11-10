@@ -11,7 +11,7 @@ function ytdlp(args, timeout = 150000) {
   return new Promise((resolve, reject) => {
     execFile('yt-dlp', args, { timeout, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
-        if (err.code === 'ENOENT') return reject(new Error('yt-dlp no está instalado (pkg install yt-dlp)'))
+        if (err.code === 'ENOENT') return reject(new Error('yt-dlp todavía no está listo en este servidor. Intenta de nuevo en un minuto.'))
         const linea = String(stderr || err.message || '').split('\n').map(s => s.trim()).filter(Boolean).pop()
         return reject(new Error(linea || err.message))
       }
@@ -51,7 +51,7 @@ async function descargar(tipo, entrada, apikey, usuario) {
   const prefijo = 'dl_' + Date.now() + '_' + Math.floor(Math.random() * 1e6)
   const base = path.join(dir, prefijo)
   const comunes = [
-    '--no-playlist', '--no-warnings', '--no-progress', '--js-runtimes', 'node',
+    '--no-playlist', '--no-warnings', '--no-progress', '--js-runtimes', 'node:' + process.execPath,
     '--max-filesize', '50M',
     '-o', base + '.%(ext)s',
     '--print-to-file', '%(title)s', base + '.titulo'

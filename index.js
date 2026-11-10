@@ -20,6 +20,7 @@ const {
 const pino = require('pino')
 const readline = require('readline')
 const { generarMenu } = require('./menu')
+require('./binarios').preparar()
 const { actualizarDesdeGithub, revertirActualizacion } = require('./actualizar')
 const { aFotoCuadrada } = require('./foto')
 const { aMp3, aVideo } = require('./convertir')
@@ -2296,7 +2297,8 @@ async function iniciar(opciones = {}) {
             const v2 = (await correr('yt-dlp', ['--version'])).salida.trim()
             lineas.push((pk.ok ? '✅' : '⚠️') + ' Herramientas (yt-dlp, ffmpeg): ' + (v1 === v2 ? 'ya estaban al día (' + v2 + ')' : v1 + ' → ' + v2))
           } else {
-            lineas.push('ℹ️ Herramientas: se omiten fuera de Termux')
+            const yu = await correr('yt-dlp', ['-U'])
+            lineas.push((yu.ok ? '✅' : '⚠️') + ' yt-dlp: ' + (/up to date|up-to-date/i.test(yu.salida) ? 'ya estaba al día' : (yu.ok ? 'actualizado' : 'no pude actualizarlo')))
           }
           for (const f of ['package.json', 'package-lock.json']) {
             try { fs.copyFileSync(f, f.replace('.json', '.backup.json')) } catch {}

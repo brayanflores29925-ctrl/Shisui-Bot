@@ -24,3 +24,8 @@ foto.jpg
 *.bak
 *.save
 *backup*.js
+bin/
+
+package.backup*.json
+subir.sh
+bin/
