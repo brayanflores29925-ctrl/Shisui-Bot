@@ -889,11 +889,12 @@ async function iniciar(opciones = {}) {
       case 'fb':
       case 'x':
       case 'instagram':
-      case 'ig': {
+      case 'ig':
+      case 'pinterest': {
         const tipos = {
           musica: 'musica', m: 'musica', play: 'musica', video: 'video', v: 'video',
           tiktok: 'tiktok', tt: 'tiktok', facebook: 'facebook', fb: 'facebook',
-          x: 'x', instagram: 'instagram', ig: 'instagram'
+          x: 'x', instagram: 'instagram', ig: 'instagram', pinterest: 'pinterest'
         }
         const tipo = tipos[comando]
         const entrada = cuerpo.slice(cmd.length).trim()
@@ -903,7 +904,7 @@ async function iniciar(opciones = {}) {
           tiktok: '#tiktok <enlace>',
           facebook: '#facebook <enlace>',
           x: '#x <enlace>',
-          instagram: '#instagram <enlace>'
+          instagram: '#instagram <enlace>', pinterest: '#pinterest <enlace>'
         }
         if (!entrada) {
           await responder('Uso: ' + ejemplos[tipo])
@@ -913,7 +914,7 @@ async function iniciar(opciones = {}) {
           tiktok: /tiktok\.com/i,
           facebook: /(facebook\.com|fb\.watch)/i,
           x: /(x\.com|twitter\.com)/i,
-          instagram: /instagram\.com/i
+          instagram: /instagram\.com/i, pinterest: /(pinterest\.com|pin\.it)/i
         }
         if (validar[tipo] && !validar[tipo].test(entrada)) {
           await responder('⚠️ Envía un enlace válido de ' + tipo + '.\nUso: ' + ejemplos[tipo])

@@ -57,6 +57,7 @@ const secciones = [
     '#facebook / #fb — Descarga contenido de Facebook.',
     '#x — Ejecuta herramientas para X.',
     '#instagram / #ig — Descarga contenido de Instagram.',
+    '#pinterest — Descarga contenido de Pinterest.',
     '#code — Genera un código para vincular un subbot.',
     '#delcode — Elimina un código de vinculación.',
     '#subs — Muestra información de los subbots.'

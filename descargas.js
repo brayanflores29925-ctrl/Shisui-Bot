@@ -73,6 +73,9 @@ async function descargar(tipo, entrada, apikey, usuario) {
     const objetivo = esUrl ? entrada : 'ytsearch1:' + entrada
     args = [...comunes, '-f', 'bv*[height<=480]+ba/b[height<=480]/bv*+ba/b', '--merge-output-format', 'mp4', objetivo]
     tipoResultado = 'video'
+  } else if (tipo === 'pinterest') {
+    args = [...comunes, '-f', 'best', entrada]
+    tipoResultado = 'video'
   } else {
     args = [...comunes, '-f', 'bv*+ba/b', '--merge-output-format', 'mp4', entrada]
     tipoResultado = 'video'
@@ -93,6 +96,7 @@ async function descargar(tipo, entrada, apikey, usuario) {
     const archivos = fs.readdirSync(dir).filter(f =>
       f.startsWith(prefijo) && !f.endsWith('.titulo') && !f.endsWith('.part') && !f.endsWith('.ytdl')
     )
+    if (tipo === 'pinterest' && archivos[0] && /\.(jpe?g|png|webp|gif)$/i.test(archivos[0])) tipoResultado = 'image'
     if (!archivos.length) {
       limpiar()
       return { ok: false, error: 'No pude descargarlo. Puede que sea muy pesado (más de 50 MB) o no esté disponible.' }
