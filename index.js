@@ -20,6 +20,7 @@ const {
 const pino = require('pino')
 const readline = require('readline')
 const { generarMenu } = require('./menu')
+const limpieza = require('./limpieza')
 const { ejecutar: gachaEjecutar, COMANDOS_GACHA } = require('./gacha')
 require('./binarios').preparar()
 const { actualizarDesdeGithub, revertirActualizacion } = require('./actualizar')
@@ -194,6 +195,28 @@ function correr(cmd, args, opciones = {}) {
   })
 }
 
+let limpiezaTimer = null
+let ultimoAvisoEspacio = 0
+function programarLimpieza(sock) {
+  if (limpiezaTimer) return
+  const revisar = async () => {
+    try {
+      const libre = limpieza.libreMB()
+      if (libre === null || libre >= 150) return
+      const r = limpieza.limpiar()
+      console.log('Limpieza automática: ' + r.antes + ' MB → ' + r.despues + ' MB')
+      if (r.despues !== null && r.despues < 100 && Date.now() - ultimoAvisoEspacio > 6 * 3600 * 1000 && typeof DUENO_JID !== 'undefined') {
+        ultimoAvisoEspacio = Date.now()
+        await sock.sendMessage(DUENO_JID, { text: '⚠️ Queda poco espacio en el servidor (' + r.despues + ' MB) aunque ya limpié. Revisa con #espacio.' })
+      }
+    } catch (e) {
+      console.log('Limpieza automática:', e.message)
+    }
+  }
+  setTimeout(revisar, 60000)
+  limpiezaTimer = setInterval(revisar, 30 * 60 * 1000)
+}
+
 function preguntar(texto) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
   return new Promise(res => rl.question(texto, r => { rl.close(); res(r) }))
@@ -256,6 +279,7 @@ async function iniciar(opciones = {}) {
     if (connection === 'open') {
       if (esSub) subEstado[numeroSub] = { vinculado: true }
       console.log(esSub ? 'Sub bot conectado ✅ ' + numeroSub : 'Bot conectado ✅')
+      if (!esSub) programarLimpieza(sock)
     }
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode
@@ -2275,6 +2299,7 @@ async function iniciar(opciones = {}) {
             break
           }
           await responder('🔧 Actualizando todo, esto puede tardar unos minutos...')
+          try { limpieza.limpiar() } catch {}
           const lineas = ['✅ Actualización terminada', '']
           let reiniciar = false
           if (cfgFx.updateRepo) {
@@ -2433,33 +2458,36 @@ async function iniciar(opciones = {}) {
         break
       }
 
-      case 'limpiar': {
+
+      case 'limpiar':
+      case 'espacio': {
         if (!esDueno(m)) {
           await responder('⛔ Solo el dueño del bot puede usar este comando.')
           break
         }
-        const libre = () => {
-          try {
-            const s = fs.statfsSync('.')
-            return Math.round(s.bavail * s.bsize / 1048576)
-          } catch {
-            return null
+        if (comando === 'espacio') {
+          const libre = limpieza.libreMB()
+          const carpetas = limpieza.resumenCarpetas().slice(0, 6)
+          await responder(
+            '💾 *Espacio del servidor*\n\nLibre: ' + (libre === null ? 'no disponible' : libre + ' MB') +
+            (carpetas.length ? '\n\nCarpetas del bot:\n' + carpetas.map(x => '• ' + x[0] + ': ' + Math.round(x[1] / 1048576) + ' MB').join('\n') : '')
+          )
+          break
+        }
+        const r = limpieza.limpiar()
+        await responder(
+          '🧹 *Limpieza hecha*\n\nLiberé: ' + r.liberadoMB + ' MB' +
+          (r.antes !== null ? '\n💾 Espacio libre: ' + r.antes + ' MB → ' + r.despues + ' MB' : '') +
+          '\n\nNo se tocó el código, config.json, las sesiones ni gacha.json.'
+        )
+        if ((args[0] || '').toLowerCase() === 'reiniciar') {
+          if (process.env.BOT_LOOP || leerConfig().reinicioAuto) {
+            await responder('♻️ Reiniciando el bot...')
+            setTimeout(() => process.exit(42), 2000)
+          } else {
+            await responder('ℹ️ Reinicia el bot desde el panel para terminar.')
           }
         }
-        const antes = libre()
-        for (const d of ['tmp-ytdlp', 'backup-update']) {
-          try { fs.rmSync(d, { recursive: true, force: true }) } catch {}
-        }
-        try {
-          const tmp = require('os').tmpdir()
-          for (const f of fs.readdirSync(tmp)) {
-            if (/^(dl_|stk_|cita_|mp3_|vid_|foto_|voz_|chk_)/.test(f)) {
-              try { fs.unlinkSync(require('path').join(tmp, f)) } catch {}
-            }
-          }
-        } catch {}
-        const despues = libre()
-        await responder('🧹 Limpieza hecha' + (antes !== null ? '\n💾 Espacio libre: ' + antes + ' MB → ' + despues + ' MB' : ''))
         break
       }
 
