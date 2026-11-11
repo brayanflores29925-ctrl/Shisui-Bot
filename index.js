@@ -483,6 +483,62 @@ async function iniciar(opciones = {}) {
       break
     }
 
+    case 'info': {
+      const info = `╭━━〔 🤖 SHISUI BOT 〕━━╮
+┃ ✨ ¡BIENVENIDO!
+╰━━━━━━━━━━━━━━━━━━╯
+
+Soy Shisui Bot, tu asistente de WhatsApp.
+
+╭━━〔 📥 DESCARGAS 〕
+┃ 🎵 Música en MP3
+┃ 🎬 Videos en MP4
+┃ 🔎 Búsqueda de contenido
+┃ 🔗 Descargas mediante enlaces compatibles
+╰━━━━━━━━━━━━━━━━━━╯
+
+╭━━〔 🖼️ STICKERS E IMÁGENES 〕
+┃ Creación de stickers
+┃ Conversión de imágenes
+┃ Herramientas multimedia
+╰━━━━━━━━━━━━━━━━━━╯
+
+╭━━〔 🤖 INTELIGENCIA ARTIFICIAL 〕
+┃ Preguntas y respuestas
+┃ Consultas con IA
+┃ Asistencia inteligente
+╰━━━━━━━━━━━━━━━━━━╯
+
+╭━━〔 🛠️ HERRAMIENTAS 〕
+┃ Utilidades y funciones especiales
+┃ Comandos interactivos
+┃ Juegos y entretenimiento
+╰━━━━━━━━━━━━━━━━━━╯
+
+╭━━〔 👥 ADMINISTRACIÓN 〕
+┃ Herramientas para grupos
+┃ Bienvenidas y moderación
+┃ Funciones administrativas
+╰━━━━━━━━━━━━━━━━━━╯
+
+╭━━〔 📌 ¿CÓMO SE USA? 〕
+┃ Escribe #menu para ver los comandos.
+┃ Elige la función que necesitas.
+┃ Sigue las instrucciones del bot.
+╰━━━━━━━━━━━━━━━━━━╯
+
+╭━━〔 🤖 SISTEMA DE SUBBOTS 〕
+┃ ⚠️ Límite máximo: 5 subbots.
+┃ No se permiten más de 5 conectados.
+╰━━━━━━━━━━━━━━━━━━╯
+
+💡 Escribe #menu para descubrir todas las funciones.
+
+💜 SHISUI BOT — TU ASISTENTE DE WHATSAPP.`;
+      await responder(info)
+      break
+    }
+
     case 'menu': {
         const quien = m.key.participant || m.key.remoteJid
         const tag = '@' + quien.split('@')[0].split(':')[0]
