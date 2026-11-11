@@ -62,6 +62,11 @@ const secciones = [
     '#delcode — Elimina un código de vinculación.',
     '#subs — Muestra información de los subbots.'
   ]],
+  ['🤖 INTELIGENCIA ARTIFICIAL', [
+    '#ia — Pregunta a la inteligencia artificial.',
+    '#chatgpt — Consulta al asistente de IA.',
+    '#gpt — Envía una pregunta a la IA.'
+  ]],
   ['🎮 GACHA MENU', [
     '#gachamenu / #ayudagacha — Muestra la ayuda Gacha.',
     '#gacha / #roll / #tirar — Realiza una invocación.',

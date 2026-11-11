@@ -1,4 +1,7 @@
 const fs = require('fs')
+require('dotenv').config()
+const Groq = require('groq-sdk')
+const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null
 for (const nivel of ['info', 'warn']) {
   const original = console[nivel]
   console[nivel] = (...a) => {
@@ -31,6 +34,21 @@ const { conMetadatos } = require('./sticker-meta')
 const { crearCita } = require('./cita')
 const { textoAVoz } = require('./voz')
 const { descargar, bajarMedia, buscarImagenes } = require('./descargas')
+
+async function consultarGroq(pregunta) {
+  if (!groq) throw new Error('Falta configurar GROQ_API_KEY')
+  const respuesta = await groq.chat.completions.create({
+    model: 'openai/gpt-oss-20b',
+    messages: [
+      { role: 'system', content: 'Eres Levi Bot, un asistente de inteligencia artificial útil. Responde en español claro y directamente.' },
+      { role: 'user', content: pregunta }
+    ],
+    max_completion_tokens: 1024,
+    reasoning_effort: 'low',
+    include_reasoning: false
+  })
+  return respuesta.choices?.[0]?.message?.content?.trim() || 'No pude generar una respuesta.'
+}
 
 const PREFIJOS = ['!', '#', '.', '/']
 const DUENOS = ['50494874330', '50494874330']
@@ -447,7 +465,25 @@ async function iniciar(opciones = {}) {
     if (conocido) await reaccionar('⏳')
 
     switch (comando) {
-      case 'menu': {
+      case 'ia':
+    case 'chatgpt':
+    case 'gpt': {
+      const pregunta = args.join(' ').trim()
+      if (!pregunta) {
+        await responder('🤖 Escribe tu pregunta. Ejemplo: #ia ¿Qué es la inteligencia artificial?')
+        break
+      }
+      try {
+        const respuesta = await consultarGroq(pregunta)
+        await responder('🤖 *LEVI AI*\\n\\n' + respuesta)
+      } catch (e) {
+        console.error('Error Groq:', e.message)
+        await responder('❌ No pude consultar la inteligencia artificial. Inténtalo más tarde.')
+      }
+      break
+    }
+
+    case 'menu': {
         const quien = m.key.participant || m.key.remoteJid
         const tag = '@' + quien.split('@')[0].split(':')[0]
         const saludo = `Hola ${tag}, soy ${leerConfig().nombre || 'Shisui Bot'} 🤖`
