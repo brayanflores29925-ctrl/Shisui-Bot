@@ -2298,8 +2298,12 @@ async function iniciar(opciones = {}) {
             const v2 = (await correr('yt-dlp', ['--version'])).salida.trim()
             lineas.push((pk.ok ? '✅' : '⚠️') + ' Herramientas (yt-dlp, ffmpeg): ' + (v1 === v2 ? 'ya estaban al día (' + v2 + ')' : v1 + ' → ' + v2))
           } else {
-            const yu = await correr('yt-dlp', ['-U'])
-            lineas.push((yu.ok ? '✅' : '⚠️') + ' yt-dlp: ' + (/up to date|up-to-date/i.test(yu.salida) ? 'ya estaba al día' : (yu.ok ? 'actualizado' : 'no pude actualizarlo')))
+            if (cfgFx.herramientas) {
+              const yu = await correr('yt-dlp', ['-U'])
+              lineas.push((yu.ok ? '✅' : '⚠️') + ' yt-dlp: ' + (/up to date|up-to-date/i.test(yu.salida) ? 'ya estaba al día' : (yu.ok ? 'actualizado' : 'no pude actualizarlo')))
+            } else {
+              lineas.push('ℹ️ Herramientas: desactivadas en este servidor')
+            }
           }
           for (const f of ['package.json', 'package-lock.json']) {
             try { fs.copyFileSync(f, f.replace('.json', '.backup.json')) } catch {}
@@ -2321,6 +2325,10 @@ async function iniciar(opciones = {}) {
             }
           } catch {}
           lineas.push('🧹 Archivos temporales borrados: ' + borrados)
+          try {
+            const sp = fs.statfsSync('.')
+            lineas.push('💾 Espacio libre: ' + Math.round(sp.bavail * sp.bsize / 1048576) + ' MB')
+          } catch {}
           await terminar(lineas, reiniciar)
         } catch (e) {
           console.log('Error en fix:', e.message)
@@ -2375,6 +2383,17 @@ async function iniciar(opciones = {}) {
           }
           break
         }
+        if (a0 === 'herramientas') {
+          const v = (args[1] || '').toLowerCase()
+          if (v !== 'on' && v !== 'off') {
+            await responder('Uso: #setupdate herramientas on|off\nActivado, el bot descarga yt-dlp y ffmpeg (unos 120 MB). Solo para servidores con espacio.')
+            break
+          }
+          cfgUp.herramientas = v === 'on'
+          guardarConfig(cfgUp)
+          await responder('✅ Herramientas: ' + (v === 'on' ? 'activadas (se descargan al reiniciar)' : 'desactivadas'))
+          break
+        }
         if (a0 === 'reinicio') {
           const v = (args[1] || '').toLowerCase()
           if (v !== 'on' && v !== 'off') {
@@ -2411,6 +2430,36 @@ async function iniciar(opciones = {}) {
           'Agregados (' + extrasOw.length + '):\n' +
           (extrasOw.length ? extrasOw.map(n => '• +' + n).join('\n') : '• ninguno')
         )
+        break
+      }
+
+      case 'limpiar': {
+        if (!esDueno(m)) {
+          await responder('⛔ Solo el dueño del bot puede usar este comando.')
+          break
+        }
+        const libre = () => {
+          try {
+            const s = fs.statfsSync('.')
+            return Math.round(s.bavail * s.bsize / 1048576)
+          } catch {
+            return null
+          }
+        }
+        const antes = libre()
+        for (const d of ['tmp-ytdlp', 'backup-update']) {
+          try { fs.rmSync(d, { recursive: true, force: true }) } catch {}
+        }
+        try {
+          const tmp = require('os').tmpdir()
+          for (const f of fs.readdirSync(tmp)) {
+            if (/^(dl_|stk_|cita_|mp3_|vid_|foto_|voz_|chk_)/.test(f)) {
+              try { fs.unlinkSync(require('path').join(tmp, f)) } catch {}
+            }
+          }
+        } catch {}
+        const despues = libre()
+        await responder('🧹 Limpieza hecha' + (antes !== null ? '\n💾 Espacio libre: ' + antes + ' MB → ' + despues + ' MB' : ''))
         break
       }
 
