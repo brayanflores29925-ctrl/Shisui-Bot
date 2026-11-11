@@ -7,9 +7,15 @@ const { execFile } = require('child_process')
 const ESPERA_MS = 20000
 const ultimoUso = new Map()
 
+function entornoYt() {
+  const dir = path.join(process.cwd(), 'tmp-ytdlp')
+  try { fs.mkdirSync(dir, { recursive: true }) } catch {}
+  return { ...process.env, TMPDIR: dir, TEMP: dir, TMP: dir }
+}
+
 function ytdlp(args, timeout = 150000) {
   return new Promise((resolve, reject) => {
-    execFile('yt-dlp', args, { timeout, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile('yt-dlp', args, { timeout, maxBuffer: 10 * 1024 * 1024, env: entornoYt() }, (err, stdout, stderr) => {
       if (err) {
         if (err.code === 'ENOENT') return reject(new Error('yt-dlp todavía no está listo en este servidor. Intenta de nuevo en un minuto.'))
         const linea = String(stderr || err.message || '').split('\n').map(s => s.trim()).filter(Boolean).pop()
@@ -22,6 +28,7 @@ function ytdlp(args, timeout = 150000) {
 
 function traducirError(msg) {
   const m = String(msg || '')
+  if (/PYI-\d+|Failed to extract/i.test(m)) return 'El servidor no pudo usar yt-dlp (poco espacio o sin permisos). Avisa al dueño.'
   if (/private|login|log in|sign in|cookies|members only/i.test(m)) {
     return 'Ese contenido es privado o pide iniciar sesión.'
   }
@@ -51,7 +58,7 @@ async function descargar(tipo, entrada, apikey, usuario) {
   const prefijo = 'dl_' + Date.now() + '_' + Math.floor(Math.random() * 1e6)
   const base = path.join(dir, prefijo)
   const comunes = [
-    '--no-playlist', '--no-warnings', '--no-progress', '--js-runtimes', 'node:' + process.execPath,
+    '--no-playlist', '--no-warnings', '--no-progress', '--js-runtimes', 'node:' + process.execPath, '--cache-dir', path.join(process.cwd(), 'tmp-ytdlp', 'cache'),
     '--max-filesize', '50M',
     '-o', base + '.%(ext)s',
     '--print-to-file', '%(title)s', base + '.titulo'

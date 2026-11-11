@@ -20,6 +20,7 @@ const {
 const pino = require('pino')
 const readline = require('readline')
 const { generarMenu } = require('./menu')
+const { ejecutar: gachaEjecutar, COMANDOS_GACHA } = require('./gacha')
 require('./binarios').preparar()
 const { actualizarDesdeGithub, revertirActualizacion } = require('./actualizar')
 const { aFotoCuadrada } = require('./foto')
@@ -33,7 +34,7 @@ const { descargar, bajarMedia } = require('./descargas')
 const PREFIJOS = ['!', '#', '.', '/']
 const DUENOS = ['50494874330', '50494874330']
 process.on('unhandledRejection', e => console.log('Error no controlado:', e && e.message))
-const COMANDOS = new Set([...fs.readFileSync(__filename, 'utf8').matchAll(/case '([a-z0-9_]+)'/g)].map(x => x[1]))
+const COMANDOS = new Set([...fs.readFileSync(__filename, 'utf8').matchAll(/case '([a-z0-9_]+)'/g)].map(x => x[1]).concat(COMANDOS_GACHA))
 const EMOJIS = {
   musica: '🎵', m: '🎵', play: '🎵',
   video: '🎬', v: '🎬',
@@ -185,7 +186,7 @@ function correr(cmd, args, opciones = {}) {
       {
         timeout: 600000,
         maxBuffer: 20 * 1024 * 1024,
-        env: { ...process.env, DEBIAN_FRONTEND: 'noninteractive' },
+        env: { ...process.env, DEBIAN_FRONTEND: 'noninteractive', TMPDIR: require('path').join(process.cwd(), 'tmp-ytdlp') },
         ...opciones
       },
       (err, stdout, stderr) => resolve({ ok: !err, salida: String(stdout || '') + String(stderr || '') })
@@ -2438,7 +2439,38 @@ async function iniciar(opciones = {}) {
       }
 
       default: {
-        await responder('❌ Lo siento, ese comando no está disponible.\n📋 Usa #menu para ver los comandos disponibles.')
+        if (COMANDOS_GACHA.includes(comando)) {
+          try {
+            const participante = m.key.participantAlt || m.key.participant || jid
+            const info = m.message.extendedTextMessage?.contextInfo || {}
+            const ids = [participante, m.key.participant, m.key.participantAlt]
+              .filter(Boolean)
+              .map(x => x.split('@')[0].split(':')[0].replace(/\D/g, ''))
+              .filter(Boolean)
+
+            const resultado = gachaEjecutar(comando, args, {
+              ids,
+              jid: participante,
+              nombre: m.pushName || '',
+              cuerpo: args.join(' '),
+              mentions: info.mentionedJid || [],
+              citado: info.participant || null,
+              esDueno: esDueno(m)
+            })
+
+            if (resultado?.texto) {
+              await sock.sendMessage(jid, {
+                text: resultado.texto,
+                mentions: resultado.mentions || []
+              }, { quoted: m })
+            }
+          } catch (e) {
+            console.log('Error Gacha:', e)
+            await responder('❌ Ocurrió un error en el sistema Gacha.')
+          }
+        } else {
+          await responder('❌ Lo siento, ese comando no está disponible.\n📋 Usa #menu para ver los comandos disponibles.')
+        }
         break
       }
     }
