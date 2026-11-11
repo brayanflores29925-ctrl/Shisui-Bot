@@ -128,4 +128,60 @@ async function bajarMedia(url, maxMB = 60) {
   return Buffer.from(await res.arrayBuffer())
 }
 
-module.exports = { descargar, bajarMedia }
+
+async function buscarImagenes(consulta, limite = 3) {
+  if (!consulta || /^https?:\/\//i.test(consulta)) {
+    throw new Error('Escribe el nombre de la imagen que deseas buscar.')
+  }
+
+  const headers = {
+    'User-Agent': 'Mozilla/5.0',
+    'Accept': 'application/json, text/plain, */*'
+  }
+
+  const pagina = await fetch(
+    'https://duckduckgo.com/?q=' + encodeURIComponent(consulta) + '&iax=images&ia=images',
+    { headers, signal: AbortSignal.timeout(15000) }
+  )
+
+  if (!pagina.ok) throw new Error('No pude conectar con el buscador.')
+  const html = await pagina.text()
+  const token = html.match(/vqd=['"]?([\d-]+)['"]?/i)
+
+  if (!token) throw new Error('El buscador no permitió realizar la búsqueda. Intenta más tarde.')
+
+  const api = new URL('https://duckduckgo.com/i.js')
+  api.search = new URLSearchParams({
+    l: 'us-en',
+    o: 'json',
+    q: consulta,
+    vqd: token[1],
+    f: ',,,',
+    p: '1',
+    kp: '1'
+  })
+
+  const respuesta = await fetch(api, {
+    headers,
+    signal: AbortSignal.timeout(15000)
+  })
+
+  if (!respuesta.ok) throw new Error('El buscador no está disponible.')
+  const datos = await respuesta.json()
+  const vistos = new Set()
+
+  return (datos.results || [])
+    .filter(x => typeof x.image === 'string' && /^https?:\/\//i.test(x.image))
+    .filter(x => {
+      if (vistos.has(x.image)) return false
+      vistos.add(x.image)
+      return true
+    })
+    .slice(0, Math.min(3, Math.max(1, limite)))
+    .map(x => ({
+      url: x.image,
+      titulo: String(x.title || consulta).slice(0, 180)
+    }))
+}
+
+module.exports = { descargar, bajarMedia, buscarImagenes }
