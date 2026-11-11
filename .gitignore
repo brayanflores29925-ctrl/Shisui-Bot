@@ -30,3 +30,5 @@ package.backup*.json
 subir.sh
 bin/
 tmp-ytdlp/
+
+.env

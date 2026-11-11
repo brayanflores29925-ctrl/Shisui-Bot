@@ -495,7 +495,8 @@ async function iniciar(opciones = {}) {
         break
       }
 
-      case 'ping': {
+      case 'p':
+    case 'ping': {
         const t0 = Date.now()
         const enviado = await sock.sendMessage(jid, { text: '🏓 Calculando...' }, { quoted: m })
         const ms = Date.now() - t0
