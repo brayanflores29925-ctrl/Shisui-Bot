@@ -34,6 +34,7 @@ const { conMetadatos } = require('./sticker-meta')
 const { crearCita } = require('./cita')
 const { textoAVoz } = require('./voz')
 const { descargar, bajarMedia, buscarImagenes } = require('./descargas')
+const { registrarGrupo, revisarRegistros } = require('./registro-grupos')
 
 async function consultarGroq(pregunta) {
   if (!groq) throw new Error('Falta configurar GROQ_API_KEY')
@@ -297,9 +298,18 @@ async function iniciar(opciones = {}) {
     if (connection === 'open') {
       if (esSub) subEstado[numeroSub] = { vinculado: true }
       console.log(esSub ? 'Sub bot conectado ✅ ' + numeroSub : 'Bot conectado ✅')
-      if (!esSub) programarLimpieza(sock)
+      if (!esSub) {
+        programarLimpieza(sock)
+        revisarRegistros(sock).catch(e => console.log('Registro:', e.message))
+        if (!sock.__registroInterval) {
+          sock.__registroInterval = setInterval(() => {
+            revisarRegistros(sock).catch(e => console.log('Registro:', e.message))
+          }, 60000)
+        }
+      }
     }
     if (connection === 'close') {
+      if (sock.__registroInterval) clearInterval(sock.__registroInterval)
       const code = lastDisconnect?.error?.output?.statusCode
       if (esSub) {
         if (!(leerConfig().subbots || []).includes(numeroSub)) return
@@ -453,7 +463,7 @@ async function iniciar(opciones = {}) {
       'activarbot', 'desactivarbot',
       'setnombre', 'setbienvenida', 'setdespedida',
       'setperfil', 'setban', 'setred', 'key',
-      'setprotect', 'setnsfw', 'setmenu', 'miid'
+      'setprotect', 'setnsfw', 'setmenu', 'miid', 'registrargrupo'
     ])
 
     if (comandosSoloDueno.has(comando) && !esDueno(m)) {
@@ -465,6 +475,15 @@ async function iniciar(opciones = {}) {
     if (conocido) await reaccionar('⏳')
 
     switch (comando) {
+      case 'registrargrupo': {
+        try {
+          await registrarGrupo(sock, jid, args[0])
+        } catch (e) {
+          await responder('❌ ' + e.message)
+        }
+        break
+      }
+
       case 'ia':
     case 'chatgpt':
     case 'gpt': {
