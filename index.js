@@ -30,7 +30,7 @@ const QRCode = require('qrcode')
 const { conMetadatos } = require('./sticker-meta')
 const { crearCita } = require('./cita')
 const { textoAVoz } = require('./voz')
-const { descargar, bajarMedia } = require('./descargas')
+const { descargar, bajarMedia, buscarImagenes } = require('./descargas')
 
 const PREFIJOS = ['!', '#', '.', '/']
 const DUENOS = ['50494874330', '50494874330']
@@ -910,6 +910,37 @@ async function iniciar(opciones = {}) {
           await responder('Uso: ' + ejemplos[tipo])
           break
         }
+        if (tipo === 'pinterest' && !/^https?:\/\//i.test(entrada)) {
+          await responder('🔎 Buscando 3 imágenes de: ' + entrada)
+          try {
+            const resultados = await buscarImagenes(entrada, 3)
+            if (!resultados.length) {
+              await responder('❌ No encontré imágenes. Prueba con otro nombre.')
+              break
+            }
+
+            let enviadas = 0
+            for (const imagen of resultados) {
+              try {
+                const buffer = await bajarMedia(imagen.url, 10)
+                await sock.sendMessage(jid, {
+                  image: buffer,
+                  caption: '🖼️ ' + imagen.titulo + '\n🔎 Búsqueda: ' + entrada
+                }, { quoted: m })
+                enviadas++
+              } catch (e) {
+                console.log('Error enviando imagen Pinterest:', e.message)
+              }
+            }
+
+            if (!enviadas) await responder('❌ No pude enviar las imágenes encontradas.')
+          } catch (e) {
+            console.log('Error buscando imágenes:', e.message)
+            await responder('❌ ' + String(e.message || 'Error al buscar imágenes.').slice(0, 150))
+          }
+          break
+        }
+
         const validar = {
           tiktok: /tiktok\.com/i,
           facebook: /(facebook\.com|fb\.watch)/i,
