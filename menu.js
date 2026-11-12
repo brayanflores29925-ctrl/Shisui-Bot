@@ -93,6 +93,9 @@ const secciones = [
     '#rechazar — Rechaza un intercambio.',
     '#addpj — Agrega un personaje al sistema.'
   ]],
+  ['🎄 NAVIDAD', [
+    '#navidad', '#nochebuena', '#anonuevo', '#felicitar', '#arbol'
+  ]],
   ['👥 GRUPOS / ADMIN', [
     '#cerrar — Restringe los mensajes del grupo.',
     '#abrir — Abre nuevamente el grupo.',

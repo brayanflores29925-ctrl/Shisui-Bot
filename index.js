@@ -23,6 +23,7 @@ const {
 const pino = require('pino')
 const readline = require('readline')
 const { generarMenu } = require('./menu')
+const { ejecutar: navidadEjecutar } = require('./navidad')
 const limpieza = require('./limpieza')
 const { ejecutar: gachaEjecutar, COMANDOS_GACHA } = require('./gacha')
 require('./binarios').preparar()
@@ -2631,6 +2632,23 @@ Soy Shisui Bot, tu asistente de WhatsApp.
           } else {
             await responder('ℹ️ Reinicia el bot desde el panel para terminar.')
           }
+        }
+        break
+      }
+
+      case 'navidad':
+      case 'nochebuena':
+      case 'anonuevo':
+      case 'felicitar':
+      case 'arbol': {
+        const ctxNa = m.message.extendedTextMessage?.contextInfo
+        const rNa = navidadEjecutar(comando, {
+          mentions: ctxNa?.mentionedJid || [],
+          citado: ctxNa?.participant || null,
+          jid: m.key.participant || m.key.remoteJid
+        })
+        if (rNa.texto) {
+          await sock.sendMessage(jid, { text: rNa.texto, mentions: rNa.mentions || [] }, { quoted: m })
         }
         break
       }
