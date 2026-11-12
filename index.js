@@ -1081,7 +1081,7 @@ Soy Shisui Bot, tu asistente de WhatsApp.
           } else if (r.tipo === 'image') {
             await sock.sendMessage(jid, { image: await bajarMedia(r.url), caption: r.titulo || '' }, { quoted: m })
           } else {
-            await sock.sendMessage(jid, { video: await bajarMedia(r.url), caption: r.titulo || '' }, { quoted: m })
+            await sock.sendMessage(jid, { video: await bajarMedia(r.url), mimetype: 'video/mp4', caption: r.titulo || '' }, { quoted: m })
           }
         } catch (e) {
           console.log('Error de descarga:', e.message)

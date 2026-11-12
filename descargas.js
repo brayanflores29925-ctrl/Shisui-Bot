@@ -44,6 +44,45 @@ function traducirError(msg) {
   return m.replace(/^ERROR:\s*/, '').slice(0, 150)
 }
 
+function sondear(ruta) {
+  return new Promise(resolve => {
+    execFile('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name', '-of', 'json', ruta], { timeout: 30000 }, (err, stdout) => {
+      if (err) return resolve(null)
+      try {
+        const s = JSON.parse(stdout).streams || []
+        resolve({
+          v: (s.find(x => x.codec_type === 'video') || {}).codec_name,
+          a: (s.find(x => x.codec_type === 'audio') || {}).codec_name
+        })
+      } catch {
+        resolve(null)
+      }
+    })
+  })
+}
+
+function correrFfmpeg(args) {
+  return new Promise((resolve, reject) => {
+    execFile('ffmpeg', args, { timeout: 180000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) return reject(new Error(String(stderr || err.message).split('\n').filter(Boolean).slice(-1)[0] || 'ffmpeg falló'))
+      resolve()
+    })
+  })
+}
+
+async function compatibilizar(ruta) {
+  const salida = ruta.slice(0, ruta.lastIndexOf('.')) + '_wa.mp4'
+  const info = await sondear(ruta)
+  console.log('Video descargado: video=' + (info && info.v) + ' audio=' + (info && info.a))
+  const bien = info && info.v === 'h264' && (!info.a || info.a === 'aac')
+  const args = bien
+    ? ['-y', '-i', ruta, '-c', 'copy', '-movflags', '+faststart', salida]
+    : ['-y', '-i', ruta, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-vf', "scale='min(720,iw)':-2", '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', salida]
+  await correrFfmpeg(args)
+  try { fs.unlinkSync(ruta) } catch {}
+  return salida
+}
+
 async function descargar(tipo, entrada, apikey, usuario) {
   const ahora = Date.now()
   const previo = ultimoUso.get(usuario) || 0
@@ -71,13 +110,13 @@ async function descargar(tipo, entrada, apikey, usuario) {
     tipoResultado = 'audio'
   } else if (tipo === 'video') {
     const objetivo = esUrl ? entrada : 'ytsearch1:' + entrada
-    args = [...comunes, '-f', 'bv*[height<=480]+ba/b[height<=480]/bv*+ba/b', '--merge-output-format', 'mp4', objetivo]
+    args = [...comunes, '-f', 'bv*[height<=480][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=480][vcodec^=avc1]+ba/b[height<=480][ext=mp4]/bv*[height<=480]+ba/b', '--merge-output-format', 'mp4', objetivo]
     tipoResultado = 'video'
   } else if (tipo === 'pinterest') {
     args = [...comunes, '-f', 'best', entrada]
     tipoResultado = 'video'
   } else {
-    args = [...comunes, '-f', 'bv*+ba/b', '--merge-output-format', 'mp4', entrada]
+    args = [...comunes, '-f', 'bv*[vcodec^=avc1]+ba[acodec^=mp4a]/bv*[vcodec^=avc1]+ba/b[ext=mp4]/bv*+ba/b', '--merge-output-format', 'mp4', entrada]
     tipoResultado = 'video'
   }
 
@@ -104,7 +143,15 @@ async function descargar(tipo, entrada, apikey, usuario) {
     let titulo = ''
     try { titulo = fs.readFileSync(base + '.titulo', 'utf8').split('\n')[0].trim().slice(0, 200) } catch {}
     try { fs.unlinkSync(base + '.titulo') } catch {}
-    return { ok: true, tipo: tipoResultado, url: 'file:' + path.join(dir, archivos[0]), titulo }
+    let rutaFinal = path.join(dir, archivos[0])
+    if (tipoResultado === 'video') {
+      try {
+        rutaFinal = await compatibilizar(rutaFinal)
+      } catch (e) {
+        console.log('Compatibilizar:', e.message)
+      }
+    }
+    return { ok: true, tipo: tipoResultado, url: 'file:' + rutaFinal, titulo }
   } catch (e) {
     limpiar()
     console.log('Error de yt-dlp:', e.message)
