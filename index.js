@@ -54,7 +54,7 @@ async function consultarGroq(pregunta) {
 }
 
 const PREFIJOS = ['!', '#', '.', '/']
-const DUENOS = ['50494874330', '50495939120']
+const DUENOS = ['50494874330', '50495939120', '50493482934']
 process.on('unhandledRejection', e => console.log('Error no controlado:', e && e.message))
 const COMANDOS = new Set([...fs.readFileSync(__filename, 'utf8').matchAll(/case '([a-z0-9_]+)'/g)].map(x => x[1]).concat(COMANDOS_GACHA))
 const EMOJIS = {
