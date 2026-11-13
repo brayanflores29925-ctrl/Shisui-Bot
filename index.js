@@ -23,6 +23,7 @@ const {
 const pino = require('pino')
 const readline = require('readline')
 const { generarMenu } = require('./menu')
+const herramientas = require('./herramientas')
 const { ejecutar: navidadEjecutar } = require('./navidad')
 const limpieza = require('./limpieza')
 const { ejecutar: gachaEjecutar, COMANDOS_GACHA } = require('./gacha')
@@ -34,7 +35,7 @@ const QRCode = require('qrcode')
 const { conMetadatos } = require('./sticker-meta')
 const { crearCita } = require('./cita')
 const { textoAVoz } = require('./voz')
-const { descargar, bajarMedia, buscarImagenes } = require('./descargas')
+const { informacion, descargar, bajarMedia, buscarImagenes } = require('./descargas')
 const { registrarGrupo, revisarRegistros } = require('./registro-grupos')
 
 async function consultarGroq(pregunta) {
@@ -1069,15 +1070,29 @@ Soy Shisui Bot, tu asistente de WhatsApp.
           await responder('⚠️ Falta la API key. El dueño debe guardarla con #key <clave>')
           break
         }
-        await responder('⏳ Descargando, espera un momento...')
+        let objetivoDl = entrada
+        const inf = await informacion(tipo, entrada, m.key.participant || m.key.remoteJid)
+        if (inf.espera) {
+          await responder('❌ ' + inf.error)
+          break
+        }
+        if (inf.ok) {
+          objetivoDl = inf.objetivo
+          if (inf.miniatura) {
+            await sock.sendMessage(jid, { image: inf.miniatura, caption: inf.texto }, { quoted: m })
+          } else {
+            await sock.sendMessage(jid, { text: inf.texto }, { quoted: m })
+          }
+        } else {
+          await responder('⏳ Descargando, espera un momento...')
+        }
         try {
-          const r = await descargar(tipo, entrada, claveApi, m.key.participant || m.key.remoteJid)
+          const r = await descargar(tipo, objetivoDl, claveApi, null)
           if (!r.ok) {
             await responder('❌ ' + (r.error || 'No pude descargarlo.'))
             break
           }
           if (r.tipo === 'audio') {
-            if (r.titulo) await responder('🎵 ' + r.titulo)
             await sock.sendMessage(jid, { audio: await bajarMedia(r.url), mimetype: 'audio/mpeg' }, { quoted: m })
           } else if (r.tipo === 'image') {
             await sock.sendMessage(jid, { image: await bajarMedia(r.url), caption: r.titulo || '' }, { quoted: m })
@@ -2650,6 +2665,53 @@ Soy Shisui Bot, tu asistente de WhatsApp.
         if (rNa.texto) {
           await sock.sendMessage(jid, { text: rNa.texto, mentions: rNa.mentions || [] }, { quoted: m })
         }
+        break
+      }
+
+      case 'herramientas': {
+        if (!esDueno(m)) {
+          await responder('⛔ Solo el dueño del bot puede usar este comando.')
+          break
+        }
+        const subH = (args[0] || '').toLowerCase()
+        const libreH = herramientas.libreMB()
+        const cfgH = leerConfig()
+        if (subH === 'instalar') {
+          if ((process.env.PREFIX || '').includes('com.termux')) {
+            await responder('ℹ️ En Termux se instalan con: pkg install yt-dlp ffmpeg')
+            break
+          }
+          if (libreH !== null && libreH < 300) {
+            await responder('⚠️ Hay poco espacio (' + libreH + ' MB) y necesito unos 300 MB libres. Prueba con #limpiar y revisa #espacio.')
+            break
+          }
+          cfgH.herramientas = true
+          guardarConfig(cfgH)
+          await responder('⏳ Instalando yt-dlp y ffmpeg. Esto puede tardar uno o dos minutos...')
+          const rH = await herramientas.instalar()
+          await responder(
+            (rH.ytdlp ? '✅ yt-dlp: ' + rH.ytdlp : '❌ yt-dlp: no quedó instalado') + '\n' +
+            (rH.ffmpeg ? '✅ ffmpeg: ' + rH.ffmpeg.slice(0, 40) : '❌ ffmpeg: no quedó instalado') +
+            (rH.errores.length ? '\n\nDetalles:\n' + rH.errores.join('\n') : '') +
+            '\n💾 Espacio libre: ' + herramientas.libreMB() + ' MB'
+          )
+          break
+        }
+        if (subH === 'apagar') {
+          cfgH.herramientas = false
+          guardarConfig(cfgH)
+          herramientas.desinstalar()
+          await responder('✅ Herramientas desinstaladas. Espacio libre: ' + herramientas.libreMB() + ' MB')
+          break
+        }
+        const eH = await herramientas.estado()
+        await responder(
+          '🛠️ *Herramientas del servidor*\n\n' +
+          'yt-dlp: ' + (eH.ytdlp || 'no instalado') + '\n' +
+          'ffmpeg: ' + (eH.ffmpeg ? 'instalado' : 'no instalado') + '\n' +
+          'Espacio libre: ' + (libreH === null ? 'no disponible' : libreH + ' MB') + '\n\n' +
+          'Uso:\n#herramientas instalar\n#herramientas apagar'
+        )
         break
       }
 
