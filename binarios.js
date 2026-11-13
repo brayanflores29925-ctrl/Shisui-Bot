@@ -60,13 +60,6 @@ async function prepararYtDlp() {
 }
 
 function preparar() {
-  if ((process.env.PREFIX || '').includes('com.termux')) return
-  let activo = false
-  try { activo = JSON.parse(fs.readFileSync('./config.json', 'utf8')).herramientas === true } catch {}
-  if (!activo) {
-    console.log('Herramientas (yt-dlp/ffmpeg): desactivadas en este servidor')
-    return
-  }
   prepararFfmpeg().catch(e => console.log('ffmpeg:', e.message))
   prepararYtDlp().catch(e => console.log('yt-dlp:', e.message))
 }
