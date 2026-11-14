@@ -442,7 +442,7 @@ async function iniciar(opciones = {}) {
     if (m.key.remoteJid.endsWith('@g.us') && !m.key.fromMe) {
       const participanteRacha = m.key.participantAlt || m.key.participant
       if (participanteRacha) {
-        racha.registrarMensaje(jid, racha.numero(participanteRacha))
+        racha.registrarMensaje(m.key.remoteJid, racha.numero(participanteRacha))
       }
     }
 
