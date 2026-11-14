@@ -1195,19 +1195,28 @@ case 'buscartt': {
   }
   await responder('🔎 Buscando un video de TikTok sobre: ' + consulta)
   try {
-    const TikSR = require('shadowx-tiksr')
-    const tiktok = new TikSR()
-    const result = await tiktok.search(consulta)
+    const TikTokAPI = require('tiktok-api-wangyi')
 
-    if (!result || !result.success || !result.video) {
+    // La librería busca por palabra clave. El segundo parámetro (1) es la página.
+    const videoSearch = await TikTokAPI.searchVideos(consulta, 1)
+
+    // DEPURACIÓN: Mostramos en consola qué devolvió exactamente la librería
+    console.log('Respuesta de tiktok-api-wangyi:', JSON.stringify(videoSearch, null, 2))
+
+    // La estructura puede variar; intentamos extraer un array de videos
+    const videos = videoSearch?.data || videoSearch?.itemList || videoSearch || []
+
+    if (!videos || !Array.isArray(videos) || videos.length === 0) {
       await responder('❌ No encontré videos para esa búsqueda.')
       break
     }
 
-    // La URL sin marca de agua está en result.downloads.video_no_watermark
-    const urlVideo = result.downloads && result.downloads.video_no_watermark
+    const v = videos[0] // Tomamos el primer resultado
+
+    // Intentamos obtener la URL del video sin marca de agua
+    const urlVideo = v.video?.playAddr || v.video?.downloadAddr || v.playAddr || v.downloadAddr || v.video_url
     if (!urlVideo) {
-      await responder('❌ Encontré el video pero no pude obtener la URL de descarga.')
+      await responder('❌ Encontré un resultado pero no pude extraer la URL del video.')
       break
     }
 
@@ -1217,13 +1226,13 @@ case 'buscartt': {
       break
     }
 
-    const autor = result.video.author && result.video.author.nickname ? result.video.author.nickname : 'Desconocido'
-    const caption = '🎬 ' + (result.video.title || consulta) + '\n👤 ' + autor
+    const autor = v.author?.uniqueId || v.author?.nickname || 'Desconocido'
+    const caption = '🎬 ' + (v.desc || v.title || consulta) + '\n👤 ' + autor
 
     await sock.sendMessage(jid, { video: bufferVideo, caption }, { quoted: m })
 
   } catch (e) {
-    console.log('Error en .buscar (shadowx-tiksr):', e.message)
+    console.log('Error en .buscar (tiktok-api-wangyi):', e.message)
     await responder('❌ Error al buscar videos. Revisa la consola para más detalles.')
   }
   break
