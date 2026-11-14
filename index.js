@@ -87,6 +87,7 @@ const { textoAVoz } = require('./voz')
 const { informacion, descargar, bajarMedia, buscarImagenes } = require('./descargas')
 const { registrarGrupo, revisarRegistros } = require('./registro-grupos')
 const racha = require('./racha')
+const antiporno = require('./antiporno')
 
 async function consultarGroq(pregunta) {
   if (!groq) throw new Error('Falta configurar GROQ_API_KEY')
@@ -458,6 +459,8 @@ async function iniciar(opciones = {}) {
       m.message.imageMessage?.caption ||
       m.message.videoMessage?.caption ||
       ''
+
+    if (await antiporno.procesar(sock, m, texto, esAdmin, downloadMediaMessage)) return
 
     if (m.key.remoteJid.endsWith('@g.us') && !m.key.fromMe) {
       const gCfg = (leerConfig().grupos || {})[m.key.remoteJid] || {}

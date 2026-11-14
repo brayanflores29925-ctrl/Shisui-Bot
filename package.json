@@ -11,10 +11,12 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
     "@whiskeysockets/baileys": "^7.0.0-rc14",
     "dotenv": "^18.0.10",
     "groq-sdk": "^1.6.0",
     "node-webpmux": "^3.2.1",
+    "nsfwjs": "^4.4.0",
     "pino": "^10.4.0",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0"
