@@ -1195,49 +1195,33 @@ case 'buscartt': {
   }
   await responder('🔎 Buscando 2 videos de TikTok sobre: ' + consulta)
   try {
-    const scraper = require('kalss-scraper')
+    const { downloader } = require('@heavstaltech/api')
 
-    // La librería tiene un módulo específico para TikTok
-    // que incluye búsqueda y descarga.
-    const result = await scraper.tiktok.search(consulta)
+    // El método downloader.tiktok() sirve tanto para URL como para búsqueda por texto[reference:1]
+    const result = await downloader.tiktok(consulta)
 
-    // El sistema de fallback asegura una estructura de respuesta,
-    // pero verificamos por si acaso.
-    const videos = result && result.status ? result.data : (result.results || [])
-
-    if (!videos || videos.length === 0) {
+    // La respuesta exitosa contiene 'no_watermark' y 'title'[reference:2]
+    if (!result || !result.status || !result.no_watermark) {
       await responder('❌ No encontré videos para esa búsqueda.')
       break
     }
 
-    let enviados = 0
-    for (const v of videos) {
-      if (enviados >= 2) break
-      try {
-        // Los resultados suelen tener la URL en 'video_url' o similar
-        const urlVideo = v.video_url || v.play || v.url
-        if (!urlVideo) continue
-
-        const bufferVideo = await bajarMedia(urlVideo, 30)
-        if (!bufferVideo || !bufferVideo.length) continue
-
-        const autor = v.author || 'Desconocido'
-        const caption = '🎬 ' + (v.title || consulta) + '\n👤 ' + autor
-
-        await sock.sendMessage(jid, { video: bufferVideo, caption }, { quoted: m })
-        enviados++
-        await new Promise(r => setTimeout(r, 1500))
-      } catch (err) {
-        console.log('Error enviando resultado:', err.message)
-      }
+    // Esta librería devuelve un solo resultado por búsqueda,
+    // así que lo enviamos directamente.
+    const bufferVideo = await bajarMedia(result.no_watermark, 30)
+    if (!bufferVideo || !bufferVideo.length) {
+      await responder('❌ Encontré un video pero no pude descargarlo. Intenta de nuevo.')
+      break
     }
 
-    if (enviados === 0) {
-      await responder('❌ Encontré videos pero no pude descargarlos. Intenta de nuevo.')
-    }
+    const autor = result.author && result.author.name ? result.author.name : 'Desconocido'
+    const caption = '🎬 ' + (result.title || consulta) + '\n👤 ' + autor
+
+    await sock.sendMessage(jid, { video: bufferVideo, caption }, { quoted: m })
+
   } catch (e) {
-    console.log('Error en .buscar (kalss-scraper):', e.message)
-    await responder('❌ Error al buscar videos con el nuevo método.')
+    console.log('Error en .buscar (@heavstaltech/api):', e.message)
+    await responder('❌ Error al buscar videos. Revisa la consola para más detalles.')
   }
   break
 }
