@@ -1128,7 +1128,65 @@ Soy Shisui Bot, tu asistente de WhatsApp.
         break
       }
 
-      case 'musica':
+      case 'pin': {
+  const entrada = cuerpo.slice(cmd.length).trim()
+
+  if (!entrada) {
+    await responder('Uso: .pin descripción\\nEjemplos: .pin gato triste | .pin anime | .pin boys ojos verdes')
+    break
+  }
+
+  await responder('🔎 Buscando stickers e imágenes de: ' + entrada)
+
+  try {
+    const resultados = await buscarImagenes(entrada, 3)
+
+    if (!resultados.length) {
+      await responder('❌ No encontré imágenes para esa búsqueda. Prueba con otras palabras.')
+      break
+    }
+
+    const fotos = []
+    let stickers = 0
+
+    for (const imagen of resultados) {
+      try {
+        const buffer = await bajarMedia(imagen.url, 10)
+        if (!buffer || !buffer.length) continue
+
+        fotos.push({ buffer, titulo: imagen.titulo })
+
+        try {
+          const webp = await imagenASticker(buffer)
+          await sock.sendMessage(jid, {
+            sticker: await conMetadatos(webp)
+          }, { quoted: m })
+          stickers++
+        } catch (e) {
+          console.log('No se pudo convertir la imagen en sticker:', e.message)
+        }
+      } catch (e) {
+        console.log('Error descargando imagen para .pin:', e.message)
+      }
+    }
+
+    if (stickers === 0 && fotos.length) {
+      await sock.sendMessage(jid, {
+        image: fotos[0].buffer,
+        caption: '🖼️ No pude obtener un sticker, aquí tienes la foto de: ' + entrada
+      }, { quoted: m })
+    } else if (stickers === 0) {
+      await responder('❌ No pude descargar las imágenes. Intenta otra búsqueda.')
+    }
+  } catch (e) {
+    console.log('Error en .pin:', e.message)
+    await responder('❌ Error buscando imágenes. Intenta nuevamente.')
+  }
+
+  break
+}
+
+case 'musica':
       case 'm':
       case 'play':
       case 'video':
