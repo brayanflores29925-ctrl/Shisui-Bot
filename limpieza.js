@@ -46,10 +46,14 @@ function borrar(ruta) {
 function limpiar() {
   const antes = libreMB()
   let liberado = 0
-  const fijos = ['tmp-ytdlp', 'backup-update', path.join('node_modules', '.cache'), path.join(os.homedir(), '.npm', '_cacache')]
+  const fijos = ['tmp-ytdlp', path.join('node_modules', '.cache'), path.join(os.homedir(), '.npm', '_cacache')]
   for (const r of fijos) {
     if (fs.existsSync(r)) liberado += borrar(r)
   }
+  try {
+    const carpetasBk = fs.readdirSync('backup-update').sort()
+    for (const c of carpetasBk.slice(0, -1)) liberado += borrar(path.join('backup-update', c))
+  } catch {}
   for (const d of [os.tmpdir(), process.cwd()]) {
     let lista = []
     try { lista = fs.readdirSync(d) } catch {}

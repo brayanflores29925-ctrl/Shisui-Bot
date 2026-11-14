@@ -1,3 +1,52 @@
+if (!process.env.BOT_CHILD && !process.env.BOT_LOOP) {
+  // Supervisor: mantiene vivo el bot y lo reinicia solo, sin depender del hosting
+  const { spawn } = require('child_process')
+  const supFs = require('fs')
+  const supPath = require('path')
+  let hijo = null
+  let rapidos = 0
+  const revertir = () => {
+    try {
+      const carpetas = supFs.readdirSync('backup-update').sort()
+      if (!carpetas.length) return false
+      const ult = carpetas[carpetas.length - 1]
+      for (const a of supFs.readdirSync(supPath.join('backup-update', ult))) {
+        supFs.copyFileSync(supPath.join('backup-update', ult, a), a)
+      }
+      supFs.rmSync(supPath.join('backup-update', ult), { recursive: true, force: true })
+      return true
+    } catch {
+      return false
+    }
+  }
+  const lanzar = () => {
+    const inicio = Date.now()
+    hijo = spawn(process.execPath, [__filename], { stdio: 'inherit', env: { ...process.env, BOT_CHILD: '1', BOT_LOOP: '1' } })
+    hijo.on('exit', code => {
+      if (code === 0) process.exit(0)
+      rapidos = Date.now() - inicio < 30000 ? rapidos + 1 : 0
+      let espera = 3000
+      if (rapidos >= 3) {
+        const volvio = revertir()
+        console.log(volvio ? 'El bot falla al arrancar: volví a la versión anterior.' : 'El bot falla al arrancar y no hay copia anterior.')
+        rapidos = 0
+        espera = 15000
+      } else if (rapidos > 0) {
+        espera = 10000
+      }
+      console.log('El bot se detuvo (código ' + code + '). Reiniciando en ' + espera / 1000 + ' segundos...')
+      setTimeout(lanzar, espera)
+    })
+  }
+  const apagar = () => {
+    if (hijo) hijo.kill('SIGTERM')
+    setTimeout(() => process.exit(0), 1500)
+  }
+  process.on('SIGTERM', apagar)
+  process.on('SIGINT', apagar)
+  lanzar()
+  return
+}
 const fs = require('fs')
 require('dotenv').config()
 const Groq = require('groq-sdk')
