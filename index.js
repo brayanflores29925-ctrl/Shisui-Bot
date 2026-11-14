@@ -1139,7 +1139,7 @@ Soy Shisui Bot, tu asistente de WhatsApp.
   await responder('🔎 Buscando stickers e imágenes de: ' + entrada)
 
   try {
-    const resultados = await buscarImagenes(entrada, 3)
+    const resultados = await buscarImagenes(entrada, 1)
 
     if (!resultados.length) {
       await responder('❌ No encontré imágenes para esa búsqueda. Prueba con otras palabras.')
@@ -1149,7 +1149,7 @@ Soy Shisui Bot, tu asistente de WhatsApp.
     const fotos = []
     let stickers = 0
 
-    for (const imagen of resultados) {
+    for (const imagen of resultados.slice(0, 1)) {
       try {
         const buffer = await bajarMedia(imagen.url, 10)
         if (!buffer || !buffer.length) continue
