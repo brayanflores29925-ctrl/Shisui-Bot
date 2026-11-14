@@ -88,11 +88,18 @@ async function clasificar(archivo) {
 
     const model = await obtenerModelo()
 
-    const resultados = await model.classify({
-      data: new Uint8Array(pixeles),
-      width: 224,
-      height: 224
-    })
+    const tensor = tf.tensor3d(
+      new Uint8Array(pixeles),
+      [224, 224, 3],
+      'int32'
+    )
+
+    let resultados
+    try {
+      resultados = await model.classify(tensor)
+    } finally {
+      tensor.dispose()
+    }
 
     return resultados.reduce((peor, item) => {
       if ((item.className in UMBRALES) &&
