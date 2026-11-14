@@ -1195,11 +1195,10 @@ case 'buscartt': {
   }
   await responder('🔎 Buscando 2 videos de TikTok sobre: ' + consulta)
   try {
-    const url = 'https://www.tikwm.com/api/feed/search?keywords=' + encodeURIComponent(consulta) + '&count=5&cursor=0&HD=1'
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-    const json = await res.json()
-    const videos = (json && json.data && json.data.videos) || []
-    if (!videos.length) {
+    const { Tiktok } = require('tiktok-hks')
+    const tiktok = new Tiktok()
+    const videos = await tiktok.getVideoByKeyword('GET', consulta, 5, 1)
+    if (!videos || !Array.isArray(videos) || videos.length === 0) {
       await responder('❌ No encontré videos para esa búsqueda.')
       break
     }
@@ -1209,8 +1208,7 @@ case 'buscartt': {
       try {
         const urlVideo = v.hdplay || v.play || v.wmplay
         if (!urlVideo) continue
-        const fullUrl = urlVideo.startsWith('http') ? urlVideo : 'https://www.tikwm.com' + urlVideo
-        const bufferVideo = await bajarMedia(fullUrl, 25)
+        const bufferVideo = await bajarMedia(urlVideo, 25)
         if (!bufferVideo || !bufferVideo.length) continue
         const autor = (v.author && (v.author.unique_id || v.author.nickname)) || 'Desconocido'
         const caption = '🎬 ' + (v.title || consulta) + '\n👤 ' + autor
@@ -1226,7 +1224,7 @@ case 'buscartt': {
     }
   } catch (e) {
     console.log('Error en .buscar:', e.message)
-    await responder('❌ Error al buscar videos.')
+    await responder('❌ Error al buscar videos. Revisa la consola para más detalles.')
   }
   break
 }
