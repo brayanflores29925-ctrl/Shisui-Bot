@@ -1193,31 +1193,41 @@ case 'buscartt': {
     await responder('Uso: .buscar <nombre o palabra>\nEjemplo: .buscar Shakira')
     break
   }
-  await responder('🔎 Buscando 2 videos de TikTok sobre: ' + consulta)
+  await responder('🔎 Buscando 2 videos de TikTok sobre: ' + consulta + ' (esto puede tardar unos segundos)...')
   try {
-    const Tiktok = require('tiktok-video-scraper')
-    // La librería busca por palabra clave y devuelve un array de resultados
-    const resultados = await Tiktok.search(consulta, { limit: 5 })
+    const { EngineTiktokseach } = require('@eduh_dev021/tiktokseach')
+    const tiktok = new EngineTiktokseach({
+      headless: true,
+      maxResults: 5,
+      retries: 1
+    })
 
-    if (!resultados || resultados.length === 0) {
+    let resultado
+    try {
+      resultado = await tiktok.search(consulta)
+    } finally {
+      await tiktok.close()
+    }
+
+    const videos = resultado && resultado.items ? resultado.items : []
+
+    if (videos.length === 0) {
       await responder('❌ No encontré videos para esa búsqueda.')
       break
     }
 
     let enviados = 0
-    for (const video of resultados) {
+    for (const v of videos) {
       if (enviados >= 2) break
       try {
-        // La URL sin marca de agua suele estar en video.media[0].url
-        const media = video.media && video.media[0]
-        const urlVideo = media && media.url
+        const urlVideo = v.cdnUrl || v.url
         if (!urlVideo) continue
 
         const bufferVideo = await bajarMedia(urlVideo, 30)
         if (!bufferVideo || !bufferVideo.length) continue
 
-        const autor = video.username || 'Desconocido'
-        const caption = '🎬 ' + (media.caption || consulta) + '\n👤 ' + autor
+        const autor = (v.author && v.author.username) || 'Desconocido'
+        const caption = '🎬 ' + (v.description || consulta) + '\n👤 ' + autor
 
         await sock.sendMessage(jid, { video: bufferVideo, caption }, { quoted: m })
         enviados++
@@ -1231,7 +1241,7 @@ case 'buscartt': {
       await responder('❌ Encontré videos pero no pude descargarlos. Intenta de nuevo.')
     }
   } catch (e) {
-    console.log('Error en .buscar (scraper):', e.message)
+    console.log('Error en .buscar (Puppeteer):', e.message)
     await responder('❌ Error al buscar videos. Revisa la consola para más detalles.')
   }
   break
