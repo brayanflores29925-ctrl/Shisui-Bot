@@ -1193,25 +1193,19 @@ case 'buscartt': {
     await responder('Uso: .buscar <nombre o palabra>\nEjemplo: .buscar Shakira')
     break
   }
-  await responder('🔎 Buscando 2 videos de TikTok sobre: ' + consulta + ' (esto puede tardar unos segundos)...')
+  await responder('🔎 Buscando 2 videos de TikTok sobre: ' + consulta)
   try {
-    const { EngineTiktokseach } = require('@eduh_dev021/tiktokseach')
-    const tiktok = new EngineTiktokseach({
-      headless: true,
-      maxResults: 5,
-      retries: 1
-    })
+    const scraper = require('kalss-scraper')
 
-    let resultado
-    try {
-      resultado = await tiktok.search(consulta)
-    } finally {
-      await tiktok.close()
-    }
+    // La librería tiene un módulo específico para TikTok
+    // que incluye búsqueda y descarga.
+    const result = await scraper.tiktok.search(consulta)
 
-    const videos = resultado && resultado.items ? resultado.items : []
+    // El sistema de fallback asegura una estructura de respuesta,
+    // pero verificamos por si acaso.
+    const videos = result && result.status ? result.data : (result.results || [])
 
-    if (videos.length === 0) {
+    if (!videos || videos.length === 0) {
       await responder('❌ No encontré videos para esa búsqueda.')
       break
     }
@@ -1220,14 +1214,15 @@ case 'buscartt': {
     for (const v of videos) {
       if (enviados >= 2) break
       try {
-        const urlVideo = v.cdnUrl || v.url
+        // Los resultados suelen tener la URL en 'video_url' o similar
+        const urlVideo = v.video_url || v.play || v.url
         if (!urlVideo) continue
 
         const bufferVideo = await bajarMedia(urlVideo, 30)
         if (!bufferVideo || !bufferVideo.length) continue
 
-        const autor = (v.author && v.author.username) || 'Desconocido'
-        const caption = '🎬 ' + (v.description || consulta) + '\n👤 ' + autor
+        const autor = v.author || 'Desconocido'
+        const caption = '🎬 ' + (v.title || consulta) + '\n👤 ' + autor
 
         await sock.sendMessage(jid, { video: bufferVideo, caption }, { quoted: m })
         enviados++
@@ -1241,8 +1236,8 @@ case 'buscartt': {
       await responder('❌ Encontré videos pero no pude descargarlos. Intenta de nuevo.')
     }
   } catch (e) {
-    console.log('Error en .buscar (Puppeteer):', e.message)
-    await responder('❌ Error al buscar videos. Revisa la consola para más detalles.')
+    console.log('Error en .buscar (kalss-scraper):', e.message)
+    await responder('❌ Error al buscar videos con el nuevo método.')
   }
   break
 }
