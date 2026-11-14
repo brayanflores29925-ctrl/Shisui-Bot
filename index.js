@@ -503,14 +503,14 @@ async function iniciar(opciones = {}) {
 
         const resultado = racha.invitar(jid, emisor, destino)
         if (resultado.error) await responder('⚠️ ' + resultado.error)
-        else await responder('🔥 ¡Invitación de racha enviada!\n\n❤️ @' + destino + ', tienes una invitación para crear una racha de amistad.\n\nEscribe .aceptar para comenzar.')
+        else await responder('🔥 ¡Invitación de racha enviada!\n\n❤️ @' + destino + ', tienes una invitación para crear una racha de amistad.\n\nEscribe .aceptarracha para comenzar.')
         if (!resultado.error) {
           await sock.sendMessage(jid, { text: '🔥 Invitación de racha', mentions: [objetivo] }, { quoted: m })
         }
         break
       }
 
-      case 'aceptar': {
+      case 'aceptarracha': {
         if (!jid.endsWith('@g.us')) {
           await responder('⛔ Usa este comando en un grupo.')
           break
@@ -541,7 +541,7 @@ async function iniciar(opciones = {}) {
         break
       }
 
-      case 'rechazar': {
+      case 'rechazarracha': {
         const usuario = racha.numero(m.key.participantAlt || m.key.participant)
         if (racha.rechazar(jid, usuario)) {
           await responder('❌ Invitación de racha rechazada.')

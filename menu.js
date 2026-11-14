@@ -67,6 +67,13 @@ const secciones = [
     '#chatgpt — Consulta al asistente de IA.',
     '#gpt — Envía una pregunta a la IA.'
   ]],
+  ['🔥 RACHAS DE AMISTAD', [
+    '#racha @persona — Invita a alguien a crear una racha.',
+    '#aceptarracha — Acepta una invitación.',
+    '#miracha — Consulta tu racha y récord.',
+    '#rechazarracha — Rechaza una invitación.',
+    '#desactivarracha — Desactiva la racha.'
+  ]],
   ['🎮 GACHA MENU', [
     '#gachamenu / #ayudagacha — Muestra la ayuda Gacha.',
     '#gacha / #roll / #tirar — Realiza una invocación.',
