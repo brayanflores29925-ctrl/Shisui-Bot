@@ -1186,6 +1186,42 @@ Soy Shisui Bot, tu asistente de WhatsApp.
   break
 }
 
+case 'buscar':
+case 'buscartt': {
+  const consulta = cuerpo.slice(cmd.length).trim()
+  if (!consulta) {
+    await responder('Uso: .buscar <nombre o palabra clave>\nEjemplo: .buscar Shakira')
+    break
+  }
+  await responder('🔎 Buscando 2 videos de TikTok sobre: ' + consulta)
+  try {
+    const TikTokScraper = require('nexora-tiktok-search')
+    const tiktok = new TikTokScraper()
+    const resultados = await tiktok.search(consulta, 2)
+    if (!resultados || resultados.length === 0) {
+      await responder('❌ No encontré videos para esa búsqueda.')
+      break
+    }
+    for (const video of resultados.slice(0, 2)) {
+      try {
+        const urlVideo = video.downloadUrl
+        if (!urlVideo) { console.log('Sin downloadUrl:', video); continue }
+        const bufferVideo = await bajarMedia(urlVideo, 25)
+        if (!bufferVideo || !bufferVideo.length) { console.log('Video vacío:', urlVideo); continue }
+        const caption = '🎬 ' + (video.description || consulta) + '\n👤 Autor: ' + (video.author || video.nickname || 'Desconocido')
+        await sock.sendMessage(jid, { video: bufferVideo, caption }, { quoted: m })
+        await new Promise(r => setTimeout(r, 1500))
+      } catch (err) {
+        console.log('Error enviando resultado:', err.message)
+      }
+    }
+  } catch (e) {
+    console.log('Error en .buscar:', e.message)
+    await responder('❌ Error al buscar videos.')
+  }
+  break
+}
+
 case 'musica':
       case 'm':
       case 'play':
