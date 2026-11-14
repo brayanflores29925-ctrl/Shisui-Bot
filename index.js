@@ -1190,42 +1190,36 @@ case 'buscar':
 case 'buscartt': {
   const consulta = cuerpo.slice(cmd.length).trim()
   if (!consulta) {
-    await responder('Uso: .buscar <nombre o palabra>\nEjemplo: .buscar Karol g')
+    await responder('Uso: .buscar <nombre o palabra>\nEjemplo: .buscar Shakira')
     break
   }
   await responder('🔎 Buscando 2 videos de TikTok sobre: ' + consulta)
   try {
-    const { execFile } = require('child_process')
-    const { promisify } = require('util')
-    const execFileAsync = promisify(execFile)
+    const Tiktok = require('tiktok-video-scraper')
+    // La librería busca por palabra clave y devuelve un array de resultados
+    const resultados = await Tiktok.search(consulta, { limit: 5 })
 
-    // yt-dlp busca con el prefijo "tiktoksearch:" y devuelve las URLs directas
-    const { stdout } = await execFileAsync('yt-dlp', [
-      `tiktoksearch:${consulta}`,
-      '--playlist-end', '2',
-      '--get-url',
-      '--no-warnings'
-    ], { timeout: 30000 })
-
-    const urls = stdout.trim().split('\n').filter(u => u.startsWith('http'))
-
-    if (!urls.length) {
-      await responder('❌ No encontré videos para esa búsqueda. Prueba con otras palabras.')
+    if (!resultados || resultados.length === 0) {
+      await responder('❌ No encontré videos para esa búsqueda.')
       break
     }
 
     let enviados = 0
-    for (const urlVideo of urls) {
+    for (const video of resultados) {
       if (enviados >= 2) break
       try {
+        // La URL sin marca de agua suele estar en video.media[0].url
+        const media = video.media && video.media[0]
+        const urlVideo = media && media.url
+        if (!urlVideo) continue
+
         const bufferVideo = await bajarMedia(urlVideo, 30)
         if (!bufferVideo || !bufferVideo.length) continue
 
-        await sock.sendMessage(jid, {
-          video: bufferVideo,
-          caption: `🎬 Resultado de búsqueda: *${consulta}*`
-        }, { quoted: m })
+        const autor = video.username || 'Desconocido'
+        const caption = '🎬 ' + (media.caption || consulta) + '\n👤 ' + autor
 
+        await sock.sendMessage(jid, { video: bufferVideo, caption }, { quoted: m })
         enviados++
         await new Promise(r => setTimeout(r, 1500))
       } catch (err) {
@@ -1234,11 +1228,11 @@ case 'buscartt': {
     }
 
     if (enviados === 0) {
-      await responder('❌ Encontré enlaces pero no pude descargarlos. Intenta de nuevo.')
+      await responder('❌ Encontré videos pero no pude descargarlos. Intenta de nuevo.')
     }
   } catch (e) {
-    console.log('Error en .buscar (yt-dlp):', e.message)
-    await responder('❌ Error al buscar videos. Revisa la consola del bot para más detalles.')
+    console.log('Error en .buscar (scraper):', e.message)
+    await responder('❌ Error al buscar videos. Revisa la consola para más detalles.')
   }
   break
 }
