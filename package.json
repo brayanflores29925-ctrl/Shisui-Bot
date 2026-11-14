@@ -20,7 +20,8 @@
     "nsfwjs": "^4.4.0",
     "pino": "^10.4.0",
     "qrcode": "^1.5.4",
-    "qrcode-terminal": "^0.12.0"
+    "qrcode-terminal": "^0.12.0",
+    "tiktok-hks": "^1.0.4"
   },
   "optionalDependencies": {
     "ffmpeg-static": "^5.2.0"

@@ -1190,30 +1190,39 @@ case 'buscar':
 case 'buscartt': {
   const consulta = cuerpo.slice(cmd.length).trim()
   if (!consulta) {
-    await responder('Uso: .buscar <nombre o palabra clave>\nEjemplo: .buscar Shakira')
+    await responder('Uso: .buscar <nombre o palabra>\nEjemplo: .buscar Shakira')
     break
   }
   await responder('🔎 Buscando 2 videos de TikTok sobre: ' + consulta)
   try {
-    const TikTokScraper = require('nexora-tiktok-search')
-    const tiktok = new TikTokScraper()
-    const resultados = await tiktok.search(consulta, 2)
-    if (!resultados || resultados.length === 0) {
+    const url = 'https://www.tikwm.com/api/feed/search?keywords=' + encodeURIComponent(consulta) + '&count=5&cursor=0&HD=1'
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+    const json = await res.json()
+    const videos = (json && json.data && json.data.videos) || []
+    if (!videos.length) {
       await responder('❌ No encontré videos para esa búsqueda.')
       break
     }
-    for (const video of resultados.slice(0, 2)) {
+    let enviados = 0
+    for (const v of videos) {
+      if (enviados >= 2) break
       try {
-        const urlVideo = video.downloadUrl
-        if (!urlVideo) { console.log('Sin downloadUrl:', video); continue }
-        const bufferVideo = await bajarMedia(urlVideo, 25)
-        if (!bufferVideo || !bufferVideo.length) { console.log('Video vacío:', urlVideo); continue }
-        const caption = '🎬 ' + (video.description || consulta) + '\n👤 Autor: ' + (video.author || video.nickname || 'Desconocido')
+        const urlVideo = v.hdplay || v.play || v.wmplay
+        if (!urlVideo) continue
+        const fullUrl = urlVideo.startsWith('http') ? urlVideo : 'https://www.tikwm.com' + urlVideo
+        const bufferVideo = await bajarMedia(fullUrl, 25)
+        if (!bufferVideo || !bufferVideo.length) continue
+        const autor = (v.author && (v.author.unique_id || v.author.nickname)) || 'Desconocido'
+        const caption = '🎬 ' + (v.title || consulta) + '\n👤 ' + autor
         await sock.sendMessage(jid, { video: bufferVideo, caption }, { quoted: m })
+        enviados++
         await new Promise(r => setTimeout(r, 1500))
       } catch (err) {
         console.log('Error enviando resultado:', err.message)
       }
+    }
+    if (enviados === 0) {
+      await responder('❌ Encontré videos pero no pude descargarlos. Intenta de nuevo.')
     }
   } catch (e) {
     console.log('Error en .buscar:', e.message)
