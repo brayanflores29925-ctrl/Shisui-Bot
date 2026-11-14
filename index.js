@@ -37,6 +37,7 @@ const { crearCita } = require('./cita')
 const { textoAVoz } = require('./voz')
 const { informacion, descargar, bajarMedia, buscarImagenes } = require('./descargas')
 const { registrarGrupo, revisarRegistros } = require('./registro-grupos')
+const racha = require('./racha')
 
 async function consultarGroq(pregunta) {
   if (!groq) throw new Error('Falta configurar GROQ_API_KEY')
@@ -437,6 +438,14 @@ async function iniciar(opciones = {}) {
       }
     }
 
+    // Sistema de rachas estilo TikTok
+    if (jid.endsWith('@g.us') && !m.key.fromMe) {
+      const participanteRacha = m.key.participantAlt || m.key.participant
+      if (participanteRacha) {
+        racha.registrarMensaje(jid, racha.numero(participanteRacha))
+      }
+    }
+
     // Acepta prefijos separados del comando por cualquier cantidad de espacios
     const textoLimpio = texto.trim()
     const soloMenu = sinTildes(textoLimpio) === 'menu'
@@ -477,6 +486,81 @@ async function iniciar(opciones = {}) {
     if (conocido) await reaccionar('⏳')
 
     switch (comando) {
+      case 'racha': {
+        if (!jid.endsWith('@g.us')) {
+          await responder('⛔ La racha se configura dentro de un grupo.')
+          break
+        }
+        const ctx = m.message.extendedTextMessage?.contextInfo || {}
+        const objetivo = ctx.mentionedJid?.[0] || ''
+        const emisor = racha.numero(m.key.participantAlt || m.key.participant)
+        const destino = racha.numero(objetivo)
+
+        if (!destino) {
+          await responder('💜 Etiqueta a la persona con quien quieres comenzar una racha.\nEjemplo: .racha @persona')
+          break
+        }
+
+        const resultado = racha.invitar(jid, emisor, destino)
+        if (resultado.error) await responder('⚠️ ' + resultado.error)
+        else await responder('🔥 ¡Invitación de racha enviada!\n\n❤️ @' + destino + ', tienes una invitación para crear una racha de amistad.\n\nEscribe .aceptar para comenzar.')
+        if (!resultado.error) {
+          await sock.sendMessage(jid, { text: '🔥 Invitación de racha', mentions: [objetivo] }, { quoted: m })
+        }
+        break
+      }
+
+      case 'aceptar': {
+        if (!jid.endsWith('@g.us')) {
+          await responder('⛔ Usa este comando en un grupo.')
+          break
+        }
+        const usuario = racha.numero(m.key.participantAlt || m.key.participant)
+        const resultado = racha.aceptar(jid, usuario)
+        if (resultado.error) await responder('⚠️ ' + resultado.error)
+        else await responder('🔥 ¡RACHA ACTIVADA!\n\n💜 Ya tienen su racha de amistad.\n📅 Racha actual: 0 días.\n\n¡Ambos deben participar cada día para mantenerla!')
+        break
+      }
+
+      case 'miracha': {
+        const pareja = racha.obtener(jid)
+        if (!pareja) {
+          await responder('💔 No hay ninguna racha activa en este grupo.\nUsa .racha @persona para invitar a alguien.')
+          break
+        }
+        const menciones = pareja.usuarios.map(n => '@' + n).join(' ❤️ ')
+        await sock.sendMessage(jid, {
+          text: '🔥 *RACHA DE AMISTAD* 🔥\n\n' +
+            menciones +
+            '\n\n🔥 Racha actual: *' + pareja.racha + ' días*' +
+            '\n🏆 Récord: *' + pareja.mejor + ' días*' +
+            '\n📅 Último día completado: ' + (pareja.ultimoDia || 'Todavía ninguno') +
+            '\n\n💜 ¡Sigan participando cada día!',
+          mentions: pareja.usuarios.map(n => n + '@s.whatsapp.net')
+        }, { quoted: m })
+        break
+      }
+
+      case 'rechazar': {
+        const usuario = racha.numero(m.key.participantAlt || m.key.participant)
+        if (racha.rechazar(jid, usuario)) {
+          await responder('❌ Invitación de racha rechazada.')
+        } else {
+          await responder('⚠️ No tienes una invitación pendiente para rechazar.')
+        }
+        break
+      }
+
+      case 'desactivarracha': {
+        const usuario = racha.numero(m.key.participantAlt || m.key.participant)
+        if (racha.desactivar(jid, usuario)) {
+          await responder('💔 La racha ha sido desactivada.')
+        } else {
+          await responder('⚠️ No tienes una racha activa en este grupo.')
+        }
+        break
+      }
+
       case 'registrargrupo': {
         try {
           await registrarGrupo(sock, jid, args[0])
