@@ -1193,34 +1193,37 @@ case 'buscartt': {
     await responder('Uso: .buscar <nombre o palabra>\nEjemplo: .buscar Shakira')
     break
   }
-  await responder('🔎 Buscando 2 videos de TikTok sobre: ' + consulta)
+  await responder('🔎 Buscando un video de TikTok sobre: ' + consulta)
   try {
-    const { downloader } = require('@heavstaltech/api')
+    const TikSR = require('shadowx-tiksr')
+    const tiktok = new TikSR()
+    const result = await tiktok.search(consulta)
 
-    // El método downloader.tiktok() sirve tanto para URL como para búsqueda por texto[reference:1]
-    const result = await downloader.tiktok(consulta)
-
-    // La respuesta exitosa contiene 'no_watermark' y 'title'[reference:2]
-    if (!result || !result.status || !result.no_watermark) {
+    if (!result || !result.success || !result.video) {
       await responder('❌ No encontré videos para esa búsqueda.')
       break
     }
 
-    // Esta librería devuelve un solo resultado por búsqueda,
-    // así que lo enviamos directamente.
-    const bufferVideo = await bajarMedia(result.no_watermark, 30)
-    if (!bufferVideo || !bufferVideo.length) {
-      await responder('❌ Encontré un video pero no pude descargarlo. Intenta de nuevo.')
+    // La URL sin marca de agua está en result.downloads.video_no_watermark
+    const urlVideo = result.downloads && result.downloads.video_no_watermark
+    if (!urlVideo) {
+      await responder('❌ Encontré el video pero no pude obtener la URL de descarga.')
       break
     }
 
-    const autor = result.author && result.author.name ? result.author.name : 'Desconocido'
-    const caption = '🎬 ' + (result.title || consulta) + '\n👤 ' + autor
+    const bufferVideo = await bajarMedia(urlVideo, 30)
+    if (!bufferVideo || !bufferVideo.length) {
+      await responder('❌ No pude descargar el video. Intenta de nuevo.')
+      break
+    }
+
+    const autor = result.video.author && result.video.author.nickname ? result.video.author.nickname : 'Desconocido'
+    const caption = '🎬 ' + (result.video.title || consulta) + '\n👤 ' + autor
 
     await sock.sendMessage(jid, { video: bufferVideo, caption }, { quoted: m })
 
   } catch (e) {
-    console.log('Error en .buscar (@heavstaltech/api):', e.message)
+    console.log('Error en .buscar (shadowx-tiksr):', e.message)
     await responder('❌ Error al buscar videos. Revisa la consola para más detalles.')
   }
   break
