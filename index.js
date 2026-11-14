@@ -492,9 +492,9 @@ async function iniciar(opciones = {}) {
 
     // Sistema de rachas estilo TikTok
     if (m.key.remoteJid.endsWith('@g.us') && !m.key.fromMe) {
-      const participanteRacha = m.key.participantAlt || m.key.participant
-      if (participanteRacha) {
-        racha.registrarMensaje(m.key.remoteJid, racha.numero(participanteRacha))
+      const participanteRacha = [m.key.participantAlt, m.key.participant].filter(Boolean).map(racha.numero).filter(Boolean)
+      if (participanteRacha.length) {
+        racha.registrarMensaje(m.key.remoteJid, participanteRacha)
       }
     }
 
@@ -545,10 +545,10 @@ async function iniciar(opciones = {}) {
         }
         const ctx = m.message.extendedTextMessage?.contextInfo || {}
         const objetivo = ctx.mentionedJid?.[0] || ''
-        const emisor = racha.numero(m.key.participantAlt || m.key.participant)
-        const destino = racha.numero(objetivo)
+        const emisor = [m.key.participantAlt, m.key.participant].filter(Boolean).map(racha.numero).filter(Boolean)
+        const destino = [objetivo].filter(Boolean).map(racha.numero).filter(Boolean)
 
-        if (!destino) {
+        if (!destino.length) {
           await responder('💜 Etiqueta a la persona con quien quieres comenzar una racha.\nEjemplo: .racha @persona')
           break
         }
@@ -567,7 +567,7 @@ async function iniciar(opciones = {}) {
           await responder('⛔ Usa este comando en un grupo.')
           break
         }
-        const usuario = racha.numero(m.key.participantAlt || m.key.participant)
+        const usuario = [m.key.participantAlt, m.key.participant].filter(Boolean).map(racha.numero).filter(Boolean)
         const resultado = racha.aceptar(jid, usuario)
         if (resultado.error) await responder('⚠️ ' + resultado.error)
         else await responder('🔥 ¡RACHA ACTIVADA!\n\n💜 Ya tienen su racha de amistad.\n📅 Racha actual: 0 días.\n\n¡Ambos deben participar cada día para mantenerla!')
@@ -594,7 +594,7 @@ async function iniciar(opciones = {}) {
       }
 
       case 'rechazarracha': {
-        const usuario = racha.numero(m.key.participantAlt || m.key.participant)
+        const usuario = [m.key.participantAlt, m.key.participant].filter(Boolean).map(racha.numero).filter(Boolean)
         if (racha.rechazar(jid, usuario)) {
           await responder('❌ Invitación de racha rechazada.')
         } else {
@@ -604,7 +604,7 @@ async function iniciar(opciones = {}) {
       }
 
       case 'desactivarracha': {
-        const usuario = racha.numero(m.key.participantAlt || m.key.participant)
+        const usuario = [m.key.participantAlt, m.key.participant].filter(Boolean).map(racha.numero).filter(Boolean)
         if (racha.desactivar(jid, usuario)) {
           await responder('💔 La racha ha sido desactivada.')
         } else {
