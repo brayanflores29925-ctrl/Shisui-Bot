@@ -123,6 +123,26 @@ const ALIAS = {
 }
 const COMANDOS_GACHA = Object.keys(ALIAS)
 
+const EMOJIS_GACHA = {
+  daily: '🎁', diario: '🎁',
+  monedas: '💰', balance: '💰', cartera: '💰',
+  tirar: '🎲', gacha: '🎲', roll: '🎲',
+  reclamar: '✅', claim: '✅',
+  coleccion: '📚', col: '📚', mispj: '📚',
+  topgacha: '🏆', rankgacha: '🏆',
+  regalar: '🎁', darpj: '🎁',
+  dar: '💸', darmonedas: '💸',
+  intercambiar: '🔄', trade: '🔄',
+  aceptar: '🤝', rechazar: '❌',
+  addpj: '➕', tiendagacha: '🛒',
+  inventario: '🎒', usar: '🧪',
+  fusionar: '🔥', favorito: '⭐',
+  w: '💼', trabajar: '💼',
+  nivel: '📈', xp: '📈', topnivel: '🏆',
+  misiones: '🎯', recompensas: '🎁',
+  gachamenu: '📜', ayudagacha: '📜'
+}
+
 const ofertas = []
 
 function sinTildes(t) {
@@ -635,4 +655,4 @@ function ejecutar(comando, args, ctx) {
   }
 }
 
-module.exports = { ejecutar, COMANDOS_GACHA }
+module.exports = { ejecutar, COMANDOS_GACHA, EMOJIS_GACHA }

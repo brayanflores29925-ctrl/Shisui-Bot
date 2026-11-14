@@ -26,7 +26,7 @@ const { generarMenu } = require('./menu')
 const herramientas = require('./herramientas')
 const { ejecutar: navidadEjecutar } = require('./navidad')
 const limpieza = require('./limpieza')
-const { ejecutar: gachaEjecutar, COMANDOS_GACHA } = require('./gacha')
+const { ejecutar: gachaEjecutar, COMANDOS_GACHA, EMOJIS_GACHA } = require('./gacha')
 require('./binarios').preparar()
 const { actualizarDesdeGithub, revertirActualizacion } = require('./actualizar')
 const { aFotoCuadrada } = require('./foto')
@@ -2789,7 +2789,7 @@ Soy Shisui Bot, tu asistente de WhatsApp.
         break
       }
     }
-    if (conocido) await reaccionar(marcaFinal || EMOJIS[comando] || '✅')
+    if (conocido) await reaccionar(marcaFinal || EMOJIS_GACHA[comando] || EMOJIS[comando] || '✅')
   })
 }
 
