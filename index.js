@@ -439,7 +439,7 @@ async function iniciar(opciones = {}) {
     }
 
     // Sistema de rachas estilo TikTok
-    if (jid.endsWith('@g.us') && !m.key.fromMe) {
+    if (m.key.remoteJid.endsWith('@g.us') && !m.key.fromMe) {
       const participanteRacha = m.key.participantAlt || m.key.participant
       if (participanteRacha) {
         racha.registrarMensaje(jid, racha.numero(participanteRacha))
