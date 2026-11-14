@@ -2715,6 +2715,20 @@ Soy Shisui Bot, tu asistente de WhatsApp.
         break
       }
 
+      case 'reiniciar': {
+        if (!esDueno(m)) {
+          await responder('⛔ Solo el dueño del bot puede usar este comando.')
+          break
+        }
+        if (process.env.BOT_LOOP || leerConfig().reinicioAuto) {
+          await responder('♻️ Reiniciando el bot... vuelvo en un momento.')
+          setTimeout(() => process.exit(42), 2000)
+        } else {
+          await responder('⚠️ El reinicio automático está desactivado. Si tu hosting reinicia solo el bot cuando se cierra, actívalo con #setupdate reinicio on')
+        }
+        break
+      }
+
       case 'setmenu': {
         if (!esDueno(m)) {
           console.log('setmenu denegado. key:', JSON.stringify(m.key))
