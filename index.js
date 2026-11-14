@@ -1190,41 +1190,55 @@ case 'buscar':
 case 'buscartt': {
   const consulta = cuerpo.slice(cmd.length).trim()
   if (!consulta) {
-    await responder('Uso: .buscar <nombre o palabra>\nEjemplo: .buscar Shakira')
+    await responder('Uso: .buscar <nombre o palabra>\nEjemplo: .buscar Karol g')
     break
   }
   await responder('🔎 Buscando 2 videos de TikTok sobre: ' + consulta)
   try {
-    const { Tiktok } = require('tiktok-hks')
-    const tiktok = new Tiktok()
-    const videos = await tiktok.getVideoByKeyword('GET', consulta, 5, 1)
-    if (!videos || !Array.isArray(videos) || videos.length === 0) {
-      await responder('❌ No encontré videos para esa búsqueda.')
+    const { execFile } = require('child_process')
+    const { promisify } = require('util')
+    const execFileAsync = promisify(execFile)
+
+    // yt-dlp busca con el prefijo "tiktoksearch:" y devuelve las URLs directas
+    const { stdout } = await execFileAsync('yt-dlp', [
+      `tiktoksearch:${consulta}`,
+      '--playlist-end', '2',
+      '--get-url',
+      '--no-warnings'
+    ], { timeout: 30000 })
+
+    const urls = stdout.trim().split('\n').filter(u => u.startsWith('http'))
+
+    if (!urls.length) {
+      await responder('❌ No encontré videos para esa búsqueda. Prueba con otras palabras.')
       break
     }
+
     let enviados = 0
-    for (const v of videos) {
+    for (const urlVideo of urls) {
       if (enviados >= 2) break
       try {
-        const urlVideo = v.hdplay || v.play || v.wmplay
-        if (!urlVideo) continue
-        const bufferVideo = await bajarMedia(urlVideo, 25)
+        const bufferVideo = await bajarMedia(urlVideo, 30)
         if (!bufferVideo || !bufferVideo.length) continue
-        const autor = (v.author && (v.author.unique_id || v.author.nickname)) || 'Desconocido'
-        const caption = '🎬 ' + (v.title || consulta) + '\n👤 ' + autor
-        await sock.sendMessage(jid, { video: bufferVideo, caption }, { quoted: m })
+
+        await sock.sendMessage(jid, {
+          video: bufferVideo,
+          caption: `🎬 Resultado de búsqueda: *${consulta}*`
+        }, { quoted: m })
+
         enviados++
         await new Promise(r => setTimeout(r, 1500))
       } catch (err) {
         console.log('Error enviando resultado:', err.message)
       }
     }
+
     if (enviados === 0) {
-      await responder('❌ Encontré videos pero no pude descargarlos. Intenta de nuevo.')
+      await responder('❌ Encontré enlaces pero no pude descargarlos. Intenta de nuevo.')
     }
   } catch (e) {
-    console.log('Error en .buscar:', e.message)
-    await responder('❌ Error al buscar videos. Revisa la consola para más detalles.')
+    console.log('Error en .buscar (yt-dlp):', e.message)
+    await responder('❌ Error al buscar videos. Revisa la consola del bot para más detalles.')
   }
   break
 }
