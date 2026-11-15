@@ -2332,10 +2332,18 @@ case 'simi': {
   if (!texto) { await responder('Uso: #simi <mensaje>'); break; }
   await responder('💬 Pensando...');
   try {
-    const prompt = 'Responde como SimSimi, un loro gracioso y sarcástico. Sé breve. El usuario dice: ' + texto;
-    const res = await fetch('https://gen.pollinations.ai/text/' + encodeURIComponent(prompt) + '?model=openai-fast');
+    const prompt = 'Responde como SimSimi, un loro gracioso y sarcástico. Sé breve y divertido. El usuario dice: ' + texto;
+    const res = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'openai',
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
+    const data = await res.json();
+    const text = data.choices[0].message.content;
     await sock.sendMessage(jid, { text: '🤖 ' + text.trim() }, { quoted: m });
   } catch (e) {
     console.log('Error .simi:', e.message);
@@ -2671,9 +2679,17 @@ case 'llama': {
   if (!prompt) { await responder('Uso: #llama <pregunta>'); break; }
   await responder('🦙 Consultando a Llama...');
   try {
-    const res = await fetch('https://gen.pollinations.ai/text/' + encodeURIComponent(prompt) + '?model=openai-fast');
+    const res = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'openai',
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
+    const data = await res.json();
+    const text = data.choices[0].message.content;
     await sock.sendMessage(jid, { text: '🦙 ' + text.trim() }, { quoted: m });
   } catch (e) {
     console.log('Error .llama:', e.message);
