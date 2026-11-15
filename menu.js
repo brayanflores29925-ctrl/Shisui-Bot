@@ -126,7 +126,14 @@ const secciones = [
     '#descripcion <texto> — Cambia la descripción del grupo.',
     '#admins — Menciona a los administradores.',
     '#fantasmas — Muestra los miembros sin actividad registrada.',
-    '#invitar <enlace> — Cualquiera puede solicitar unir el bot a un grupo/canal (el owner aprueba).'
+    '#invitar <enlace> — Cualquiera puede solicitar unir el bot a un grupo/canal (el owner aprueba).',
+    '#antiaudio on/off (#aa) — Bloquea audios.',
+    '#antivideos on/off (#av) — Bloquea videos.',
+    '#antisticker on/off (#as) — Bloquea stickers.',
+    '#antispam on/off (#aspam) — Bloquea spam (5 msgs/10s).',
+    '#antibots on/off (#ab) — Expulsa bots por nombre.',
+    '#antiestafas on/off (#ae) — Bloquea enlaces de estafa.',
+    '#antistatus — Muestra el estado de todos los filtros.'
   ]],
 
   ['👑 COMANDOS DEL DUEÑO', [

@@ -437,6 +437,12 @@ async function iniciar(opciones = {}) {
   
 // Sistema de invitaciones pendientes (en memoria)
 global.antiPorno = false
+global.antiaudio = false
+global.antivideos = false
+global.antisticker = false
+global.antispam = false
+global.antibots = false
+global.antiestafas = false
 const invitacionesPendientes = new Map()
 let contadorInvitaciones = 0
 
@@ -518,6 +524,94 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     console.log('[antiporno] Error en chequeo:', e.message)
   }
   // --- FIN DETECCIÓN ANTIPORNO ---
+
+  // --- FILTROS ANTI-* ---
+  try {
+    if (m.key.remoteJid && m.key.remoteJid.endsWith('@g.us') && !m.key.fromMe) {
+      let innerA = m.message || {}
+      if (innerA.ephemeralMessage) innerA = innerA.ephemeralMessage.message || {}
+      if (innerA.viewOnceMessage) innerA = innerA.viewOnceMessage.message || {}
+      if (innerA.viewOnceMessageV2) innerA = innerA.viewOnceMessageV2.message || {}
+      if (innerA.documentWithCaptionMessage) innerA = innerA.documentWithCaptionMessage.message || {}
+
+      const senderA = m.key.participant || m.key.remoteJid
+      const senderNumA = senderA.split('@')[0].split(':')[0]
+
+      if (global.antiaudio && innerA.audioMessage) {
+        try {
+          await sock.sendMessage(m.key.remoteJid, { delete: m.key })
+          await sock.sendMessage(m.key.remoteJid, { text: '🔇 Audio eliminado por AntiAudio.' }, { quoted: m })
+        } catch (e) {}
+        return
+      }
+
+      if (global.antivideos && innerA.videoMessage) {
+        try {
+          await sock.sendMessage(m.key.remoteJid, { delete: m.key })
+          await sock.sendMessage(m.key.remoteJid, { text: '🎬 Video eliminado por AntiVideos.' }, { quoted: m })
+        } catch (e) {}
+        return
+      }
+
+      if (global.antisticker && innerA.stickerMessage) {
+        try {
+          await sock.sendMessage(m.key.remoteJid, { delete: m.key })
+          await sock.sendMessage(m.key.remoteJid, { text: '🎨 Sticker eliminado por AntiSticker.' }, { quoted: m })
+        } catch (e) {}
+        return
+      }
+
+      if (global.antibots) {
+        try {
+          const meta = await sock.groupMetadata(m.key.remoteJid)
+          const p = meta.participants.find(x => x.id === senderA)
+          const nombre = (p && p.notify) || ''
+          if (/bot|BOT|Bot/.test(nombre)) {
+            await sock.groupParticipantsUpdate(m.key.remoteJid, [senderA], 'remove')
+            await sock.sendMessage(m.key.remoteJid, { text: '🤖 Bot expulsado: ' + nombre }, { quoted: m })
+            return
+          }
+        } catch (e) {}
+      }
+
+      if (global.antiestafas) {
+        const txt = innerA.conversation || (innerA.extendedTextMessage && innerA.extendedTextMessage.text) || (innerA.imageMessage && innerA.imageMessage.caption) || (innerA.videoMessage && innerA.videoMessage.caption) || ''
+        const patron = /bit\.ly|tinyurl|shorturl|adf\.ly|shorte\.st|cutt\.ly|rebrand\.ly|is\.gd|free.*robux|robux.*free|gana.*dinero|dinero.*facil|invertir.*garantizado|ganaste.*premio/i
+        if (patron.test(txt)) {
+          try {
+            await sock.sendMessage(m.key.remoteJid, { delete: m.key })
+            await sock.sendMessage(m.key.remoteJid, { text: '⚠️ Enlace sospechoso eliminado por AntiEstafas.' }, { quoted: m })
+          } catch (e) {}
+          return
+        }
+      }
+
+      if (global.antispam) {
+        if (!global.spamTracker) global.spamTracker = new Map()
+        const ahora = Date.now()
+        const ventana = 10000
+        const max = 5
+        if (!global.spamTracker.has(senderNumA)) global.spamTracker.set(senderNumA, [])
+        const ts = global.spamTracker.get(senderNumA).filter(t => ahora - t < ventana)
+        ts.push(ahora)
+        global.spamTracker.set(senderNumA, ts)
+        if (ts.length > max) {
+          try {
+            await sock.sendMessage(m.key.remoteJid, { delete: m.key })
+            await sock.sendMessage(m.key.remoteJid, {
+              text: '⚠️ @' + senderNumA + ' deja de spamear.',
+              mentions: [senderA]
+            }, { quoted: m })
+          } catch (e) {}
+          global.spamTracker.set(senderNumA, [])
+          return
+        }
+      }
+    }
+  } catch (e) {
+    console.log('[anti-*] Error:', e.message)
+  }
+  // --- FIN FILTROS ANTI-* ---
 
     const m = messages[0]
     if (!m?.message) return
@@ -1775,6 +1869,51 @@ case 'robloxrandom': {
     console.log('Error .robloxrandom:', e.message)
     await responder('❌ Error al obtener juego aleatorio.')
   }
+  break
+}
+
+case 'antiaudio': case 'aa':
+case 'antivideos': case 'av':
+case 'antisticker': case 'as':
+case 'antispam': case 'aspam':
+case 'antibots': case 'ab':
+case 'antiestafas': case 'ae': {
+  const mapaAnti = {
+    antiaudio: 'antiaudio', aa: 'antiaudio',
+    antivideos: 'antivideos', av: 'antivideos',
+    antisticker: 'antisticker', as: 'antisticker',
+    antispam: 'antispam', aspam: 'antispam',
+    antibots: 'antibots', ab: 'antibots',
+    antiestafas: 'antiestafas', ae: 'antiestafas'
+  }
+  const emojiAnti = { antiaudio: '🔇', antivideos: '🎬', antisticker: '🎨', antispam: '📵', antibots: '🤖', antiestafas: '⚠️' }
+  const flag = mapaAnti[cmd]
+  const arg = cuerpo.slice(cmd.length).trim().toLowerCase()
+  if (arg === 'on') {
+    global[flag] = true
+    await responder(emojiAnti[flag] + ' ' + flag.toUpperCase() + ' ACTIVADO.')
+  } else if (arg === 'off') {
+    global[flag] = false
+    await responder(emojiAnti[flag] + ' ' + flag.toUpperCase() + ' DESACTIVADO.')
+  } else {
+    const estado = global[flag] ? '✅ ON' : '❌ OFF'
+    await responder('Uso: #' + cmd + ' on/off\nEstado actual: ' + estado)
+  }
+  break
+}
+case 'antistatus': {
+  const lista = [
+    ['🔇 AntiAudio', global.antiaudio],
+    ['🎬 AntiVideos', global.antivideos],
+    ['🎨 AntiSticker', global.antisticker],
+    ['📵 AntiSpam', global.antispam],
+    ['🤖 AntiBots', global.antibots],
+    ['⚠️ AntiEstafas', global.antiestafas],
+    ['🔞 AntiPorno', global.antiPorno]
+  ]
+  let txt = '🛡️ *Estado de filtros:*\n\n'
+  for (const [n, a] of lista) txt += n + ': ' + (a ? '✅ ON' : '❌ OFF') + '\n'
+  await responder(txt)
   break
 }
 
