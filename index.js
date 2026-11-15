@@ -953,7 +953,17 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
       }
       
       if (sugerencia) {
-        await responder(`❌ El comando *${comando}* no existe.\n\n💡 ¿Quizás quisiste decir *${prefijo}${sugerencia}*?`);
+        
+        try {
+          if (sugerencia) {
+            await responder(`❌ El comando *${comando}* no existe.\n\n💡 ¿Quizás quisiste decir *${prefijo}${sugerencia}*?`);
+          } else {
+            await responder(`❌ Lo siento, el comando *${comando}* no está disponible.\n📋 Usa ${prefijo}menu para ver los comandos.`);
+          }
+        } catch (err) {
+          console.log('Error en sugerencia:', err.message);
+          await responder('❌ Ese comando no existe.');
+        }
       } else {
         await responder(`❌ Lo siento, el comando *${comando}* no está disponible.\n📋 Usa ${prefijo}menu para ver los comandos.`);
       }
