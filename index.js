@@ -1479,6 +1479,305 @@ case 'rechazarinv': {
   break
 }
 
+case 'robloxuser': {
+  const nombre = cuerpo.slice(cmd.length).trim()
+  if (!nombre) {
+    await responder('Uso: #robloxuser <nombre>\nEjemplo: #robloxuser Roblox')
+    break
+  }
+  await responder('🔎 Buscando usuario de Roblox: ' + nombre + '...')
+  try {
+    const idRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [nombre], excludeBannedUsers: false })
+    })
+    const idData = await idRes.json()
+    if (!idData.data || !idData.data[0]) {
+      await responder('❌ No encontré ese usuario en Roblox.')
+      break
+    }
+    const userId = idData.data[0].id
+    const infoRes = await fetch(`https://users.roblox.com/v1/users/${userId}`)
+    const info = await infoRes.json()
+    const creado = new Date(info.created).toLocaleDateString('es-HN')
+    const caption = `👤 *${info.displayName}* (@${info.name})\n🆔 ID: ${info.id}\n📅 Creado: ${creado}\n📝 Bio: ${info.description || 'Sin descripción'}`
+    await sock.sendMessage(jid, { text: caption }, { quoted: m })
+  } catch (e) {
+    console.log('Error .robloxuser:', e.message)
+    await responder('❌ Error al buscar el usuario.')
+  }
+  break
+}
+case 'robloxavatar': {
+  const nombre = cuerpo.slice(cmd.length).trim()
+  if (!nombre) {
+    await responder('Uso: #robloxavatar <nombre>\nEjemplo: #robloxavatar Roblox')
+    break
+  }
+  await responder('🖼️ Buscando avatar de: ' + nombre + '...')
+  try {
+    const idRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [nombre], excludeBannedUsers: false })
+    })
+    const idData = await idRes.json()
+    if (!idData.data || !idData.data[0]) {
+      await responder('❌ No encontré ese usuario.')
+      break
+    }
+    const userId = idData.data[0].id
+    const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=420x420&format=Png&isCircular=false`)
+    const thumbData = await thumbRes.json()
+    if (!thumbData.data || !thumbData.data[0] || !thumbData.data[0].imageUrl) {
+      await responder('❌ No se pudo obtener el avatar.')
+      break
+    }
+    await sock.sendMessage(jid, { image: { url: thumbData.data[0].imageUrl }, caption: `🖼️ Avatar de *${nombre}*` }, { quoted: m })
+  } catch (e) {
+    console.log('Error .robloxavatar:', e.message)
+    await responder('❌ Error al obtener el avatar.')
+  }
+  break
+}
+case 'robloxgroups': {
+  const nombre = cuerpo.slice(cmd.length).trim()
+  if (!nombre) {
+    await responder('Uso: #robloxgroups <nombre>')
+    break
+  }
+  await responder('👥 Buscando grupos de: ' + nombre + '...')
+  try {
+    const idRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [nombre], excludeBannedUsers: false })
+    })
+    const idData = await idRes.json()
+    if (!idData.data || !idData.data[0]) {
+      await responder('❌ Usuario no encontrado.')
+      break
+    }
+    const userId = idData.data[0].id
+    const groupsRes = await fetch(`https://groups.roblox.com/v1/users/${userId}/groups/roles`)
+    const groupsData = await groupsRes.json()
+    const grupos = groupsData.data || []
+    if (grupos.length === 0) {
+      await responder('ℹ️ Este usuario no está en ningún grupo.')
+      break
+    }
+    let lista = '👥 *Grupos de ' + nombre + ':*\n\n'
+    grupos.slice(0, 10).forEach(g => {
+      lista += `• *${g.group.name}* (Rango: ${g.role.name})\n`
+    })
+    if (grupos.length > 10) lista += `\n... y ${grupos.length - 10} más.`
+    await sock.sendMessage(jid, { text: lista }, { quoted: m })
+  } catch (e) {
+    console.log('Error .robloxgroups:', e.message)
+    await responder('❌ Error al buscar grupos.')
+  }
+  break
+}
+case 'robloxgame': {
+  const nombre = cuerpo.slice(cmd.length).trim()
+  if (!nombre) {
+    await responder('Uso: #robloxgame <nombre del juego>\nEjemplo: #robloxgame Adopt Me')
+    break
+  }
+  await responder('🎮 Buscando juego: ' + nombre + '...')
+  try {
+    const searchRes = await fetch('https://games.roblox.com/v1/games/list?model.searchTerm=' + encodeURIComponent(nombre) + '&model.maxRows=1')
+    const searchData = await searchRes.json()
+    if (!searchData.games || searchData.games.length === 0) {
+      await responder('❌ No encontré ese juego.')
+      break
+    }
+    const juego = searchData.games[0]
+    const caption = `🎮 *${juego.name}*\n🆔 Place ID: ${juego.placeId}\n👤 Creador: ${juego.creatorName}\n📊 Visitas: ${juego.visits.toLocaleString()}`
+    await sock.sendMessage(jid, { text: caption }, { quoted: m })
+  } catch (e) {
+    console.log('Error .robloxgame:', e.message)
+    await responder('❌ Error al buscar el juego.')
+  }
+  break
+}
+case 'robloxplayers': {
+  const idStr = cuerpo.slice(cmd.length).trim()
+  if (!idStr) {
+    await responder('Uso: #robloxplayers <Universe ID>\nEjemplo: #robloxplayers 123456')
+    break
+  }
+  await responder('📊 Consultando jugadores...')
+  try {
+    const res = await fetch(`https://games.roblox.com/v1/games?universeIds=${idStr}`)
+    const data = await res.json()
+    if (!data.data || data.data.length === 0) {
+      await responder('❌ No encontré ese juego.')
+      break
+    }
+    const juego = data.data[0]
+    const caption = `🎮 *${juego.name}*\n👥 Jugadores ahora: ${juego.playing.toLocaleString()}\n📈 Visitas totales: ${juego.visits.toLocaleString()}`
+    await sock.sendMessage(jid, { text: caption }, { quoted: m })
+  } catch (e) {
+    console.log('Error .robloxplayers:', e.message)
+    await responder('❌ Error al consultar jugadores.')
+  }
+  break
+}
+case 'robloxbadges': {
+  const nombre = cuerpo.slice(cmd.length).trim()
+  if (!nombre) {
+    await responder('Uso: #robloxbadges <nombre>')
+    break
+  }
+  await responder('🏅 Buscando insignias de: ' + nombre + '...')
+  try {
+    const idRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [nombre], excludeBannedUsers: false })
+    })
+    const idData = await idRes.json()
+    if (!idData.data || !idData.data[0]) {
+      await responder('❌ Usuario no encontrado.')
+      break
+    }
+    const userId = idData.data[0].id
+    const badgesRes = await fetch(`https://badges.roblox.com/v1/users/${userId}/badges?limit=10&sortOrder=Desc`)
+    const badgesData = await badgesRes.json()
+    const badges = badgesData.data || []
+    if (badges.length === 0) {
+      await responder('ℹ️ Este usuario no tiene insignias públicas.')
+      break
+    }
+    let lista = '🏅 *Insignias de ' + nombre + ':*\n\n'
+    badges.forEach(b => {
+      lista += `• ${b.name}\n`
+    })
+    await sock.sendMessage(jid, { text: lista }, { quoted: m })
+  } catch (e) {
+    console.log('Error .robloxbadges:', e.message)
+    await responder('❌ Error al buscar insignias.')
+  }
+  break
+}
+case 'robloxfriends': {
+  const nombre = cuerpo.slice(cmd.length).trim()
+  if (!nombre) {
+    await responder('Uso: #robloxfriends <nombre>')
+    break
+  }
+  await responder('👫 Buscando amigos de: ' + nombre + '...')
+  try {
+    const idRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [nombre], excludeBannedUsers: false })
+    })
+    const idData = await idRes.json()
+    if (!idData.data || !idData.data[0]) {
+      await responder('❌ Usuario no encontrado.')
+      break
+    }
+    const userId = idData.data[0].id
+    const friendsRes = await fetch(`https://friends.roblox.com/v1/users/${userId}/friends`)
+    const friendsData = await friendsRes.json()
+    const friends = friendsData.data || []
+    if (friends.length === 0) {
+      await responder('ℹ️ Este usuario no tiene amigos públicos.')
+      break
+    }
+    let lista = '👫 *Amigos de ' + nombre + ':*\n\n'
+    friends.slice(0, 10).forEach(f => {
+      lista += `• ${f.name} (${f.displayName})\n`
+    })
+    if (friends.length > 10) lista += `\n... y ${friends.length - 10} más.`
+    await sock.sendMessage(jid, { text: lista }, { quoted: m })
+  } catch (e) {
+    console.log('Error .robloxfriends:', e.message)
+    await responder('❌ Error al buscar amigos.')
+  }
+  break
+}
+case 'robloxfollowers': {
+  const nombre = cuerpo.slice(cmd.length).trim()
+  if (!nombre) {
+    await responder('Uso: #robloxfollowers <nombre>')
+    break
+  }
+  await responder('📊 Consultando seguidores de: ' + nombre + '...')
+  try {
+    const idRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [nombre], excludeBannedUsers: false })
+    })
+    const idData = await idRes.json()
+    if (!idData.data || !idData.data[0]) {
+      await responder('❌ Usuario no encontrado.')
+      break
+    }
+    const userId = idData.data[0].id
+    const followersRes = await fetch(`https://friends.roblox.com/v1/users/${userId}/followers/count`)
+    const followersData = await followersRes.json()
+    await responder(`👥 *${nombre}* tiene *${followersData.count.toLocaleString()}* seguidores.`)
+  } catch (e) {
+    console.log('Error .robloxfollowers:', e.message)
+    await responder('❌ Error al consultar seguidores.')
+  }
+  break
+}
+case 'robloxstatus': {
+  const nombre = cuerpo.slice(cmd.length).trim()
+  if (!nombre) {
+    await responder('Uso: #robloxstatus <nombre>')
+    break
+  }
+  await responder('🔍 Consultando estado de: ' + nombre + '...')
+  try {
+    const idRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [nombre], excludeBannedUsers: false })
+    })
+    const idData = await idRes.json()
+    if (!idData.data || !idData.data[0]) {
+      await responder('❌ Usuario no encontrado.')
+      break
+    }
+    const userId = idData.data[0].id
+    const infoRes = await fetch(`https://users.roblox.com/v1/users/${userId}`)
+    const info = await infoRes.json()
+    const estado = info.isBanned ? '❌ Baneado' : '✅ Activo'
+    const premium = info.isPremium ? '⭐ Premium' : 'No'
+    const caption = `👤 *${info.displayName}* (@${info.name})\n📊 Estado: ${estado}\n⭐ Premium: ${premium}\n📅 Creado: ${new Date(info.created).toLocaleDateString('es-HN')}`
+    await sock.sendMessage(jid, { text: caption }, { quoted: m })
+  } catch (e) {
+    console.log('Error .robloxstatus:', e.message)
+    await responder('❌ Error al consultar estado.')
+  }
+  break
+}
+case 'robloxrandom': {
+  await responder('🎲 Obteniendo un juego aleatorio de Roblox...')
+  try {
+    const res = await fetch('https://games.roblox.com/v1/games/list?model.sortToken=&model.maxRows=10')
+    const data = await res.json()
+    if (!data.games || data.games.length === 0) {
+      await responder('❌ No se pudo obtener un juego aleatorio.')
+      break
+    }
+    const juego = data.games[Math.floor(Math.random() * data.games.length)]
+    const caption = `🎲 *Juego aleatorio:*\n\n🎮 *${juego.name}*\n🆔 Place ID: ${juego.placeId}\n👤 Creador: ${juego.creatorName}\n📊 Visitas: ${juego.visits.toLocaleString()}`
+    await sock.sendMessage(jid, { text: caption }, { quoted: m })
+  } catch (e) {
+    console.log('Error .robloxrandom:', e.message)
+    await responder('❌ Error al obtener juego aleatorio.')
+  }
+  break
+}
+
 case 'musica':
       case 'm':
       case 'play':

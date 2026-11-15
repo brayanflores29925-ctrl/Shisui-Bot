@@ -160,6 +160,19 @@ const secciones = [
     '#key — Gestiona la clave de acceso.'
   ]],
 
+  ['🎮 ROBLOX', [
+    '#robloxuser <nombre> — Busca un usuario y muestra su ID e info.',
+    '#robloxavatar <nombre> — Muestra la imagen del avatar.',
+    '#robloxgroups <nombre> — Lista los grupos a los que pertenece.',
+    '#robloxgame <nombre> — Busca un juego y muestra sus datos.',
+    '#robloxplayers <ID> — Muestra los jugadores en línea de un juego.',
+    '#robloxbadges <nombre> — Lista las insignias de un usuario.',
+    '#robloxfriends <nombre> — Muestra la lista de amigos.',
+    '#robloxfollowers <nombre> — Muestra el número de seguidores.',
+    '#robloxstatus <nombre> — Muestra el estado de la cuenta.',
+    '#robloxrandom — Muestra un juego aleatorio.'
+  ]],
+
   ['🔞 +18 (solo si #setnsfw está activado)', [
     '#verdad — Inicia el juego de verdad.',
     '#reto — Propone un reto.',
