@@ -1195,23 +1195,24 @@ case 'buscartt': {
   }
   await responder('🔎 Buscando un video de TikTok sobre: ' + consulta)
   try {
-    const Tiktok = require('tiktok-video-scraper')
+    const { tiktokHashtag } = require('gocreative-tiktok-search')
 
-    // La librería busca por palabra clave y devuelve un array de resultados
-    const resultados = await Tiktok.search(consulta, { limit: 1 })
+    // El "free demo tier" no necesita clave, son 5 llamadas al día.
+    // Busca como hashtag, pero funciona bien con nombres populares.
+    const result = await tiktokHashtag(consulta)
 
-    // DEPURACIÓN: Mostramos en consola qué devolvió exactamente la librería
-    console.log('Respuesta de tiktok-video-scraper:', JSON.stringify(resultados, null, 2))
+    // La estructura puede variar; buscamos un array de videos.
+    const videos = result?.videos || result?.data || (Array.isArray(result) ? result : [])
 
-    if (!resultados || resultados.length === 0) {
+    if (!videos || videos.length === 0) {
       await responder('❌ No encontré videos para esa búsqueda.')
       break
     }
 
-    const video = resultados[0]
-    const media = video.media && video.media[0]
-    const urlVideo = media && media.url // La URL sin marca de agua está aquí
+    const v = videos[0] // Tomamos el primer resultado
 
+    // Intentamos extraer la URL del video sin marca de agua.
+    const urlVideo = v.video?.playAddr || v.video?.downloadAddr || v.play || v.video_url
     if (!urlVideo) {
       await responder('❌ Encontré un resultado pero no pude extraer la URL del video.')
       break
@@ -1223,13 +1224,13 @@ case 'buscartt': {
       break
     }
 
-    const autor = video.username || 'Desconocido'
-    const caption = '🎬 ' + (media.caption || consulta) + '\n👤 ' + autor
+    const autor = v.author?.uniqueId || v.author?.nickname || 'Desconocido'
+    const caption = '🎬 ' + (v.desc || consulta) + '\n👤 ' + autor
 
     await sock.sendMessage(jid, { video: bufferVideo, caption }, { quoted: m })
 
   } catch (e) {
-    console.log('Error en .buscar (tiktok-video-scraper):', e.message)
+    console.log('Error en .buscar (gocreative):', e.message)
     await responder('❌ Error al buscar videos. Revisa la consola para más detalles.')
   }
   break

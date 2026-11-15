@@ -15,6 +15,7 @@
     "@tensorflow/tfjs": "^4.22.0",
     "@whiskeysockets/baileys": "^7.0.0-rc14",
     "dotenv": "^18.0.10",
+    "gocreative-tiktok-search": "^0.1.0",
     "groq-sdk": "^1.6.0",
     "kalss-scraper": "^1.3.1",
     "nexora-tiktok-search": "^0.0.1",
