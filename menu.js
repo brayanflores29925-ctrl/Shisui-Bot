@@ -194,6 +194,27 @@ const secciones = [
     '#rankfieles — Ranking fieles.', '#ranktherian — Ranking therian.'
   ]],
 
+  ['🎧 EFECTOS Y STICKERS', [
+    '#alteradores — Lista de efectos disponibles.',
+    '#audiolento — Audio lento.',
+    '#audiorapido — Audio rápido.',
+    '#grave — Voz grave.',
+    '#ardilla — Voz ardilla.',
+    '#bass — Aumentar bajos.',
+    '#robot — Voz robot.',
+    '#eco — Efecto eco.',
+    '#reverse — Audio al revés.',
+    '#videolento — Video lento.',
+    '#videorapido — Video rápido.',
+    '#videocontrario — Video al revés.',
+    '#tomp3 — Video a audio.',
+    '#togif — Video a sticker animado.',
+    '#sticker2 — Sticker cuadrado.',
+    '#sticker3 — Sticker circular.',
+    '#attp4 / #attp5 / #attp6 / #ttp — Texto a sticker IA.',
+    '#imagine — Genera imagen con IA.'
+  ]],
+
   ['🎮 ROBLOX', [
     '#robloxuser <nombre> — Busca un usuario y muestra su ID e info.',
     '#robloxavatar <nombre> — Muestra la imagen del avatar.',
