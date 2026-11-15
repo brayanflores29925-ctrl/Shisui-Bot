@@ -634,6 +634,52 @@ const invitacionesPendientes = new Map()
 let contadorInvitaciones = 0
 
 sock.ev.on('messages.upsert', async ({ messages }) => {
+  // --- BAN POR REACCION ---
+  try {
+    const msgR = messages[0];
+    if (msgR.message && msgR.message.reactionMessage) {
+      const reaction = msgR.message.reactionMessage;
+      const textoReaccion = (reaction.text || '').toLowerCase().trim();
+      
+      // Si la reacción es "ban" o la bota 👢
+      if (textoReaccion === 'ban' || textoReaccion === '👢' || textoReaccion === '🥾') {
+        const jid = msgR.key.remoteJid;
+        const sender = msgR.key.participant || msgR.key.remoteJid;
+        const target = reaction.key.participant || reaction.key.remoteJid;
+        
+        if (jid.endsWith('@g.us') && target && sender !== target) {
+          // Verificar que quien reacciona sea admin o dueño
+          const groupMetadata = await sock.groupMetadata(jid);
+          const senderParticipant = groupMetadata.participants.find(p => p.id === sender);
+          
+          const esAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
+          const esDuenoBot = (typeof esDueno === 'function' && esDueno(msgR));
+          
+          if (esAdmin || esDuenoBot) {
+            // Verificar que el bot sea admin
+            const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+            const botParticipant = groupMetadata.participants.find(p => p.id === botId);
+            
+            if (botParticipant && botParticipant.admin) {
+              // Expulsar
+              await sock.groupParticipantsUpdate(jid, [target], 'remove');
+              
+              // Borrar el mensaje original
+              try { await sock.sendMessage(jid, { delete: reaction.key }); } catch(e) {}
+              
+              // Avisar
+              await sock.sendMessage(jid, { text: `👢 @${target.split('@')[0]} fue expulsado por reacción de un administrador.`, mentions: [target] }, { quoted: msgR });
+              return; // Detener ejecución para que no haga nada más
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.log('Error en Ban por reacción:', e.message);
+  }
+  // --- FIN BAN POR REACCION ---
+
   // --- AUTOREAD HOOK ---
   if (global.autoread && messages[0] && !messages[0].key.fromMe) {
     try { sock.readMessages([messages[0].key]); } catch(e) {}
