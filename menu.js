@@ -126,7 +126,7 @@ const secciones = [
     '#descripcion <texto> — Cambia la descripción del grupo.',
     '#admins — Menciona a los administradores.',
     '#fantasmas — Muestra los miembros sin actividad registrada.',
-    '#invitar <enlace> — Solicita unir el bot a un grupo/canal.'
+    '#invitar <enlace> — Cualquiera puede solicitar unir el bot a un grupo/canal (el owner aprueba).'
   ]],
 
   ['👑 COMANDOS DEL DUEÑO', [
