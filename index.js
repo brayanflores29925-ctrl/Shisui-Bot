@@ -4076,6 +4076,18 @@ case 'robloxinventario': {
   break
 }
 
+
+case 'villancico': {
+  const villancicos = [
+    '🎵 *Noche de paz, noche de amor...* 🎵\nTodos duermen en derredor...',
+    '🎵 *Rodolfo el reno, tenía una nariz muy roja...* 🎵\nY si tú la vieras, dirías que brilla más que el sol.',
+    '🎵 *Campana sobre campana, y sobre campana una...* 🎵\nAsómate a la ventana, verás al niño en la cuna.',
+    '🎵 *Los peces en el río, se peinan de alegría...* 🎵'
+  ];
+  await responder(villancicos[Math.floor(Math.random() * villancicos.length)]);
+  break;
+}
+
 case 'musica':
       case 'm':
       case 'play':
