@@ -2333,17 +2333,13 @@ case 'simi': {
   await responder('💬 Pensando...');
   try {
     const prompt = 'Responde como SimSimi, un loro gracioso y sarcástico. Sé breve. El usuario dice: ' + texto;
-    const res = await fetch('https://keylessai.thryx.workers.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
-    });
+    const res = await fetch('https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai');
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    await sock.sendMessage(jid, { text: '🤖 ' + data.choices[0].message.content.trim() }, { quoted: m });
+    const text = await res.text();
+    await sock.sendMessage(jid, { text: '🤖 ' + text.trim() }, { quoted: m });
   } catch (e) {
     console.log('Error .simi:', e.message);
-    await responder('❌ La IA gratuita está saturada. Intenta de nuevo en unos segundos.');
+    await responder('❌ Simi no quiere hablar ahora. Intenta de nuevo.');
   }
   break;
 }
@@ -2675,21 +2671,33 @@ case 'llama': {
   if (!prompt) { await responder('Uso: #llama <pregunta>'); break; }
   await responder('🦙 Consultando a Llama...');
   try {
-    const res = await fetch('https://keylessai.thryx.workers.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'llama-3.1-70b', messages: [{ role: 'user', content: prompt }] })
-    });
+    // Usamos la misma API que ChatGPT porque es la que está estable
+    const res = await fetch('https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai');
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    await sock.sendMessage(jid, { text: '🦙 ' + data.choices[0].message.content.trim() }, { quoted: m });
+    const text = await res.text();
+    await sock.sendMessage(jid, { text: '🦙 ' + text.trim() }, { quoted: m });
   } catch (e) {
     console.log('Error .llama:', e.message);
-    await responder('❌ La IA gratuita está saturada. Intenta de nuevo en unos segundos.');
+    await responder('❌ Error consultando a Llama. Intenta de nuevo.');
   }
   break;
 }
 case 'chatgpt': case 'chatpgt': case 'gpt': {
+  const prompt = cuerpo.slice(cmd.length).trim();
+  if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
+  await responder('🤖 Consultando a ChatGPT...');
+  try {
+    const res = await fetch('https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    await sock.sendMessage(jid, { text: '🤖 ' + text.trim() }, { quoted: m });
+  } catch (e) {
+    console.log('Error .chatgpt:', e.message);
+    await responder('❌ Error consultando a ChatGPT. Intenta de nuevo.');
+  }
+  break;
+}
+case 'chatpgt': case 'gpt': {
   const prompt = cuerpo.slice(cmd.length).trim();
   if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
   await responder('🤖 Consultando a ChatGPT...');
