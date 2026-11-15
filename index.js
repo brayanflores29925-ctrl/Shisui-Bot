@@ -3730,6 +3730,20 @@ case 'card': case 'stats': {
   break;
 }
 
+case 'testbotones': {
+  await sock.sendMessage(jid, {
+    text: '🤖 *Prueba de Botones*\n\nEste es un mensaje con botones. Si los ves en tu pantalla, ¡funciona!',
+    footer: 'Shisui Bot v1.5.0',
+    buttons: [
+      { buttonId: '.hug', buttonText: { displayText: '🤗 Dar Abrazo' }, type: 1 },
+      { buttonId: '.kiss', buttonText: { displayText: '😘 Dar Beso' }, type: 1 },
+      { buttonId: '.menu', buttonText: { displayText: '📋 Ver Menú' }, type: 1 }
+    ],
+    headerType: 1
+  }, { quoted: m });
+  break;
+}
+
 case 'musica':
       case 'm':
       case 'play':
