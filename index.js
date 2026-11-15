@@ -971,6 +971,40 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     }
     // --------------------------------------
 
+    
+    // --- GUARDIÁN INTELIGENTE DE COMANDOS ---
+    if (typeof comando !== 'undefined' && comando && global.listaComandos) {
+      const cmdLimpio = comando.toLowerCase().trim();
+      // Si el comando NO existe en la lista y tiene más de 1 letra
+      if (!global.listaComandos.includes(cmdLimpio) && cmdLimpio.length > 1) {
+        let sug = '';
+        let min = 3;
+        const p = (typeof prefijo !== 'undefined' && prefijo) ? prefijo : (comando && comando[0]) ? comando[0] : '#';
+        
+        for (const val of global.listaComandos) {
+          // Calculamos la distancia matemáticamente
+          const m = Array.from({ length: val.length + 1 }, () => Array(cmdLimpio.length + 1).fill(0));
+          for (let i = 0; i <= val.length; i++) m[i][0] = i;
+          for (let j = 0; j <= cmdLimpio.length; j++) m[0][j] = j;
+          for (let i = 1; i <= val.length; i++) {
+            for (let j = 1; j <= cmdLimpio.length; j++) {
+              m[i][j] = val[i - 1] === cmdLimpio[j - 1] ? m[i - 1][j - 1] : Math.min(m[i - 1][j - 1] + 1, Math.min(m[i][j - 1] + 1, m[i - 1][j] + 1));
+            }
+          }
+          const d = m[val.length][cmdLimpio.length];
+          if (d < min && d > 0) { min = d; sug = val; }
+        }
+        
+        if (sug) {
+          await responder(`❌ El comando *${comando}* no existe.\n\n💡 ¿Quizás quisiste decir *${p}${sug}*?`);
+        } else {
+          await responder(`❌ Lo siento, el comando *${comando}* no está disponible.\n📋 Usa ${p}menu.`);
+        }
+        return; // Detiene la ejecución para que no llegue al switch original
+      }
+    }
+    // --- FIN GUARDIÁN ---
+    
     switch (comando) {
       case 'racha': case 'rc': {
   const sender = m.key.participant || m.key.remoteJid;
@@ -3878,12 +3912,7 @@ case 'botones': {
 
 
 case 'robloxinventario': {
-      console.log('🔥 RASTREO: El comando .robloxinventario SÍ fue detectado y está ejecutándose.');
-      try {
-        await responder('❌ *Aviso:* Roblox tiene bloqueada la API pública de inventarios. Es imposible ver el inventario de una cuenta desde un bot de WhatsApp sin tener sus cookies de inicio de sesión.\n\nSi quieres ver tus objetos, entra directamente a tu perfil en la página web de Roblox.');
-      } catch (err) {
-        console.log('🔥 Error al enviar el mensaje:', err.message);
-      }
+      await sock.sendMessage(jid, { text: '❌ *Aviso:* Roblox tiene bloqueada la API pública de inventarios. Es imposible ver el inventario de una cuenta desde un bot de WhatsApp sin tener sus cookies de inicio de sesión.\n\nSi quieres ver tus objetos, entra directamente a tu perfil en la página web de Roblox.' }, { quoted: m });
       break;
     }
     case 'bloxstock': case 'stockfrutas': {
