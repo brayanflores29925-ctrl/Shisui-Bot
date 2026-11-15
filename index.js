@@ -3885,7 +3885,15 @@ case 'robloxinventario': {
       }
       await responder('🎒 Buscando inventario de: ' + nombre + '...')
       try {
-        const idRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+        // Función para forzar el tiempo de espera
+        const fetchConTimeout = (url, options = {}, timeout = 8000) => {
+          return Promise.race([
+            fetch(url, options),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), timeout))
+          ])
+        }
+
+        const idRes = await fetchConTimeout('https://users.roblox.com/v1/usernames/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ usernames: [nombre], excludeBannedUsers: false })
@@ -3897,12 +3905,7 @@ case 'robloxinventario': {
         }
         const userId = idData.data[0].id
 
-        // Límite de 10 segundos
-        const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 10000)
-        
-        const res = await fetch(`https://inventory.roproxy.com/v2/users/${userId}/inventory?limit=10&sortOrder=Desc`, { signal: controller.signal })
-        clearTimeout(timeout)
+        const res = await fetchConTimeout(`https://inventory.roproxy.com/v2/users/${userId}/inventory?limit=10&sortOrder=Desc`)
         
         if (!res.ok) throw new Error('HTTP ' + res.status)
         const data = await res.json()
@@ -3921,10 +3924,10 @@ case 'robloxinventario': {
         await sock.sendMessage(jid, { text: txt }, { quoted: m })
       } catch (e) {
         console.log('Error .robloxinventario:', e.message)
-        if (e.name === 'AbortError') {
-          await responder('❌ La API de Roblox tardó demasiado (Timeout).')
+        if (e.message === 'TIMEOUT') {
+          await responder('❌ La API de Roblox tardó demasiado en responder (8s). Intenta de nuevo más tarde.')
         } else {
-          await responder('❌ No se pudo obtener el inventario. (La API de Roblox bloquea las consultas sin iniciar sesión).')
+          await responder('❌ No se pudo obtener el inventario. Roblox bloquea esta información si la cuenta es privada.')
         }
       }
       break
