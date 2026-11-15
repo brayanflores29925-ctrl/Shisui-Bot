@@ -2666,9 +2666,7 @@ case 'topricos': case 'topmoney': {
   break;
 }
 case 'setoficial': {
-  const OWNERS = ['50493482934', '50494874330', '50495939120']
-  const remitente = (m.key.participant || m.key.remoteJid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '')
-  if (!OWNERS.some(n => remitente.includes(n))) {
+  if (!esDueno(m)) {
     await responder('❌ Solo el dueño puede usar este comando.')
     break
   }
@@ -2691,6 +2689,27 @@ case 'setoficial': {
   } catch (e) {
     console.log('Error en .setoficial:', e.message)
     await responder('❌ No pude obtener la info del grupo. Asegúrate de que el bot ya esté en ese grupo.')
+  }
+  break
+}
+case 'setbotprincipal': {
+  if (!esDueno(m)) {
+    await responder('❌ Solo el dueño puede usar este comando.')
+    break
+  }
+  const numero = cuerpo.slice(cmd.length).trim().replace(/[^0-9]/g, '')
+  if (!numero) { await responder('Uso: #setbotprincipal <número>\nEjemplo: #setbotprincipal 50493482934'); break; }
+  
+  try {
+    const fs = require('fs')
+    let config = {}
+    try { config = JSON.parse(fs.readFileSync('./config.json', 'utf8')) } catch {}
+    config.botPrincipal = numero
+    fs.writeFileSync('./config.json', JSON.stringify(config, null, 2))
+    await responder(`✅ Bot principal configurado al número: ${numero}`)
+  } catch (e) {
+    console.log('Error en .setbotprincipal:', e.message)
+    await responder('❌ Error guardando la configuración.')
   }
   break
 }
