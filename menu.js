@@ -108,11 +108,15 @@ const secciones = [
   ]],
 
   ['🎉 EVENTOS ESPECIALES', [
-    '#navidad — Accede al evento de Navidad.',
-    '#nochebuena — Accede al evento de Nochebuena.',
-    '#anonuevo — Accede al evento de Año Nuevo.',
+    '#navidad — Mensaje especial (25 de dic).',
+    '#nochebuena — Mensaje especial (24 de dic).',
+    '#anonuevo — Mensaje especial (31 dic / 1 ene).',
     '#felicitar — Envía felicitaciones.',
-    '#arbol — Interactúa con el árbol.'
+    '#arbol — Arma un árbol de navidad (texto).',
+    '#regalo @user — Envía un regalo a un amigo.',
+    '#villancico — Canta un villancico.',
+    '#nieve — Hace que nieve en el chat.',
+    '#brindis — Envía un brindis para Año Nuevo.'
   ]],
 
   ['👥 ADMINISTRACIÓN DE GRUPOS', [
