@@ -235,6 +235,28 @@ const secciones = [
     '#rankfieles — Ranking fieles.', '#ranktherian — Ranking therian.'
   ]],
 
+  ['🎭 DIVERSIÓN', [
+    '#piropo — Frases bonitas.',
+    '#odio — Frases de odio (broma).',
+    '#muerte — Predicción de muerte.',
+    '#matar @user — Mata a alguien (broma).',
+    '#adoptar @user — Adopta a alguien.',
+    '#waifu / #neko / #husbando — Imágenes anime.',
+    '#verperfil @user — Foto de perfil.',
+    '#logos — Lista de logos.',
+    '#menulogos — Montajes con foto.',
+    '#infobot / #creador — Info del bot.',
+    '#sugerencia — Envía sugerencia.',
+    '#bug — Reporta un error.',
+    '#moneda — Convierte divisas.',
+    '#mareas — Tabla de mareas.',
+    '#infocomando — Explica un comando.',
+    '#pescar — Pesca para ganar dinero.',
+    '#minar — Mina para ganar dinero.',
+    '#tiendarpg — Tienda RPG.',
+    '#niveles — Lista de niveles.'
+  ]],
+
   ['🎧 EFECTOS Y STICKERS', [
     '#alteradores — Lista de efectos disponibles.',
     '#audiolento — Audio lento.',
