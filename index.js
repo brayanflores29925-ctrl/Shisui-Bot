@@ -1116,6 +1116,14 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     }
     // ----------------------------
     
+    
+    // --- ALIAS VILLANCICO A PLAY ---
+    if (comando === 'villancico') {
+      comando = 'play'; // Lo tratamos como .play
+      cuerpo = cuerpo + ' villancico'; // Le sumamos la palabra para que busque navideño
+    }
+    // -------------------------------
+    
     switch (comando) {
       case 'racha': case 'rc': {
   const sender = m.key.participant || m.key.remoteJid;
