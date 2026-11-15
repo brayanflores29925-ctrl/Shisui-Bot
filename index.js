@@ -558,6 +558,16 @@ async function imagenASticker(buffer, tipo) {
 const ANIME_MAP = {"hug":"hug","kiss":"kiss","pat":"pat","slap":"slap","punch":"punch","patear":"kick","poke":"poke","tickle":"tickle","cuddle":"cuddle","bite":"bite","feed":"feed","nom":"feed","smile":"smile","wink":"wink","blush":"blush","smug":"smug","happy":"happy","angry":"angry","bored":"bored","cry":"cry","laugh":"laugh","pout":"pout","baka":"baka","bonk":"bonk","wave":"wave","nod":"nod","shrug":"shrug","nope":"nope","thumbsup":"thumbsup","handshake":"handshake","handhold":"handhold","highfive":"highfive","dance":"dance","run":"run","sleep":"sleep","yawn":"yawn","lurk":"lurk","stare":"stare","think":"think","facepalm":"facepalm","tableflip":"tableflip","shoot":"shoot","yeet":"yeet","peck":"peck"};
 const ANIME_TXT = {"hug":"un abrazo","kiss":"un beso","pat":"una caricia","slap":"una bofetada","punch":"un puñetazo","patear":"una patada","poke":"un toque","tickle":"cosquillas","cuddle":"un acurruque","bite":"una mordida","feed":"de comer","nom":"de comer","smile":"una sonrisa","wink":"un guiño","blush":"un sonrojo","smug":"presumir","happy":"felicidad","angry":"enojo","bored":"aburrimiento","cry":"llanto","laugh":"risa","pout":"un puchero","baka":"un baka","bonk":"un golpecito","wave":"un saludo","nod":"un asentimiento","shrug":"un encogimiento","nope":"una negación","thumbsup":"pulgar arriba","handshake":"la mano","handhold":"la mano","highfive":"un choca los cinco","dance":"un baile","run":"una carrera","sleep":"dormir","yawn":"un bostezo","lurk":"un espía","stare":"una mirada","think":"pensar","facepalm":"una palmada en la cara","tableflip":"voltear la mesa","shoot":"un disparo","yeet":"un lanzamiento","peck":"un besito"};
 
+
+function getPerfilDB() {
+  const fs = require('fs');
+  try { return JSON.parse(fs.readFileSync('./perfiles.json', 'utf8')); } catch { return {}; }
+}
+function savePerfilDB(db) {
+  const fs = require('fs');
+  fs.writeFileSync('./perfiles.json', JSON.stringify(db, null, 2));
+}
+
 global.antiPorno = false
 global.antiaudio = false
 global.antivideos = false

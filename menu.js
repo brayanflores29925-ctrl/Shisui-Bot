@@ -15,6 +15,21 @@ function fechaHora() {
 }
 
 const secciones = [
+  ['📋 PERFILES', [
+    '#perfil (#pr) — Ver tu perfil.',
+    '#casarse (#cs) — Casarte con alguien.',
+    '#divorcio (#div) — Divorciarte de tu pareja.',
+    '#setdesc (#sd) — Establece tu descripción.',
+    '#setgenero (#sg) — Establece tu género.',
+    '#setcumple (#sc) — Establece tu cumpleaños.',
+    '#deldesc (#dd) — Elimina tu descripción.',
+    '#delgenero (#dg) — Elimina tu género.',
+    '#delcumple (#dc) — Borra tu cumpleaños.',
+    '#ship (#sp) — Calcula compatibilidad amorosa.',
+    '#alquilarbot — Alquila el bot para tu grupo.'
+  ]],
+
+
   ['📌 INFORMACIÓN Y AYUDA', [
     '#menu — Muestra el menú principal.',
     '#bot — Muestra información del bot.',
