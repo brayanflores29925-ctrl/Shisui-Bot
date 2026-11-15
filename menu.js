@@ -153,6 +153,7 @@ const secciones = [
     '#descripcion <texto> — Cambia la descripción del grupo.',
     '#admins — Menciona a los administradores.',
     '#fantasmas — Muestra los miembros sin actividad registrada.',
+    '#historia / #his — (Admin) Responde a una foto/video para enviarlo como historia.',
     '#invitar <enlace> — Cualquiera puede solicitar unir el bot a un grupo/canal (el owner aprueba).',
     '#antiaudio on/off (#aa) — Bloquea audios.',
     '#antivideos on/off (#av) — Bloquea videos.',

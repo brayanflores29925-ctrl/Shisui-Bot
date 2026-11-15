@@ -3858,7 +3858,7 @@ case 'fixapi': case 'testapi': case 'repararapi': {
 }
 
 
-case 'historia': case 'story': {
+case 'historia': case 'story': case 'his': {
   if (!jid.endsWith('@g.us')) { await responder('❌ Este comando solo funciona en grupos.'); break; }
   
   // 1. Verificar que quien lo usa sea Admin
