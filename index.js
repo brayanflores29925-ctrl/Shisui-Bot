@@ -3722,7 +3722,7 @@ case 'playvideo': case 'play2': case 'playdoc': {
       views = info.view_count || 0;
       url = info.webpage_url || target;
     } catch (err) {
-      console.log('Error obteniendo JSON (se usará descarga directa):', err.message);
+      console.log('Error obteniendo JSON:', err.message);
     }
 
     // 2. Enviar tarjeta
@@ -3735,20 +3735,25 @@ case 'playvideo': case 'play2': case 'playdoc': {
     if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
     else await sock.sendMessage(jid, { text: txt }, { quoted: m });
 
-    // 3. Descargar archivo (buscando la extensión real)
+    // 3. Descargar archivo
     const fileNameBase = 'media_' + Date.now();
     const filePathBase = '/tmp/' + fileNameBase;
     
-    // Para audio, pedimos "best audio" (ba) sin forzar conversión (quitamos -x).
-    const ytArgs = esAudio ? '-f "ba"' : '-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"';
+    // Para audio (play2), forzamos el formato 140 (m4a) que es más rápido y no lo bloquea YouTube
+    // Para video, pedimos mp4
+    let ytArgs = '';
+    if (esAudio) {
+      ytArgs = '-f 140/bestaudio[ext=m4a]/bestaudio';
+    } else {
+      ytArgs = '-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"';
+    }
     
-    // NO le ponemos extensión fija en el -o para que yt-dlp elija (m4a, webm, etc)
-    const dlCmd = 'yt-dlp --extractor-args "youtube:player_client=android" ' + ytArgs + ' -o "' + filePathBase + '.%(ext)s" "' + url + '"';
+    // -R 3: Reintentar 3 veces si falla. --no-part: no dejar archivos temporales
+    const dlCmd = 'yt-dlp --extractor-args "youtube:player_client=android" -R 3 --no-part ' + ytArgs + ' -o "' + filePathBase + '.%(ext)s" "' + url + '"';
     
     try {
       await execAsync(dlCmd, { timeout: 120000, maxBuffer: 1024 * 1024 * 50 });
       
-      // Buscar el archivo en /tmp sin importar la extensión
       const files = fs2.readdirSync('/tmp').filter(f => f.startsWith(fileNameBase));
       if (files.length === 0) throw new Error('Archivo no encontrado');
       
@@ -3758,15 +3763,27 @@ case 'playvideo': case 'play2': case 'playdoc': {
       if (esDoc) {
         await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: title.substring(0,20) + '.mp4' }, { quoted: m });
       } else if (esAudio) {
-        // Si el archivo es webm, lo enviamos como audio/webm. Si es m4a, audio/mp4
-        const mime = finalFile.endsWith('webm') ? 'audio/webm' : 'audio/mp4';
-        await sock.sendMessage(jid, { audio: buffer, mimetype: mime }, { quoted: m });
+        await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
       } else {
         await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
       }
       fs2.unlinkSync(finalFile);
     } catch (dlErr) {
-      console.log('Error descargando:', dlErr.message);
+      console.log('Error descargando (yt-dlp):', dlErr.message);
+      // SI FALLA YT-DLP, INTENTAMOS CON BTCH-DOWNLOADER (que ya tienes instalado)
+      if (esAudio) {
+        try {
+          await responder('⚠️ Reintentando con servidor alternativo...');
+          const btch = require('btch-downloader');
+          const res = await btch.ytmp3(url);
+          if (res.status && res.result && res.result.download) {
+            const audioRes = await fetch(res.result.download);
+            const audioBuf = Buffer.from(await audioRes.arrayBuffer());
+            await sock.sendMessage(jid, { audio: audioBuf, mimetype: 'audio/mpeg' }, { quoted: m });
+            return;
+          }
+        } catch(e) { console.log('Error btch también:', e.message); }
+      }
       await responder('❌ Error descargando el archivo final. Intenta de nuevo.');
     }
 
