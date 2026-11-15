@@ -3876,6 +3876,70 @@ case 'botones': {
   break;
 }
 
+
+case 'robloxinventario': {
+  const nombre = cuerpo.slice(cmd.length).trim()
+  if (!nombre) {
+    await responder('Uso: #robloxinventario <usuario>\nEjemplo: #robloxinventario Victorneutro')
+    break
+  }
+  await responder('🎒 Buscando inventario de: ' + nombre + '...')
+  try {
+    const idRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [nombre], excludeBannedUsers: false })
+    })
+    const idData = await idRes.json()
+    if (!idData.data || !idData.data[0]) {
+      await responder('❌ Usuario no encontrado.')
+      break
+    }
+    const userId = idData.data[0].id
+
+    const res = await fetch(`https://inventory.roproxy.com/v2/users/${userId}/inventory?limit=10&sortOrder=Desc`)
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    const data = await res.json()
+
+    if (!data.data || data.data.length === 0) {
+      await responder('❌ El inventario de este usuario está vacío o es privado.')
+      break
+    }
+
+    let txt = `🎒 *Inventario de ${nombre}* (Mostrando 10)\n\n`
+    data.data.forEach((item, i) => {
+      txt += `${i+1}. ${item.assetName || 'Objeto'}\n`
+    })
+    txt += '\n*(Para ver más, visita su perfil en Roblox)*'
+
+    await sock.sendMessage(jid, { text: txt }, { quoted: m })
+  } catch (e) {
+    console.log('Error .robloxinventario:', e.message)
+    await responder('❌ Error al obtener el inventario (puede ser privado).')
+  }
+  break
+}
+
+case 'bloxstock': case 'stockfrutas': {
+  await responder('🍎 Consultando stock de frutas...')
+  try {
+    const res = await fetch('https://api.anything.notte.cc/bloxfruits/stock')
+    const data = await res.json()
+
+    let txt = '🍎 *STOCK DE BLOX FRUITS*\n\n'
+    txt += `*Normal:*\n`
+    data.normal.forEach(f => { txt += `- ${f.name} (${f.price} Beli / ${f.robux} R$)\n` })
+    txt += `\n*Mirage:*\n`
+    data.mirage.forEach(f => { txt += `- ${f.name} (${f.price} Beli / ${f.robux} R$)\n` })
+
+    await sock.sendMessage(jid, { text: txt }, { quoted: m })
+  } catch (e) {
+    console.log('Error .bloxstock:', e.message)
+    await responder('❌ No se pudo obtener el stock en este momento.')
+  }
+  break
+}
+
 case 'musica':
       case 'm':
       case 'play':
