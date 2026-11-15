@@ -1417,63 +1417,82 @@ case 'menu': {
       }
 
       case 'pin': {
-  const entrada = cuerpo.slice(cmd.length).trim()
-
-  if (!entrada) {
-    await responder('Uso: .pin descripción\\nEjemplos: .pin gato triste | .pin anime | .pin boys ojos verdes')
+  const consulta = cuerpo.slice(cmd.length).trim()
+  if (!consulta) {
+    await responder('Uso: .pin <búsqueda>\nEjemplo: .pin gato')
     break
   }
-
-  await responder('🔎 Buscando stickers e imágenes de: ' + entrada)
-
+  await responder('🔍 Buscando sticker o foto de: ' + consulta)
   try {
-    const resultados = await buscarImagenes(entrada, 1)
-
-    if (!resultados.length) {
-      await responder('❌ No encontré imágenes para esa búsqueda. Prueba con otras palabras.')
-      break
+    let enviado = false
+    
+    // 1. Buscar sticker animado en Giphy (no necesita API Key)
+    try {
+      const giphyUrl = `https://api.giphy.com/v1/stickers/search?api_key=dc6zaTOxFJmzC&q=${encodeURIComponent(consulta)}&limit=1&rating=g`
+      const res = await fetch(giphyUrl)
+      const data = await res.json()
+      if (data.data && data.data.length > 0) {
+        const gifUrl = data.data[0].images.original.url
+        const gifRes = await fetch(gifUrl)
+        const gifBuffer = Buffer.from(await gifRes.arrayBuffer())
+        const webpBuffer = await convertirGifAWebp(gifBuffer)
+        await sock.sendMessage(jid, { sticker: webpBuffer }, { quoted: m })
+        enviado = true
+        console.log('[pin] Sticker de Giphy enviado para:', consulta)
+      }
+    } catch (e) {
+      console.log('Error buscando en Giphy:', e.message)
     }
 
-    const fotos = []
-    let stickers = 0
-
-    for (const imagen of resultados.slice(0, 1)) {
+    // 2. Si no hay sticker, buscar imagen en Google
+    if (!enviado) {
       try {
-        const buffer = await bajarMedia(imagen.url, 10)
-        if (!buffer || !buffer.length) continue
-
-        fotos.push({ buffer, titulo: imagen.titulo })
-
-        try {
-          const webp = await imagenASticker(buffer)
-          await sock.sendMessage(jid, {
-            sticker: await conMetadatos(webp)
-          }, { quoted: m })
-          stickers++
-        } catch (e) {
-          console.log('No se pudo convertir la imagen en sticker:', e.message)
+        const { search, ImageResult } = require('google-sr')
+        const results = await search({ query: consulta, parsers: [ImageResult] })
+        if (results && results.length > 0) {
+          const imgUrl = results[0].image
+          const imgRes = await fetch(imgUrl)
+          if (imgRes.ok) {
+            const imgBuffer = Buffer.from(await imgRes.arrayBuffer())
+            try {
+              // Intentar convertir a sticker
+              const webp = await imagenASticker(imgBuffer, 'square')
+              await sock.sendMessage(jid, { sticker: webp }, { quoted: m })
+            } catch (e) {
+              // Si falla, enviar como foto
+              await sock.sendMessage(jid, { image: imgBuffer, caption: '🖼️ Aquí tienes: ' + consulta }, { quoted: m })
+            }
+            enviado = true
+            console.log('[pin] Imagen de Google enviada para:', consulta)
+          }
         }
       } catch (e) {
-        console.log('Error descargando imagen para .pin:', e.message)
+        console.log('Error buscando imagen en Google:', e.message)
       }
     }
 
-    if (stickers === 0 && fotos.length) {
-      await sock.sendMessage(jid, {
-        image: fotos[0].buffer,
-        caption: '🖼️ No pude obtener un sticker, aquí tienes la foto de: ' + entrada
-      }, { quoted: m })
-    } else if (stickers === 0) {
-      await responder('❌ No pude descargar las imágenes. Intenta otra búsqueda.')
+    // 3. Si todo falla, generar con IA (Pollinations)
+    if (!enviado) {
+      try {
+        console.log('[pin] Generando imagen con IA...')
+        const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(consulta) + '?width=512&height=512&nologo=true'
+        const res = await fetch(url)
+        const imgBuffer = Buffer.from(await res.arrayBuffer())
+        const webp = await imagenASticker(imgBuffer, 'square')
+        await sock.sendMessage(jid, { sticker: webp }, { quoted: m })
+        enviado = true
+      } catch (e) {
+        console.log('Error generando en Pollinations:', e.message)
+      }
     }
-  } catch (e) {
-    console.log('Error en .pin:', e.message)
-    await responder('❌ Error buscando imágenes. Intenta nuevamente.')
-  }
 
+    if (!enviado) await responder('❌ No encontré nada para esa búsqueda.')
+  } catch (e) {
+    console.log('Error .pin:', e.message)
+    await responder('❌ Error buscando. Intenta de nuevo.')
+  }
   break
 }
-
 case 'buscar':
 case 'buscartt': {
   const consulta = cuerpo.slice(cmd.length).trim()
