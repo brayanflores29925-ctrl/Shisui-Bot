@@ -1,7 +1,7 @@
 // admin.js - comandos extra de administración de grupos
 const fs = require('fs')
 
-const ZONA_POR_DEFECTO = 'America/Argentina/Buenos_Aires'
+const ZONA_POR_DEFECTO = 'America/Tegucigalpa'
 const COMANDOS_ADMIN = ['horario', 'nombregrupo', 'descripcion', 'admins', 'fantasmas']
 const ultimoAdmins = new Map()
 const ultimoIntento = new Map()
