@@ -1894,20 +1894,31 @@ case 'robloxgroups': {
 case 'robloxgame': {
   const nombre = cuerpo.slice(cmd.length).trim()
   if (!nombre) {
-    await responder('Uso: #robloxgame <nombre del juego>\nEjemplo: #robloxgame Blox Fruits')
+    await responder('Uso: #robloxgame <nombre del juego>\\nEjemplo: #robloxgame Blox Fruits')
     break
   }
   await responder('🎮 Buscando juego: ' + nombre + '...')
   try {
-    const res = await fetch(`https://apis.roblox.com/search-api/omni-search?searchQuery=${encodeURIComponent(nombre)}&pageType=games`)
+    // Usamos 'pageType=all' y un 'sessionId' para que la API de Roblox responda correctamente
+    const url = `https://apis.roblox.com/search-api/omni-search?searchQuery=${encodeURIComponent(nombre)}&pageType=all&sessionId=0`
+    const res = await fetch(url)
     const data = await res.json()
+
+    // La API devuelve los resultados en 'searchResults[0].contents'
     const resultados = data.searchResults?.[0]?.contents || []
     const juego = resultados.find(r => r.name)
+
     if (!juego) {
-      await responder('❌ No encontré ese juego.')
+      await responder('❌ No encontré ese juego. Prueba con el nombre exacto.')
       break
     }
-    const caption = `🎮 *${juego.name}*\n🆔 Universe ID: ${juego.id || juego.universeId}\n👤 Creador: ${juego.creatorName || 'Desconocido'}\n📊 Visitas: ${(juego.playerCount || juego.visits || 0).toLocaleString()}\n🔗 https://www.roblox.com/games/${juego.id}`
+
+    const caption = `🎮 *${juego.name}*\\n` +
+                    `🆔 Universe ID: ${juego.id || juego.universeId}\\n` +
+                    `👤 Creador: ${juego.creatorName || 'Desconocido'}\\n` +
+                    `📊 Visitas: ${(juego.playerCount || juego.visits || 0).toLocaleString()}\\n` +
+                    `🔗 https://www.roblox.com/games/${juego.id}`
+
     await sock.sendMessage(jid, { text: caption }, { quoted: m })
   } catch (e) {
     console.log('Error .robloxgame:', e.message)
