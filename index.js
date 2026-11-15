@@ -1196,53 +1196,118 @@ case 'buscar':
 case 'buscartt': {
   const consulta = cuerpo.slice(cmd.length).trim()
   if (!consulta) {
-    await responder('Uso: .buscar <nombre o palabra>\nEjemplo: .buscar Shakira')
+    await responder('Uso: .buscar <tema>\nEjemplo: .buscar baile de moda')
     break
   }
-  await responder('🔎 Buscando un video de TikTok sobre: ' + consulta)
+
+  const apiKey = process.env.SOCIALCRAWL_API_KEY
+  if (!apiKey) {
+    await responder('❌ No está configurada la API de SocialCrawl.')
+    break
+  }
+
+  const propietario = esDueno(m)
+  const remitente = m.key.participantAlt || m.key.participant ||
+    m.key.remoteJidAlt || m.key.remoteJid
+  const idUsuario = String(remitente || '').split('@')[0]
+    .split(':')[0].replace(/\D/g, '')
+
+  if (!propietario && !idUsuario) {
+    await responder('❌ No pude identificar tu cuenta para aplicar el límite.')
+    break
+  }
+
+  const archivoLimites = path.join(__dirname, 'buscar-limites.json')
+  let limites = {}
   try {
-    const { tiktokHashtag } = require('gocreative-tiktok-search')
+    limites = JSON.parse(fs.readFileSync(archivoLimites, 'utf8'))
+    if (!limites || typeof limites !== 'object' || Array.isArray(limites)) limites = {}
+  } catch {}
 
-    // El "free demo tier" no necesita clave, son 5 llamadas al día.
-    // Busca como hashtag, pero funciona bien con nombres populares.
-    const result = await tiktokHashtag(consulta)
+  const usados = Number(limites[idUsuario] || 0)
+  if (!propietario && usados >= 2) {
+    await responder('⛔ Ya utilizaste tus 2 búsquedas de TikTok permitidas.')
+    break
+  }
 
-    // La estructura puede variar; buscamos un array de videos.
-    const videos = result?.videos || result?.data || (Array.isArray(result) ? result : [])
+  if (!propietario) {
+    limites[idUsuario] = usados + 1
+    fs.writeFileSync(archivoLimites, JSON.stringify(limites, null, 2))
+  }
 
-    if (!videos || videos.length === 0) {
+  let busquedaCobro = false
+  try {
+    await responder('🔎 Buscando 2 videos de TikTok sobre: ' + consulta)
+
+    const urlApi = new URL('https://www.socialcrawl.dev/v1/tiktok/search')
+    urlApi.searchParams.set('query', consulta)
+    urlApi.searchParams.set('limit', '2')
+    urlApi.searchParams.set('sort_by', 'relevance')
+
+    const respuestaApi = await fetch(urlApi, {
+      headers: { 'x-api-key': apiKey, 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(45000)
+    })
+
+    const datosApi = await respuestaApi.json()
+    if (!respuestaApi.ok || datosApi.success === false) {
+      throw new Error(datosApi.error?.message || datosApi.message || 'Error HTTP ' + respuestaApi.status)
+    }
+
+    busquedaCobro = true
+    const resultados = datosApi.data?.items || datosApi.items || []
+
+    if (!Array.isArray(resultados) || resultados.length === 0) {
       await responder('❌ No encontré videos para esa búsqueda.')
       break
     }
 
-    const v = videos[0] // Tomamos el primer resultado
+    let enviados = 0
 
-    // Intentamos extraer la URL del video sin marca de agua.
-    const urlVideo = v.video?.playAddr || v.video?.downloadAddr || v.play || v.video_url
-    if (!urlVideo) {
-      await responder('❌ Encontré un resultado pero no pude extraer la URL del video.')
-      break
+    for (const elemento of resultados.slice(0, 2)) {
+      const post = elemento.post || elemento
+      const enlace = post.url || post.share_url || post.web_url || post.video_url || elemento.url
+
+      if (!enlace || !/^https?:\/\//i.test(enlace)) continue
+
+      try {
+        const descarga = await descargar('video', enlace, null, null)
+        if (!descarga?.ok || !descarga.url) continue
+
+        const buffer = await bajarMedia(descarga.url, 50)
+        if (!buffer || !buffer.length) continue
+
+        const autor = post.author?.username || post.author?.nickname || 'TikTok'
+        const descripcion = String(post.caption || post.description || post.text || consulta).slice(0, 700)
+
+        await sock.sendMessage(jid, {
+          video: buffer,
+          caption: '🎬 ' + descripcion + '\n👤 ' + autor
+        }, { quoted: m })
+
+        enviados++
+      } catch (errorVideo) {
+        console.log('Error descargando resultado de .buscar:', errorVideo.message)
+      }
     }
 
-    const bufferVideo = await bajarMedia(urlVideo, 30)
-    if (!bufferVideo || !bufferVideo.length) {
-      await responder('❌ No pude descargar el video. Intenta de nuevo.')
-      break
+    if (enviados === 0) {
+      await responder('❌ Encontré resultados, pero no pude descargar sus videos.')
+    } else if (enviados === 1) {
+      await responder('⚠️ Solo pude enviar 1 de los 2 videos encontrados.')
     }
-
-    const autor = v.author?.uniqueId || v.author?.nickname || 'Desconocido'
-    const caption = '🎬 ' + (v.desc || consulta) + '\n👤 ' + autor
-
-    await sock.sendMessage(jid, { video: bufferVideo, caption }, { quoted: m })
-
-  } catch (e) {
-    console.log('Error en .buscar (gocreative):', e.message)
-    await responder('❌ Error al buscar videos. Revisa la consola para más detalles.')
+  } catch (error) {
+    if (!busquedaCobro && !propietario) {
+      limites[idUsuario] = usados
+      if (usados === 0) delete limites[idUsuario]
+      try { fs.writeFileSync(archivoLimites, JSON.stringify(limites, null, 2)) } catch {}
+    }
+    console.log('Error en .buscar (SocialCrawl):', error.message)
+    await responder('❌ No pude completar la búsqueda. Intenta más tarde.')
   }
   break
 }
-
-      case 'musica':
+case 'musica':
       case 'm':
       case 'play':
       case 'video':
