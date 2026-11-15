@@ -257,6 +257,21 @@ const secciones = [
     '#niveles — Lista de niveles.'
   ]],
 
+  ['🎮 JUEGOS', [
+    '#juegospro — Menú de juegos avanzados.',
+    '#menuclan — Menú del clan Free Fire.',
+    '#ppt — Piedra, papel o tijera.',
+    '#dados — Lanza un dado.',
+    '#flipp — Cara o sello.',
+    '#casino <cant> — Apuesta monedas.',
+    '#enigma — Resuelve un acertijo.',
+    '#horca / #resphorca — Juego del ahorcado.',
+    '#guerra @user — Reta a un duelo.',
+    '#4vs4 / #6vs6 — Forma equipos.',
+    '#sensibilidad — Sensibilidad FF.',
+    '#card / #stats — Tarjeta de jugador.',
+  ]],
+
   ['🎧 EFECTOS Y STICKERS', [
     '#alteradores — Lista de efectos disponibles.',
     '#audiolento — Audio lento.',

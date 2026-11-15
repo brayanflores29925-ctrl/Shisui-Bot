@@ -3616,6 +3616,120 @@ case 'downloadlink': {
   break;
 }
 
+case 'juegospro': {
+  await responder(`🎲 *JUEGOS PRO*\n\n• #ppt <piedra/papel/tijera>\n• #dados\n• #flipp\n• #casino <cantidad>\n• #enigma\n• #horca / #resphorca\n• #guerra @user\n• #4vs4 @users\n• #sensibilidad\n• #card\n• #stats`);
+  break;
+}
+case 'menuclan': {
+  await responder(`🛡️ *MENÚ CLAN FREE FIRE*\n\n• #card <nombre> — Tarjeta de jugador.\n• #stats <nombre> — Estadísticas.\n• #sensibilidad — Configuración de sensibilidad.\n• #guerra @user — Retar a alguien.\n\n¡Prepara a tu escuadrón!`);
+  break;
+}
+case 'ppt': {
+  const opcion = cuerpo.slice(cmd.length).trim().toLowerCase();
+  if (!['piedra', 'papel', 'tijera'].includes(opcion)) { await responder('Uso: #ppt <piedra/papel/tijera>'); break; }
+  const opciones = ['piedra', 'papel', 'tijera'];
+  const botOpcion = opciones[Math.floor(Math.random() * 3)];
+  let resultado = '';
+  if (opcion === botOpcion) resultado = '🤝 ¡Empate!';
+  else if ((opcion === 'piedra' && botOpcion === 'tijera') || (opcion === 'papel' && botOpcion === 'piedra') || (opcion === 'tijera' && botOpcion === 'papel')) resultado = '🎉 ¡Ganaste!';
+  else resultado = '😢 Perdiste.';
+  await responder(`Tú: *${opcion}*\nBot: *${botOpcion}*\n\n${resultado}`);
+  break;
+}
+case 'dados': {
+  const dado = Math.floor(Math.random() * 6) + 1;
+  await responder(`🎲 Has lanzado el dado y salió: *${dado}*`);
+  break;
+}
+case 'flipp': {
+  const res = Math.random() > 0.5 ? 'Cara 🪙' : 'Sello 🪙';
+  await responder(`Lanzando moneda... ¡Salió *${res}*!`);
+  break;
+}
+case 'casino': {
+  const sender = m.key.participant || m.key.remoteJid;
+  const cantidad = parseInt(cuerpo.slice(cmd.length).trim());
+  if (isNaN(cantidad) || cantidad <= 0) { await responder('Uso: #casino <cantidad>\nEj: #casino 50'); break; }
+  const db = getGachaDB();
+  const u = getGachaUser(db, sender);
+  if (u.coins < cantidad) { await responder('❌ No tienes suficientes monedas en tu Gacha.'); break; }
+  u.coins -= cantidad;
+  const gano = Math.random() > 0.6;
+  if (gano) { u.coins += (cantidad * 2); await responder(`🎰 ¡JACKPOT! Ganaste *${cantidad * 2} monedas*.\n💰 Saldo actual: ${u.coins}`); }
+  else { await responder(`🎰 La casa gana... Perdiste *${cantidad} monedas*.\n💰 Saldo actual: ${u.coins}`); }
+  saveGachaDB(db);
+  break;
+}
+case 'enigma': {
+  const enigmas = [
+    '¿Qué cosa es, que cuanto más grande, menos se ve? (La oscuridad)',
+    'Tiene dientes pero no muerde. (El peine)',
+    '¿Qué es lo que se rompe cuando se dice su nombre? (El silencio)',
+    'Blanco por dentro, verde por fuera, si quieres que te lo diga espera. (La pera)'
+  ];
+  await responder(`🧩 *Resuelve el enigma:*\n\n${enigmas[Math.floor(Math.random() * enigmas.length)]}`);
+  break;
+}
+case 'horca': {
+  const sender = m.key.participant || m.key.remoteJid;
+  if (!global.horcaGames) global.horcaGames = new Map();
+  const palabras = ['programacion', 'whatsapp', 'telefono', 'javascript', 'computadora', 'internet'];
+  const palabra = palabras[Math.floor(Math.random() * palabras.length)];
+  global.horcaGames.set(sender, { palabra, intentos: 6, adivinadas: [] });
+  const mostrar = palabra.split('').map(l => '_').join(' ');
+  await responder(`🎮 *AHORCADO*\nPalabra: ${mostrar} (${palabra.length} letras)\nIntentos restantes: 6\n\nUsa #resphorca <letra>`);
+  break;
+}
+case 'resphorca': {
+  const sender = m.key.participant || m.key.remoteJid;
+  const letra = cuerpo.slice(cmd.length).trim().toLowerCase();
+  if (!letra || letra.length !== 1) { await responder('❌ Escribe solo una letra.'); break; }
+  if (!global.horcaGames || !global.horcaGames.has(sender)) { await responder('❌ No tienes un juego activo. Usa #horca'); break; }
+  const juego = global.horcaGames.get(sender);
+  if (juego.palabra.includes(letra)) {
+    if (!juego.adivinadas.includes(letra)) juego.adivinadas.push(letra);
+    const mostrar = juego.palabra.split('').map(l => juego.adivinadas.includes(l) ? l : '_').join(' ');
+    if (!mostrar.includes('_')) { await responder(`🎉 ¡Ganaste! La palabra era *${juego.palabra}*.`); global.horcaGames.delete(sender); }
+    else { await responder(`✅ ¡Bien! Letra correcta.\n${mostrar}`); }
+  } else {
+    juego.intentos--;
+    if (juego.intentos === 0) { await responder(`💀 ¡Has perdido! La palabra era *${juego.palabra}*.`); global.horcaGames.delete(sender); }
+    else { await responder(`❌ Letra incorrecta. Te quedan ${juego.intentos} intentos.`); }
+  }
+  break;
+}
+case 'guerra': {
+  const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
+  if (!mencionado) { await responder('Uso: #guerra @usuario'); break; }
+  const miPoder = Math.floor(Math.random() * 100);
+  const suPoder = Math.floor(Math.random() * 100);
+  const ganador = miPoder > suPoder ? `@${m.key.participant.split('@')[0]}` : `@${mencionado.split('@')[0]}`;
+  await sock.sendMessage(jid, { text: `⚔️ *GUERRA*\n\nTú: ${miPoder} de poder.\nRival: ${suPoder} de poder.\n\n🏆 El ganador es: *${ganador}*`, mentions: [mencionado, m.key.participant] }, { quoted: m });
+  break;
+}
+case '4vs4': case '6vs6': case '12vs12': {
+  const menciones = m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+  if (menciones.length < 2) { await responder('Uso: #4vs4 @user1 @user2 ...'); break; }
+  const mezclados = menciones.sort(() => Math.random() - 0.5);
+  const mitad = Math.ceil(mezclados.length / 2);
+  const equipo1 = mezclados.slice(0, mitad).map(u => '@' + u.split('@')[0]).join(', ');
+  const equipo2 = mezclados.slice(mitad).map(u => '@' + u.split('@')[0]).join(', ');
+  await sock.sendMessage(jid, { text: `⚔️ *EQUIPOS FORMADOS*\n\n🔴 Equipo 1:\n${equipo1}\n\n🔵 Equipo 2:\n${equipo2}`, mentions: mezclados }, { quoted: m });
+  break;
+}
+case 'sensibilidad': {
+  const gen = () => Math.floor(Math.random() * 200);
+  await responder(`🎯 *SENSIBILIDAD FREE FIRE*\n\nGeneral: ${gen()}\nPunto Rojo: ${gen()}\nMira 2x: ${gen()}\nMira 4x: ${gen()}\nFranco: ${gen()}\n\n¡Prueba esta config!`);
+  break;
+}
+case 'card': case 'stats': {
+  const nombre = cuerpo.slice(cmd.length).trim() || 'Jugador';
+  const kd = (Math.random() * 3 + 1).toFixed(2);
+  const victorias = Math.floor(Math.random() * 500);
+  await responder(`📊 *TARJETA DE JUGADOR*\n\n👤 Nombre: ${nombre}\n🏆 Victorias: ${victorias}\n💀 K/D Ratio: ${kd}\n🎖️ Rango: ${victorias > 250 ? 'Heroico' : 'Diamante'}\n\n(Estadísticas simuladas)`);
+  break;
+}
+
 case 'musica':
       case 'm':
       case 'play':
