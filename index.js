@@ -436,6 +436,61 @@ async function iniciar(opciones = {}) {
 
   
 // Sistema de invitaciones pendientes (en memoria)
+
+async function convertirGifAWebp(gifBuffer) {
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+  const { execFile } = require('child_process');
+  const { promisify } = require('util');
+  const execFileAsync = promisify(execFile);
+  const base = path.join(os.tmpdir(), 'anime_' + Date.now());
+  const input = base + '.gif';
+  const output = base + '.webp';
+  fs.writeFileSync(input, gifBuffer);
+  try {
+    await execFileAsync('ffmpeg', [
+      '-y', '-i', input,
+      '-vf', 'scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0',
+      '-c:v', 'libwebp', '-quality', '80', '-loop', '0', '-an', '-vsync', '0',
+      output
+    ], { timeout: 20000 });
+    return fs.readFileSync(output);
+  } finally {
+    try { fs.unlinkSync(input); } catch (e) {}
+    try { fs.unlinkSync(output); } catch (e) {}
+  }
+}
+
+async function enviarStickerAnime(accion, jid, m, sock, mencionado) {
+  try {
+    const res = await fetch('https://nekos.best/api/v2/' + accion);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const urlGif = data.results && data.results[0] && data.results[0].url;
+    if (!urlGif) throw new Error('Sin GIF');
+    const gifRes = await fetch(urlGif);
+    const gifBuffer = Buffer.from(await gifRes.arrayBuffer());
+    const webpBuffer = await convertirGifAWebp(gifBuffer);
+    await sock.sendMessage(jid, { sticker: webpBuffer }, { quoted: m });
+    const mencionTexto = mencionado ? `@${mencionado.split('@')[0]} ` : '';
+    await sock.sendMessage(jid, {
+      text: mencionTexto + 'te da un ' + accion + ' 🤗',
+      mentions: mencionado ? [mencionado] : []
+    }, { quoted: m });
+  } catch (e) {
+    console.log('Error sticker anime (' + accion + '):', e.message);
+    await sock.sendMessage(jid, { text: '❌ No pude obtener el sticker de ' + accion }, { quoted: m });
+  }
+}
+
+function calcularPorcentaje(comando, userId) {
+  const crypto = require('crypto');
+  const hash = crypto.createHash('md5').update(comando + userId).digest('hex');
+  return parseInt(hash.substring(0, 8), 16) % 101;
+}
+
+const ANIME_MAP = {"hug": "hug", "kiss": "kiss", "pat": "pat", "slap": "slap", "punch": "punch", "patear": "kick", "poke": "poke", "tickle": "tickle", "cuddle": "cuddle", "bite": "bite", "feed": "feed", "nom": "nom", "smile": "smile", "wink": "wink", "blush": "blush", "smug": "smug", "happy": "happy", "angry": "angry", "bored": "bored", "cry": "cry", "laugh": "laugh", "pout": "pout", "baka": "baka", "bonk": "bonk", "wave": "wave", "nod": "nod", "shrug": "shrug", "nope": "nope", "thumbsup": "thumbsup", "handshake": "handshake", "handhold": "handhold", "highfive": "highfive", "dance": "dance", "run": "run", "sleep": "sleep", "yawn": "yawn", "lurk": "lurk", "stare": "stare", "think": "think", "facepalm": "facepalm", "tableflip": "tableflip", "shoot": "shoot", "yeet": "yeet", "peck": "peck"};
 global.antiPorno = false
 global.antiaudio = false
 global.antivideos = false
@@ -1917,6 +1972,103 @@ case 'antistatus': {
   break
 }
 
+case 'hug':
+case 'kiss':
+case 'pat':
+case 'slap':
+case 'punch':
+case 'patear':
+case 'poke':
+case 'tickle':
+case 'cuddle':
+case 'bite':
+case 'feed':
+case 'nom':
+case 'smile':
+case 'wink':
+case 'blush':
+case 'smug':
+case 'happy':
+case 'angry':
+case 'bored':
+case 'cry':
+case 'laugh':
+case 'pout':
+case 'baka':
+case 'bonk':
+case 'wave':
+case 'nod':
+case 'shrug':
+case 'nope':
+case 'thumbsup':
+case 'handshake':
+case 'handhold':
+case 'highfive':
+case 'dance':
+case 'run':
+case 'sleep':
+case 'yawn':
+case 'lurk':
+case 'stare':
+case 'think':
+case 'facepalm':
+case 'tableflip':
+case 'shoot':
+case 'yeet':
+case 'peck':
+{
+  const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
+  if (!mencionado) {
+    await responder('❌ Menciona a alguien. Ejemplo: #hug @usuario');
+    break;
+  }
+  const accion = ANIME_MAP[cmd];
+  await enviarStickerAnime(accion, jid, m, sock, mencionado);
+  break;
+}
+case 'gay':
+case 'feo':
+case 'rankbromistas':
+case 'rankgay':
+case 'ranklindo':
+case 'rankcornudos':
+case 'ranknazis':
+case 'rankotaku':
+case 'ranklesbianas':
+case 'rankinfieles':
+case 'rankfieles':
+case 'ranktherian':
+{
+  const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
+  const objetivo = mencionado || (m.key.participant || m.key.remoteJid);
+  const nombre = objetivo.split('@')[0];
+  if (cmd.startsWith('rank')) {
+    // Ranking grupal ficticio basado en hash de cada miembro
+    try {
+      const meta = await sock.groupMetadata(jid);
+      const lista = meta.participants.map(p => ({
+        id: p.id,
+        num: p.id.split('@')[0],
+        pct: calcularPorcentaje(cmd, p.id)
+      })).sort((a,b) => b.pct - a.pct).slice(0,5);
+      let txt = '🏆 *' + cmd.replace('rank','').toUpperCase() + ' — TOP 5*\n\n';
+      lista.forEach((u,i) => {
+        txt += (i+1) + '. @' + u.num + ' — ' + u.pct + '%\n';
+      });
+      await sock.sendMessage(jid, { text: txt, mentions: lista.map(u=>u.id) }, { quoted: m });
+    } catch(e) {
+      await responder('❌ No pude calcular el ranking.');
+    }
+  } else {
+    const pct = calcularPorcentaje(cmd, objetivo);
+    const emoji = pct > 70 ? '🔥' : pct > 40 ? '😐' : '💧';
+    await sock.sendMessage(jid, {
+      text: emoji + ' @' + nombre + ' es *' + pct + '% ' + cmd + '*.',
+      mentions: [objetivo]
+    }, { quoted: m });
+  }
+  break;
+}
 case 'musica':
       case 'm':
       case 'play':

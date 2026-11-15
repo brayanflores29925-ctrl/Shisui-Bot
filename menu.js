@@ -167,6 +167,33 @@ const secciones = [
     '#key — Gestiona la clave de acceso.'
   ]],
 
+  ['🎬 ANIME INTERACCIONES', [
+    '#hug — Abrazar.', '#kiss — Besar.', '#pat — Acariciar.',
+    '#slap — Bofetada.', '#punch — Puñetazo.', '#patear — Patear.',
+    '#poke — Picar.', '#tickle — Cosquillas.', '#cuddle — Acurrucarse.',
+    '#bite — Morder.', '#feed — Dar de comer.', '#nom — Comer.',
+    '#smile — Sonreír.', '#wink — Guiñar.', '#blush — Sonrojarse.',
+    '#smug — Presumir.', '#happy — Felicidad.', '#angry — Enojo.',
+    '#bored — Aburrido.', '#cry — Llorar.', '#laugh — Reír.',
+    '#pout — Puchero.', '#baka — Decir baka.', '#bonk — Golpecito.',
+    '#wave — Saludar.', '#nod — Asentir.', '#shrug — Encogerse.',
+    '#nope — Negarse.', '#thumbsup — Pulgar arriba.', '#handshake — Dar la mano.',
+    '#handhold — Tomar de la mano.', '#highfive — Chocar los cinco.', '#dance — Bailar.',
+    '#run — Correr.', '#sleep — Dormir.', '#yawn — Bostezar.',
+    '#lurk — Espiar.', '#stare — Mirar fijamente.', '#think — Pensar.',
+    '#facepalm — Palmada en la cara.', '#tableflip — Voltear la mesa.', '#shoot — Disparar.',
+    '#yeet — Lanzar lejos.', '#peck — Besito corto.'
+  ]],
+
+  ['🎲 RANKINGS', [
+    '#gay — Porcentaje gay.', '#feo — Porcentaje feo.',
+    '#rankbromistas — Ranking bromistas.', '#rankgay — Ranking gay.',
+    '#ranklindo — Ranking lindos.', '#rankcornudos — Ranking cornudos.',
+    '#ranknazis — Ranking malos.', '#rankotaku — Ranking otaku.',
+    '#ranklesbianas — Ranking lesbianas.', '#rankinfieles — Ranking infieles.',
+    '#rankfieles — Ranking fieles.', '#ranktherian — Ranking therian.'
+  ]],
+
   ['🎮 ROBLOX', [
     '#robloxuser <nombre> — Busca un usuario y muestra su ID e info.',
     '#robloxavatar <nombre> — Muestra la imagen del avatar.',
