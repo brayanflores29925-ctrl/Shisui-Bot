@@ -3843,6 +3843,61 @@ case 'clearlogs': {
   break;
 }
 
+
+case 'fixapi': case 'testapi': case 'repararapi': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño puede usar este comando.'); break; }
+  
+  await responder('🛠️ *Iniciando diagnóstico de APIs...*\nEsto puede tardar unos segundos.');
+  
+  let reporte = '📊 *REPORTE DE APIS*\n\n';
+  
+  // 1. Actualizar yt-dlp
+  try {
+    const { execSync } = require('child_process');
+    execSync('yt-dlp -U', { stdio: 'ignore' });
+    reporte += '✅ *yt-dlp (YouTube):* Actualizado correctamente.\n';
+  } catch (e) {
+    try {
+      execSync('pip install -U yt-dlp', { stdio: 'ignore' });
+      reporte += '✅ *yt-dlp (YouTube):* Actualizado vía pip.\n';
+    } catch (e2) {
+      reporte += '⚠️ *yt-dlp (YouTube):* No se pudo actualizar (pero podría funcionar).\n';
+    }
+  }
+
+  // 2. Probar IA (Pollinations)
+  try {
+    const res = await fetch('https://text.pollinations.ai/Hola');
+    if (res.ok) reporte += '✅ *IA (Pollinations):* Funcionando.\n';
+    else throw new Error();
+  } catch (e) {
+    reporte += '❌ *IA (Pollinations):* Caída o bloqueada.\n';
+  }
+
+  // 3. Probar TikTok (TikWM)
+  try {
+    const res = await fetch('https://www.tikwm.com/api/feed/search?keywords=test');
+    if (res.ok) reporte += '✅ *TikTok (TikWM):* Funcionando.\n';
+    else throw new Error();
+  } catch (e) {
+    reporte += '❌ *TikTok (TikWM):* Caída o bloqueada.\n';
+  }
+
+  // 4. Probar Roblox API
+  try {
+    const res = await fetch('https://users.roblox.com/v1/users/1');
+    if (res.ok) reporte += '✅ *Roblox API:* Funcionando.\n';
+    else throw new Error();
+  } catch (e) {
+    reporte += '❌ *Roblox API:* Caída o bloqueada.\n';
+  }
+
+  reporte += '\n💡 *Consejo:* Si una API está en ❌, los comandos relacionados fallarán. Intenta reiniciar el bot o usa comandos alternativos.';
+  
+  await responder(reporte);
+  break;
+}
+
 case 'musica':
       case 'm':
       case 'play':
