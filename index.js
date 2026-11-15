@@ -2830,6 +2830,65 @@ case 'chatpgt': case 'gpt': {
 }
 case 'google': case 'buscar': {
   const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder(`Uso: #google <búsqueda>
+Ej: #google Shakira`); break; }
+  
+  await responder('🔍 Buscando en la web...');
+  
+  try {
+    const { search } = await import('ducksearch');
+    const results = await search(query, { maxResults: 5 });
+    
+    if (!results || results.length === 0) {
+      await responder('❌ No encontré resultados para: ' + query);
+      break;
+    }
+    
+    let txt = `🔍 *Resultados para:* ${query}
+
+`;
+    results.forEach((r, i) => {
+      txt += `*${i+1}. ${r.title}*
+🔗 ${r.url}
+`;
+      if (r.snippet) txt += `📝 ${r.snippet.substring(0, 150)}...
+`;
+      txt += `
+`;
+    });
+    
+    await sock.sendMessage(jid, { text: txt }, { quoted: m });
+    
+  } catch (e) {
+    console.log('Error .google:', e.message);
+    try {
+      await responder('⚠️ El buscador principal falló. Buscando en Wikipedia...');
+      const wikiRes = await fetch(`https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`);
+      const wikiData = await wikiRes.json();
+      
+      if (wikiData.query && wikiData.query.search.length > 0) {
+        let wikiTxt = `📚 *Resultados en Wikipedia:*
+
+`;
+        wikiData.query.search.slice(0, 3).forEach((r, i) => {
+          wikiTxt += `*${i+1}. ${r.title}*
+🔗 https://es.wikipedia.org/wiki/${encodeURIComponent(r.title.replace(/ /g, '_'))}
+
+`;
+        });
+        await sock.sendMessage(jid, { text: wikiTxt }, { quoted: m });
+      } else {
+        await responder('❌ Error buscando. Intenta de nuevo en unos segundos.');
+      }
+    } catch (e2) {
+      console.log('Error en respaldo de Wikipedia:', e2.message);
+      await responder('❌ Error buscando. Intenta de nuevo en unos segundos.');
+    }
+  }
+  break;
+}
+case 'buscar': {
+  const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #google <búsqueda>'); break; }
   await responder('🔍 Buscando en la web...');
   try {
