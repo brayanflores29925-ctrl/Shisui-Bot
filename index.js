@@ -3711,7 +3711,7 @@ case 'playvideo': case 'play2': case 'playdoc': {
     
     let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0, url = target;
     
-    // 1. Intentar obtener info (con try/catch para que no falle si YouTube bloquea)
+    // 1. Obtener info para la tarjeta
     try {
       const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
       const info = JSON.parse(stdout.trim().split('\n')[0]);
@@ -3723,10 +3723,9 @@ case 'playvideo': case 'play2': case 'playdoc': {
       url = info.webpage_url || target;
     } catch (err) {
       console.log('Error obteniendo JSON (se usará descarga directa):', err.message);
-      // Si falla, usamos el target (ytsearch1:...) para descargar y dejamos los datos por defecto
     }
 
-    // 2. Enviar la tarjeta (con o sin foto)
+    // 2. Enviar tarjeta
     const txt = '➩ Descargando › *' + title + '*\n\n' +
                 '❖ Canal › *' + channel + '*\n' +
                 '⧖ Duración › *' + duration + '*\n' +
@@ -3736,31 +3735,39 @@ case 'playvideo': case 'play2': case 'playdoc': {
     if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
     else await sock.sendMessage(jid, { text: txt }, { quoted: m });
 
-    // 3. Descargar el archivo final
-    const fileName = 'media_' + Date.now();
-    const ext = esAudio ? 'm4a' : 'mp4';
-    const filePath = '/tmp/' + fileName + '.' + ext;
+    // 3. Descargar archivo (buscando la extensión real)
+    const fileNameBase = 'media_' + Date.now();
+    const filePathBase = '/tmp/' + fileNameBase;
     
-    const ytArgs = esAudio ? '-f "ba[ext=m4a]/ba" -x --audio-format m4a' : '-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"';
-    const dlCmd = 'yt-dlp --extractor-args "youtube:player_client=android" ' + ytArgs + ' -o "' + filePath + '" "' + url + '"';
+    // Para audio, pedimos "best audio" (ba) sin forzar conversión (quitamos -x).
+    const ytArgs = esAudio ? '-f "ba"' : '-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"';
+    
+    // NO le ponemos extensión fija en el -o para que yt-dlp elija (m4a, webm, etc)
+    const dlCmd = 'yt-dlp --extractor-args "youtube:player_client=android" ' + ytArgs + ' -o "' + filePathBase + '.%(ext)s" "' + url + '"';
     
     try {
       await execAsync(dlCmd, { timeout: 120000, maxBuffer: 1024 * 1024 * 50 });
       
-      if (!fs2.existsSync(filePath)) throw new Error('Archivo no encontrado');
-      const buffer = fs2.readFileSync(filePath);
+      // Buscar el archivo en /tmp sin importar la extensión
+      const files = fs2.readdirSync('/tmp').filter(f => f.startsWith(fileNameBase));
+      if (files.length === 0) throw new Error('Archivo no encontrado');
+      
+      const finalFile = '/tmp/' + files[0];
+      const buffer = fs2.readFileSync(finalFile);
       
       if (esDoc) {
         await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: title.substring(0,20) + '.mp4' }, { quoted: m });
       } else if (esAudio) {
-        await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+        // Si el archivo es webm, lo enviamos como audio/webm. Si es m4a, audio/mp4
+        const mime = finalFile.endsWith('webm') ? 'audio/webm' : 'audio/mp4';
+        await sock.sendMessage(jid, { audio: buffer, mimetype: mime }, { quoted: m });
       } else {
         await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
       }
-      fs2.unlinkSync(filePath);
+      fs2.unlinkSync(finalFile);
     } catch (dlErr) {
       console.log('Error descargando:', dlErr.message);
-      await responder('❌ Error descargando el archivo. Puede que YouTube esté bloqueando el servidor.');
+      await responder('❌ Error descargando el archivo final. Intenta de nuevo.');
     }
 
   } catch (e) {
@@ -3769,7 +3776,6 @@ case 'playvideo': case 'play2': case 'playdoc': {
   }
   break;
 }
-
 case 'musica':
       case 'm':
       case 'play':
