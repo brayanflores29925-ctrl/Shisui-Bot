@@ -1116,14 +1116,6 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     }
     // ----------------------------
     
-    
-    // --- ALIAS VILLANCICO A PLAY ---
-    if (comando === 'villancico') {
-      comando = 'play'; // Lo tratamos como .play
-      cuerpo = cuerpo + ' villancico'; // Le sumamos la palabra para que busque navideño
-    }
-    // -------------------------------
-    
     switch (comando) {
       case 'racha': case 'rc': {
   const sender = m.key.participant || m.key.remoteJid;
@@ -3906,77 +3898,34 @@ case 'fixapi': case 'testapi': case 'repararapi': {
   break;
 }
 
-
-
-
-
 case 'villancico': {
   const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { 
-    await responder('Uso: #villancico <nombre>\nEjemplo: #villancico mi burrito sabanero'); 
-    break; 
-  }
-  
-  await responder('🎄 Buscando música navideña: ' + query + '...');
-  
+  if (!query) { await responder('Uso: #villancico <nombre>'); break; }
+  await responder('🔍 Buscando: ' + query + '...');
   try {
     const { exec } = require('child_process');
     const { promisify } = require('util');
     const execAsync = promisify(exec);
-    const fs2 = require('fs');
-
-    // Forzamos la búsqueda para que sea de música navideña
-    const target = 'ytsearch1:"' + query + ' villancico navideño"';
+    const fs = require('fs');
+    const target = 'ytsearch1:"' + query + ' villancico"';
     
-    let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0, url = target;
+    const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
+    const info = JSON.parse(stdout.trim().split('\n')[0]);
     
-    try {
-      const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
-      const info = JSON.parse(stdout.trim().split('\n')[0]);
-      title = info.title || query;
-      thumb = info.thumbnail || null;
-      channel = info.channel || info.uploader || 'Desconocido';
-      duration = info.duration_string || (info.duration ? info.duration + 's' : 'Desconocido');
-      views = info.view_count || 0;
-      url = info.webpage_url || target;
-    } catch (err) {
-      console.log('Error obteniendo JSON (villancico):', err.message);
-    }
-
-    const txt = '🎄 Descargando villancico › *' + title + '*\n\n' +
-                '❖ Canal › *' + channel + '*\n' +
-                '⧖ Duración › *' + duration + '*\n' +
-                (views ? '❀ Vistas › *' + views.toLocaleString() + '*\n' : '') +
-                '⏳ Espera un momento mientras preparo tu audio...';
-                
-    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+    const txt = '🎄 Villancico › *' + info.title + '*\n\n❖ Canal › *' + (info.channel || 'Desconocido') + '*';
+    if (info.thumbnail) await sock.sendMessage(jid, { image: { url: info.thumbnail }, caption: txt }, { quoted: m });
     else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-
-    const fileNameBase = 'villancico_' + Date.now();
-    const filePathBase = '/tmp/' + fileNameBase;
     
-    const dlCmd = 'yt-dlp --extractor-args "youtube:player_client=android" -R 3 --no-part -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePathBase + '.%(ext)s" "' + url + '"';
+    const fileNameBase = 'villan_' + Date.now();
+    await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -R 3 --no-part -f 140/bestaudio[ext=m4a]/bestaudio -o "/tmp/' + fileNameBase + '.%(ext)s" "' + info.webpage_url + '"', { timeout: 120000 });
     
-    try {
-      await execAsync(dlCmd, { timeout: 120000, maxBuffer: 1024 * 1024 * 50 });
-      
-      const files = fs2.readdirSync('/tmp').filter(f => f.startsWith(fileNameBase));
-      if (files.length === 0) throw new Error('Archivo no encontrado');
-      
-      const finalFile = '/tmp/' + files[0];
-      const buffer = fs2.readFileSync(finalFile);
-      
+    const files = fs.readdirSync('/tmp').filter(f => f.startsWith(fileNameBase));
+    if (files.length > 0) {
+      const buffer = fs.readFileSync('/tmp/' + files[0]);
       await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
-      fs2.unlinkSync(finalFile);
-    } catch (dlErr) {
-      console.log('Error descargando villancico:', dlErr.message);
-      await responder('❌ Error descargando el villancico final.');
+      fs.unlinkSync('/tmp/' + files[0]);
     }
-
-  } catch (e) {
-    console.log('Error .villancico:', e.message);
-    await responder('❌ Error procesando el villancico.');
-  }
+  } catch (e) { console.log('Error villancico:', e.message); await responder('❌ Error al descargar.'); }
   break;
 }
 
