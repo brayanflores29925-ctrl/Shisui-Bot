@@ -174,7 +174,18 @@ const secciones = [
     '#setoficial <enlace> — Configura el grupo oficial (subbots no responderán ahí).',
     '#setbotprincipal <número> — Define cuál es el bot principal.',
     '#aceptarinv <id> — Acepta una solicitud de invitación.',
-    '#rechazarinv <id> — Rechaza una solicitud de invitación.'
+    '#rechazarinv <id> — Rechaza una solicitud de invitación.',
+    '#addmoney @user <cant> — Añade monedas a un usuario.',
+    '#removemoney @user <cant> — Quita monedas a un usuario.',
+    '#autoread on/off — Marca los mensajes como leídos automáticamente.',
+    '#ram — Muestra el uso de memoria RAM del bot.',
+    '#estado / #disco — Muestra el estado del sistema y espacio en disco.',
+    '#error / #e — Muestra el último error capturado por el bot.',
+    '#restart — Reinicia el bot.',
+    '#setprimary <num> — Define cuál es el bot principal.',
+    '#tbcookie <cookie> — Guarda una cookie en el sistema.',
+    '#testvideo — Envía un video de prueba.',
+    '#clear — Limpia la consola del servidor.'
   ]],
 
   ['📱 SISTEMA DE SUBBOTS', [
