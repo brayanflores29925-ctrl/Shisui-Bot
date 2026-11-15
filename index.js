@@ -3898,6 +3898,35 @@ case 'fixapi': case 'testapi': case 'repararapi': {
   break;
 }
 
+
+case 'villancico': {
+  // Lista ampliada de villancicos populares con sus letras
+  const villancicos = [
+    '🎵 *Noche de paz, noche de amor...* 🎵\nTodos duermen en derredor...',
+    '🎵 *Rodolfo el reno, tenía una nariz muy roja...* 🎵\nY si tú la vieras, dirías que brilla más que el sol.',
+    '🎵 *Campana sobre campana, y sobre campana una...* 🎵\nAsómate a la ventana, verás al niño en la cuna.',
+    '🎵 *Los peces en el río, se peinan de alegría...* 🎵',
+    '🎵 *Feliz Navidad, Feliz Navidad...* 🎵\nPróspero año y felicidad.',
+    '🎵 *Mi burrito sabanero, voy camino de Belén...* 🎵',
+    '🎵 *Arre borriquito, arre burro arre...* 🎵\nQue llegamos tarde.',
+    '🎵 *Blanca Navidad, sueño...* 🎵\nY con la nieve alrededor.',
+    '🎵 *Los pastores a Belén, corren presurosos...* 🎵',
+    '🎵 *Tutaina, tuturuma, tutaina, tuturumaina...* 🎵',
+    '🎵 *Venid fieles todos, a Belén marchemos...* 🎵',
+    '🎵 *Hacia Belén va una burra, rin, rin...* 🎵\nCargada de chocolate.'
+  ];
+  
+  // Seleccionar uno al azar
+  const elegido = villancicos[Math.floor(Math.random() * villancicos.length)];
+  
+  try {
+    await responder(elegido);
+  } catch (e) {
+    console.log('Error enviando villancico:', e.message);
+  }
+  break;
+}
+
 case 'musica':
       case 'm':
       case 'play':
