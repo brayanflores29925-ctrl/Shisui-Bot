@@ -482,8 +482,8 @@ async function enviarStickerAnime(cmd, jid, m, sock, mencionado) {
     await sock.sendMessage(jid, { sticker: webpBuffer }, { quoted: m });
 
     // Enviamos el texto igual que el bot Akame
-    const nombre = mencionado ? '@' + mencionado.split('@')[0] : 'Alguien';
-    const texto = '*' + nombre + '* ' + textoAccion + ' 🤗';
+    const nombre = mencionado ? '@' + mencionado.split('@')[0] : 'alguien';
+    const texto = 'Tú le diste *' + textoAccion + '* a ' + nombre + ' 🤗';
     await sock.sendMessage(jid, {
       text: texto,
       mentions: mencionado ? [mencionado] : []
@@ -556,7 +556,7 @@ async function imagenASticker(buffer, tipo) {
 }
 
 const ANIME_MAP = {"hug":"hug","kiss":"kiss","pat":"pat","slap":"slap","punch":"punch","patear":"kick","poke":"poke","tickle":"tickle","cuddle":"cuddle","bite":"bite","feed":"feed","nom":"feed","smile":"smile","wink":"wink","blush":"blush","smug":"smug","happy":"happy","angry":"angry","bored":"bored","cry":"cry","laugh":"laugh","pout":"pout","baka":"baka","bonk":"bonk","wave":"wave","nod":"nod","shrug":"shrug","nope":"nope","thumbsup":"thumbsup","handshake":"handshake","handhold":"handhold","highfive":"highfive","dance":"dance","run":"run","sleep":"sleep","yawn":"yawn","lurk":"lurk","stare":"stare","think":"think","facepalm":"facepalm","tableflip":"tableflip","shoot":"shoot","yeet":"yeet","peck":"peck"};
-const ANIME_TXT = {"hug":"te abraza","kiss":"te da un beso","pat":"te acaricia","slap":"te da una bofetada","punch":"te da un puñetazo","patear":"te da una patada","poke":"te molesta","tickle":"te hace cosquillas","cuddle":"se acurruca contigo","bite":"te muerde","feed":"te da de comer","nom":"come contigo","smile":"te sonríe","wink":"te guiña el ojo","blush":"se sonroja por ti","smug":"presume frente a ti","happy":"se alegra por ti","angry":"se enoja contigo","bored":"se aburre contigo","cry":"llora por ti","laugh":"se ríe de ti","pout":"te hace puchero","baka":"te dice baka","bonk":"te da un golpecito","wave":"te saluda","nod":"te asiente","shrug":"se encoge de hombros","nope":"te niega","thumbsup":"te da pulgar arriba","handshake":"te da la mano","handhold":"toma tu mano","highfive":"choca los cinco contigo","dance":"baila contigo","run":"corre contigo","sleep":"duerme contigo","yawn":"bosteza contigo","lurk":"te espía","stare":"te mira fijamente","think":"piensa en ti","facepalm":"se da una palmada por ti","tableflip":"voltea la mesa por ti","shoot":"te dispara","yeet":"te lanza lejos","peck":"te da un besito"};
+const ANIME_TXT = {"hug":"un abrazo","kiss":"un beso","pat":"una caricia","slap":"una bofetada","punch":"un puñetazo","patear":"una patada","poke":"un toque","tickle":"cosquillas","cuddle":"un acurruque","bite":"una mordida","feed":"de comer","nom":"de comer","smile":"una sonrisa","wink":"un guiño","blush":"un sonrojo","smug":"presumir","happy":"felicidad","angry":"enojo","bored":"aburrimiento","cry":"llanto","laugh":"risa","pout":"un puchero","baka":"un baka","bonk":"un golpecito","wave":"un saludo","nod":"un asentimiento","shrug":"un encogimiento","nope":"una negación","thumbsup":"pulgar arriba","handshake":"la mano","handhold":"la mano","highfive":"un choca los cinco","dance":"un baile","run":"una carrera","sleep":"dormir","yawn":"un bostezo","lurk":"un espía","stare":"una mirada","think":"pensar","facepalm":"una palmada en la cara","tableflip":"voltear la mesa","shoot":"un disparo","yeet":"un lanzamiento","peck":"un besito"};
 
 global.antiPorno = false
 global.antiaudio = false
@@ -2039,50 +2039,50 @@ case 'antistatus': {
   break
 }
 
-case 'hug':
-case 'kiss':
-case 'pat':
-case 'slap':
-case 'punch':
-case 'patear':
-case 'poke':
-case 'tickle':
-case 'cuddle':
-case 'bite':
-case 'feed':
-case 'nom':
-case 'smile':
-case 'wink':
-case 'blush':
-case 'smug':
-case 'happy':
-case 'angry':
-case 'bored':
-case 'cry':
-case 'laugh':
-case 'pout':
-case 'baka':
-case 'bonk':
-case 'wave':
-case 'nod':
-case 'shrug':
-case 'nope':
-case 'thumbsup':
-case 'handshake':
-case 'handhold':
-case 'highfive':
-case 'dance':
-case 'run':
-case 'sleep':
-case 'yawn':
-case 'lurk':
-case 'stare':
-case 'think':
-case 'facepalm':
-case 'tableflip':
-case 'shoot':
-case 'yeet':
-case 'peck':
+case 'hug': case 'h':
+case 'kiss': case 'k':
+case 'pat': case 'pt':
+case 'slap': case 'sl':
+case 'punch': case 'pu':
+case 'patear': case 'patada':
+case 'poke': case 'pk':
+case 'tickle': case 'tk':
+case 'cuddle': case 'cd':
+case 'bite': case 'bt':
+case 'feed': case 'fd':
+case 'nom': case 'nm':
+case 'smile': case 'sm':
+case 'wink': case 'wn':
+case 'blush': case 'bl':
+case 'smug': case 'sg':
+case 'happy': case 'hp':
+case 'angry': case 'an':
+case 'bored': case 'bd':
+case 'cry': case 'cr':
+case 'laugh': case 'lf':
+case 'pout': case 'po':
+case 'baka': case 'bk':
+case 'bonk': case 'bn':
+case 'wave': case 'wv':
+case 'nod': case 'nd':
+case 'shrug': case 'sr':
+case 'nope': case 'np':
+case 'thumbsup': case 'tu':
+case 'handshake': case 'hs':
+case 'handhold': case 'hh':
+case 'highfive': case 'hf':
+case 'dance': case 'dn':
+case 'run': case 'rn':
+case 'sleep': case 'zz':
+case 'yawn': case 'yn':
+case 'lurk': case 'lk':
+case 'stare': case 'st':
+case 'think': case 'th':
+case 'facepalm': case 'fp':
+case 'tableflip': case 'tf':
+case 'shoot': case 'sh':
+case 'yeet': case 'yt':
+case 'peck': case 'pc':
 {
   const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
   if (!mencionado) {
