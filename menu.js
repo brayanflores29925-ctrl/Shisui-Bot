@@ -48,7 +48,14 @@ const secciones = [
     '#instagram / #ig — Descarga contenido de Instagram.',
     '#pinterest — Descarga contenido de Pinterest.',
     '#x — Ejecuta herramientas para X.',
-    '#buscar <nombre> — Busca y envía un video de TikTok.'
+    '#buscar <nombre> — Busca y envía un video de TikTok.',
+    '#play2 — Descarga música para iPhone (m4a).',
+    '#playvideo — Descarga videos de YouTube.',
+    '#playdoc — Descarga video de YouTube como documento.',
+    '#ytsearch — Busca videos en YouTube.',
+    '#descargarapk — Descarga aplicaciones APK.',
+    '#mediafire — Descarga archivos de MediaFire.',
+    '#downloadlink — Descarga desde un link directo.'
   ]],
 
   ['🎭 STICKERS Y MULTIMEDIA', [

@@ -3439,6 +3439,183 @@ case 'consola': case 'cmd': case 'sh': case 'c': {
   break;
 }
 
+case 'ytsearch': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #ytsearch <búsqueda>'); break; }
+  await responder('🔍 Buscando en YouTube...');
+  try {
+    const YouTube = require('youtube-sr').default;
+    const results = await YouTube.search(query, { limit: 5 });
+    if (!results || results.length === 0) { await responder('❌ No encontré resultados.'); break; }
+    
+    let txt = `🔍 *Resultados para:* ${query}\n\n`;
+    results.forEach((v, i) => {
+      txt += `*${i+1}. ${v.title}*\n`;
+      txt += `👤 ${v.channel.name}\n`;
+      txt += `⏱️ ${v.durationFormatted}\n`;
+      txt += `🔗 ${v.url}\n\n`;
+    });
+    await sock.sendMessage(jid, { text: txt }, { quoted: m });
+  } catch (e) {
+    console.log('Error .ytsearch:', e.message);
+    await responder('❌ Error buscando en YouTube.');
+  }
+  break;
+}
+
+case 'play2': case 'playdoc': case 'playvideo': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
+  await responder(`⬇️ Descargando ${cmd === 'playdoc' ? 'documento' : cmd === 'play2' ? 'audio (iPhone)' : 'video'}...`);
+  
+  try {
+    const { exec } = require('child_process');
+    const esDoc = cmd === 'playdoc';
+    const esAudio = cmd === 'play2';
+    
+    let url = query;
+    if (!query.startsWith('http')) {
+      const YouTube = require('youtube-sr').default;
+      const res = await YouTube.searchOne(query);
+      if (!res) throw new Error('No encontrado');
+      url = res.url;
+    }
+
+    const fileName = `descarga_${Date.now()}`;
+    let outExt = (esDoc || !esAudio) ? 'mp4' : 'm4a';
+    let filePath = `/tmp/${fileName}.${outExt}`;
+
+    let args = '';
+    if (esAudio) args = `-f "ba[ext=m4a]/ba" -x --audio-format m4a`;
+    else args = `-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"`;
+
+    exec(`yt-dlp ${args} -o "${filePath}" "${url}"`, { timeout: 90000, maxBuffer: 1024 * 1024 * 10 }, async (error, stdout, stderr) => {
+      if (error) {
+        console.log('Error yt-dlp:', error.message);
+        return responder('❌ Error descargando. El video puede ser privado o muy largo.');
+      }
+      try {
+        const fs = require('fs');
+        if (!fs.existsSync(filePath)) {
+          const files = fs.readdirSync('/tmp').filter(f => f.startsWith(fileName));
+          if (files.length > 0) filePath = `/tmp/${files[0]}`;
+          else throw new Error('Archivo no encontrado');
+        }
+        
+        const buffer = fs.readFileSync(filePath);
+        
+        if (esDoc) {
+          await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: `${query.substring(0,20)}.mp4` }, { quoted: m });
+        } else if (esAudio) {
+          await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+        } else {
+          await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + query }, { quoted: m });
+        }
+        fs.unlinkSync(filePath);
+      } catch (e) {
+        console.log('Error enviando archivo:', e.message);
+        await responder('❌ Error enviando el archivo.');
+      }
+    });
+  } catch (e) {
+    console.log('Error .' + cmd + ':', e.message);
+    await responder('❌ Error procesando la descarga.');
+  }
+  break;
+}
+
+case 'mediafire': {
+  const url = cuerpo.slice(cmd.length).trim();
+  if (!url || !url.includes('mediafire.com')) { await responder('Uso: #mediafire <enlace de MediaFire>'); break; }
+  await responder('⬇️ Descargando de MediaFire...');
+  try {
+    const mediafireDl = require('mediafire-dl');
+    const res = await mediafireDl(url);
+    if (!res || !res.link) throw new Error('No se pudo obtener el enlace');
+    
+    const bufferRes = await fetch(res.link);
+    const arrayBuffer = await bufferRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    await sock.sendMessage(jid, {
+      document: buffer,
+      mimetype: bufferRes.headers.get('content-type') || 'application/octet-stream',
+      fileName: res.name || 'archivo_mediafire'
+    }, { quoted: m });
+  } catch (e) {
+    console.log('Error .mediafire:', e.message);
+    await responder('❌ Error descargando de MediaFire.');
+  }
+  break;
+}
+
+case 'descargarapk': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #descargarapk <nombre de la app>'); break; }
+  await responder(`🔍 Buscando APK de *${query}*...`);
+  try {
+    const res = await fetch(`https://ws75.aptoide.com/api/7/apps/search?query=${encodeURIComponent(query)}&limit=1`);
+    const json = await res.json();
+    if (!json.datalist || !json.datalist.list || json.datalist.list.length === 0) {
+      await responder('❌ No encontré la aplicación.');
+      break;
+    }
+    const app = json.datalist.list[0];
+    const apkUrl = app.file.path;
+    const appName = app.name;
+    const appSize = (app.size / 1024 / 1024).toFixed(2) + ' MB';
+    const icon = app.icon;
+    
+    await sock.sendMessage(jid, {
+      image: { url: icon },
+      caption: `📱 *${appName}*\n⚖️ Tamaño: ${appSize}\n\n⬇️ Descargando APK...`
+    }, { quoted: m });
+
+    const apkRes = await fetch(apkUrl);
+    const buffer = Buffer.from(await apkRes.arrayBuffer());
+
+    await sock.sendMessage(jid, {
+      document: buffer,
+      mimetype: 'application/vnd.android.package-archive',
+      fileName: `${appName.replace(/ /g, '_')}.apk`
+    }, { quoted: m });
+
+  } catch (e) {
+    console.log('Error .descargarapk:', e.message);
+    await responder('❌ Error descargando la APK.');
+  }
+  break;
+}
+
+case 'downloadlink': {
+  const url = cuerpo.slice(cmd.length).trim();
+  if (!url || !url.startsWith('http')) { await responder('Uso: #downloadlink <enlace directo>'); break; }
+  await responder('⬇️ Descargando archivo del enlace...');
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const contentType = res.headers.get('content-type') || '';
+    const buffer = Buffer.from(await res.arrayBuffer());
+    
+    const urlParts = url.split('/');
+    let fileName = urlParts[urlParts.length - 1].split('?')[0] || 'archivo_descargado';
+
+    if (contentType.includes('image')) {
+      await sock.sendMessage(jid, { image: buffer, caption: '✅ Archivo descargado' }, { quoted: m });
+    } else if (contentType.includes('video')) {
+      await sock.sendMessage(jid, { video: buffer, caption: '✅ Archivo descargado' }, { quoted: m });
+    } else if (contentType.includes('audio')) {
+      await sock.sendMessage(jid, { audio: buffer, mimetype: contentType }, { quoted: m });
+    } else {
+      await sock.sendMessage(jid, { document: buffer, mimetype: contentType, fileName }, { quoted: m });
+    }
+  } catch (e) {
+    console.log('Error .downloadlink:', e.message);
+    await responder('❌ Error descargando el enlace.');
+  }
+  break;
+}
+
 case 'musica':
       case 'm':
       case 'play':
