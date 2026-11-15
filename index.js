@@ -3692,62 +3692,37 @@ case 'ytsearch': {
 
 case 'play2': case 'playdoc': case 'playvideo': {
   const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
-  await responder('⬇️ Descargando ' + (cmd === 'playdoc' ? 'documento' : cmd === 'play2' ? 'audio (iPhone)' : 'video') + '...');
+  if (!query) { await responder('Uso: #playvideo <nombre o enlace>'); break; }
+  await responder('⏳ *Cargando video, esto puede tardar un momento...*');
   
   try {
     const { exec } = require('child_process');
-    const esDoc = cmd === 'playdoc';
-    const esAudio = cmd === 'play2';
-    
-    // Si no es un enlace, usar el buscador interno de yt-dlp (ytsearch1:)
-    let target = query;
-    if (!query.startsWith('http')) {
-      target = 'ytsearch1:"' + query + '"';
-    }
+    let target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
+    const fileName = 'vid_' + Date.now();
+    const filePath = '/tmp/' + fileName + '.mp4';
 
-    const fileName = 'descarga_' + Date.now();
-    let outExt = (esDoc || !esAudio) ? 'mp4' : 'm4a';
-    let filePath = '/tmp/' + fileName + '.' + outExt;
-
-    let args = '';
-    if (esAudio) args = '-f "ba[ext=m4a]/ba" -x --audio-format m4a';
-    else args = '-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"';
-
-    // Comando con el bypass de Android
-    const execCmd = 'yt-dlp --extractor-args "youtube:player_client=android" ' + args + ' -o "' + filePath + '" "' + target + '"';
+    const execCmd = 'yt-dlp --extractor-args "youtube:player_client=android" -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]" -o "' + filePath + '" "' + target + '"';
 
     exec(execCmd, { timeout: 90000, maxBuffer: 1024 * 1024 * 50 }, async (error, stdout, stderr) => {
       if (error) {
         console.log('Error yt-dlp:', error.message);
-        return responder('❌ Error descargando. Puede que YouTube esté bloqueando o el video sea privado.');
+        return responder('❌ Error descargando el video. Puede que esté privado o bloqueado.');
       }
       try {
         const fs = require('fs');
         if (!fs.existsSync(filePath)) {
-          // A veces yt-dlp guarda con otra extensión (webm, etc)
           const files = fs.readdirSync('/tmp').filter(f => f.startsWith(fileName));
-          if (files.length > 0) filePath = '/tmp/' + files[0];
-          else throw new Error('Archivo no encontrado');
+          if (files.length > 0) { /* usa la ruta encontrada */ } else throw new Error('No file');
         }
-        
         const buffer = fs.readFileSync(filePath);
-        
-        if (esDoc) {
-          await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: query.substring(0,20) + '.mp4' }, { quoted: m });
-        } else if (esAudio) {
-          await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
-        } else {
-          await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + query }, { quoted: m });
-        }
+        await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + query }, { quoted: m });
         fs.unlinkSync(filePath);
       } catch (e) {
-        console.log('Error enviando archivo:', e.message);
-        await responder('❌ Error enviando el archivo descargado.');
+        await responder('❌ Error enviando el video.');
       }
     });
   } catch (e) {
-    console.log('Error .' + cmd + ':', e.message);
+    console.log('Error .playvideo:', e.message);
     await responder('❌ Error procesando la descarga.');
   }
   break;
@@ -4859,6 +4834,36 @@ case 'fotogrupo':
       }
 
       case 'del': case 'borrar': {
+  if (!jid.endsWith('@g.us')) { await responder('❌ Solo en grupos.'); break; }
+  try {
+    const groupMetadata = await sock.groupMetadata(jid);
+    const botNumber = sock.user.id.split(':')[0].split('@')[0];
+    const botParticipant = groupMetadata.participants.find(p => p.id.startsWith(botNumber));
+    
+    if (!botParticipant || (botParticipant.admin !== 'admin' && botParticipant.admin !== 'superadmin')) {
+      await responder('❌ Necesito ser administrador para borrar.');
+      break;
+    }
+    
+    let target = m.message?.extendedTextMessage?.contextInfo?.participant;
+    if (!target) { await responder('❌ Responde al mensaje de la persona a la que le quieres borrar todo.'); break; }
+    
+    try { await sock.sendMessage(jid, { react: { text: '🗑️', key: m.key } }); } catch (e) {}
+    
+    let borrados = 0;
+    if (global.msgCache && global.msgCache[jid]) {
+      const msgsABorrar = global.msgCache[jid].filter(k => k.participant === target || (k.participant && k.participant.includes(target.split('@')[0])));
+      for (const k of msgsABorrar) {
+        try { await sock.sendMessage(jid, { delete: k }); borrados++; await new Promise(r => setTimeout(r, 250)); } catch(err) {}
+      }
+    }
+    await sock.sendMessage(jid, { text: '🗑️ Se eliminaron ' + borrados + ' mensajes de @' + target.split('@')[0] + '.', mentions: [target] }, { quoted: m });
+  } catch (e) {
+    console.log('Error .del:', e.message);
+  }
+  break;
+}
+case 'borrar': {
   if (!jid.endsWith('@g.us')) { await responder('❌ Este comando solo funciona en grupos.'); break; }
   
   // Verificar que el bot sea admin
@@ -5204,6 +5209,55 @@ case 'borrar': {
       }
 
       case 'ban': case 'kick': {
+  if (!jid.endsWith('@g.us')) { await responder('❌ Este comando solo funciona en grupos.'); break; }
+  try {
+    const groupMetadata = await sock.groupMetadata(jid);
+    const botNumber = sock.user.id.split(':')[0].split('@')[0];
+    const botParticipant = groupMetadata.participants.find(p => p.id.startsWith(botNumber));
+    
+    if (!botParticipant || (botParticipant.admin !== 'admin' && botParticipant.admin !== 'superadmin')) {
+      await responder('❌ Necesito ser administrador para banear.');
+      break;
+    }
+    
+    let mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0] || m.message?.extendedTextMessage?.contextInfo?.participant;
+    if (!mencionado) { await responder('❌ Menciona o responde a alguien para banearlo.'); break; }
+    
+    const targetParticipant = groupMetadata.participants.find(p => p.id.split('@')[0].split(':')[0] === mencionado.split('@')[0].split(':')[0]);
+    if (targetParticipant && (targetParticipant.admin === 'admin' || targetParticipant.admin === 'superadmin')) {
+      await responder('❌ No puedo banear a un administrador.');
+      break;
+    }
+    
+    try { await sock.sendMessage(jid, { react: { text: '👢', key: m.key } }); } catch (e) {}
+    
+    let expulsado = false;
+    try {
+      await sock.groupParticipantsUpdate(jid, [mencionado], 'remove');
+      expulsado = true;
+      await sock.sendMessage(jid, { text: '👢 @' + mencionado.split('@')[0] + ' ha sido pateado.', mentions: [mencionado] }, { quoted: m });
+    } catch (e) {
+      try {
+        const num = mencionado.split('@')[0].split(':')[0];
+        await sock.groupParticipantsUpdate(jid, [num + '@s.whatsapp.net'], 'remove');
+        expulsado = true;
+        await sock.sendMessage(jid, { text: '👢 @' + num + ' ha sido pateado.', mentions: [num + '@s.whatsapp.net'] }, { quoted: m });
+      } catch (e2) {}
+    }
+    
+    if (expulsado && global.msgCache && global.msgCache[jid]) {
+      const msgsABorrar = global.msgCache[jid].filter(k => (k.participant === mencionado || (k.participant && k.participant.includes(mencionado.split('@')[0]))));
+      for (const k of msgsABorrar) {
+        try { await sock.sendMessage(jid, { delete: k }); await new Promise(r => setTimeout(r, 200)); } catch(err) {}
+      }
+    }
+  } catch (e) {
+    console.log('Error .ban:', e.message);
+    await responder('❌ Error interno al banear.');
+  }
+  break;
+}
+case 'kick': {
   if (!jid.endsWith('@g.us')) { await responder('❌ Este comando solo funciona en grupos.'); break; }
   
   const groupMetadata = await sock.groupMetadata(jid);
