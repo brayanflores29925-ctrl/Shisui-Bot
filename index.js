@@ -642,7 +642,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
       const textoReaccion = (reaction.text || '').toLowerCase().trim();
       
       // Si la reacción es "ban" o la bota 👢
-      if (textoReaccion === 'ban' || textoReaccion === '👢' || textoReaccion === '🥾') {
+      if (['ban', '👢', '🥾', 'del', '🗑️'].includes(textoReaccion)) {
         const jid = msgR.key.remoteJid;
         const sender = msgR.key.participant || msgR.key.remoteJid;
         const target = reaction.key.participant || reaction.key.remoteJid;
@@ -662,8 +662,24 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             
             if (botParticipant && botParticipant.admin) {
               // Expulsar
-              await sock.groupParticipantsUpdate(jid, [target], 'remove');
               
+              if (['ban', '👢', '🥾'].includes(textoReaccion)) {
+                await sock.groupParticipantsUpdate(jid, [target], 'remove');
+                await sock.sendMessage(jid, { text: `👢 @${target.split('@')[0]} fue expulsado por reacción.`, mentions: [target] }, { quoted: msgR });
+              }
+              
+              // Borrar mensajes (tanto para ban como para del)
+              if (global.msgCache && global.msgCache[jid]) {
+                const msgsABorrar = global.msgCache[jid].filter(k => k.participant === target || (k.participant && k.participant.includes(target.split('@')[0])));
+                for (const k of msgsABorrar) {
+                  try { await sock.sendMessage(jid, { delete: k }); } catch(e) {}
+                }
+              }
+              
+              if (['del', '🗑️'].includes(textoReaccion)) {
+                await sock.sendMessage(jid, { text: `🗑️ Mensajes de @${target.split('@')[0]} eliminados por reacción.`, mentions: [target] }, { quoted: msgR });
+              }
+                          
               // Borrar el mensaje original
               try { await sock.sendMessage(jid, { delete: reaction.key }); } catch(e) {}
               
@@ -4839,8 +4855,54 @@ case 'fotogrupo':
         break
       }
 
-      case 'del':
-      case 'borrar': {
+      case 'del': case 'borrar': {
+  if (!jid.endsWith('@g.us')) { await responder('❌ Este comando solo funciona en grupos.'); break; }
+  
+  // Verificar que el bot sea admin
+  const groupMetadata = await sock.groupMetadata(jid);
+  const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+  const botParticipant = groupMetadata.participants.find(p => p.id === botId);
+  if (!botParticipant || !botParticipant.admin) {
+    await responder('❌ Necesito ser administrador para borrar mensajes.');
+    break;
+  }
+
+  // Detectar a quién se le van a borrar los mensajes
+  let target = m.message?.extendedTextMessage?.contextInfo?.participant;
+  
+  if (!target) {
+    await responder('❌ Responde al mensaje de la persona a la que le quieres borrar todo.');
+    break;
+  }
+
+  // Reaccionar con la escoba o basura 🗑️
+  try { await sock.sendMessage(jid, { react: { text: '🗑️', key: m.key } }); } catch (e) {}
+
+  let borrados = 0;
+  
+  // Borrar el mensaje al que le respondiste
+  try {
+    await sock.sendMessage(jid, { delete: m.message.extendedTextMessage.contextInfo.stanzaId ? { remoteJid: jid, id: m.message.extendedTextMessage.contextInfo.stanzaId, participant: target } : m.key });
+    borrados++;
+  } catch(e) {}
+
+  // Borrar TODOS los mensajes de su caché
+  if (global.msgCache && global.msgCache[jid]) {
+    const msgsABorrar = global.msgCache[jid].filter(k => k.participant === target || (k.participant && k.participant.includes(target.split('@')[0])));
+    
+    for (const k of msgsABorrar) {
+      try { 
+        await sock.sendMessage(jid, { delete: k }); 
+        borrados++;
+        await new Promise(r => setTimeout(r, 250)); // Pausa para no ser baneados por spam
+      } catch(err) {}
+    }
+  }
+
+  await sock.sendMessage(jid, { text: `🗑️ Se eliminaron ${borrados} mensajes de @${target.split('@')[0]}.`, mentions: [target] }, { quoted: m });
+  break;
+}
+case 'borrar': {
         if (!jid.endsWith('@g.us')) {
           await responder('Este comando solo funciona en grupos.')
           break
