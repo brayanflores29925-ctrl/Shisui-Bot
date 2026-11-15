@@ -1662,10 +1662,10 @@ case 'invitacion': {
   const tipo = matchGrupo ? 'grupo' : 'canal'
   const codigo = matchGrupo ? matchGrupo[1] : matchCanal[1]
   const id = ++contadorInvitaciones
-  const remitente = (m.key.participant || m.key.remoteJid || '').replace(/[^0-9]/g, '')
+  const remitente = (m.key.participant || m.key.remoteJid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '')
   invitacionesPendientes.set(id, { tipo, codigo, enlace, remitente, jid: m.key.remoteJid })
   await responder('📨 Solicitud #' + id + ' enviada al dueño del bot. Te aviso cuando responda.')
-  const OWNERS = ['50493482934', '50495939120']
+  const OWNERS = ['50493482934', '50494874330', '50495939120']
   for (const num of OWNERS) {
     const ownerJid = num + '@s.whatsapp.net'
     try {
@@ -1684,8 +1684,8 @@ case 'invitacion': {
 }
 case 'aceptarinv':
 case 'rechazarinv': {
-  const OWNERS = ['50493482934', '50495939120']
-  const remitente = (m.key.participant || m.key.remoteJid || '').replace(/[^0-9]/g, '')
+  const OWNERS = ['50493482934', '50494874330', '50495939120']
+  const remitente = (m.key.participant || m.key.remoteJid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '')
   const esOwner = OWNERS.some(n => remitente.includes(n))
   if (!esOwner) {
     await responder('❌ Solo el owner del bot puede aceptar o rechazar invitaciones.')
@@ -2666,8 +2666,8 @@ case 'topricos': case 'topmoney': {
   break;
 }
 case 'setoficial': {
-  const OWNERS = ['50493482934', '50495939120']
-  const remitente = (m.key.participant || m.key.remoteJid || '').replace(/[^0-9]/g, '')
+  const OWNERS = ['50493482934', '50494874330', '50495939120']
+  const remitente = (m.key.participant || m.key.remoteJid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '')
   if (!OWNERS.some(n => remitente.includes(n))) {
     await responder('❌ Solo el dueño puede usar este comando.')
     break
@@ -2695,8 +2695,8 @@ case 'setoficial': {
   break
 }
 case 'setbotprincipal': {
-  const OWNERS = ['50493482934', '50495939120']
-  const remitente = (m.key.participant || m.key.remoteJid || '').replace(/[^0-9]/g, '')
+  const OWNERS = ['50493482934', '50494874330', '50495939120']
+  const remitente = (m.key.participant || m.key.remoteJid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '')
   if (!OWNERS.some(n => remitente.includes(n))) {
     await responder('❌ Solo el dueño puede usar este comando.')
     break
