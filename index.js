@@ -2676,7 +2676,7 @@ case 'llama': {
   if (!prompt) { await responder('Uso: #llama <pregunta>'); break; }
   await responder('🦙 Consultando a Llama...');
   try {
-    const res = await fetch('https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=llama');
+    const res = await fetch('https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=mistral');
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
     await sock.sendMessage(jid, { text: '🦙 ' + text.trim() }, { quoted: m });
@@ -2728,17 +2728,19 @@ case 'clima': {
   if (!ciudad) { await responder('Uso: #clima <ciudad>\nEj: #clima Tegucigalpa'); break; }
   await responder('🌤️ Consultando clima de ' + ciudad + '...');
   try {
-    const geoRes = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(ciudad) + '&count=1&language=es&format=json');
-    const geoData = await geoRes.json();
-    if (!geoData.results || geoData.results.length === 0) {
-      await responder('❌ No encontré esa ciudad. Verifica el nombre.');
-      break;
-    }
-    const { latitude, longitude, name, country } = geoData.results[0];
-    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&timezone=auto`);
-    const weatherData = await weatherRes.json();
-    const w = weatherData.current_weather;
-    const txt = `🌤️ *Clima en ${name}, ${country}*\n🌡️ Temperatura: ${w.temperature}°C\n💨 Viento: ${w.windspeed} km/h\n🧭 Dirección: ${w.winddirection}°\n🕒 Hora local: ${w.time}`;
+    const res = await fetch('https://wttr.in/' + encodeURIComponent(ciudad) + '?format=j1');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const current = data.current_condition[0];
+    const area = data.nearest_area[0].areaName[0].value;
+    const region = data.nearest_area[0].region[0].value;
+    
+    const txt = `🌤️ *Clima en ${area}, ${region}*\n` +
+                `🌡️ *Temperatura:* ${current.temp_C}°C (Sensación: ${current.FeelsLikeC}°C)\n` +
+                `☁️ *Clima:* ${current.weatherDesc[0].value}\n` +
+                `💧 *Humedad:* ${current.humidity}%\n` +
+                `💨 *Viento:* ${current.windspeedKmph} km/h\n` +
+                `🕒 *Hora local:* ${current.localObsDateTime.split(' ')[1]}`;
     await sock.sendMessage(jid, { text: txt }, { quoted: m });
   } catch (e) {
     console.log('Error .clima:', e.message);
