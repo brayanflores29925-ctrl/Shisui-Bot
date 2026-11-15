@@ -2044,11 +2044,12 @@ case 'robloxfollowers': {
 case 'robloxstatus': {
   const nombre = cuerpo.slice(cmd.length).trim()
   if (!nombre) {
-    await responder('Uso: #robloxstatus <nombre>')
+    await responder('Uso: #robloxstatus <nombre>\\nEjemplo: #robloxstatus Roblox')
     break
   }
   await responder('🔍 Consultando estado de: ' + nombre + '...')
   try {
+    // 1. Obtener el ID del usuario
     const idRes = await fetch('https://users.roblox.com/v1/usernames/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2060,15 +2061,50 @@ case 'robloxstatus': {
       break
     }
     const userId = idData.data[0].id
+
+    // 2. Obtener detalles del perfil (bio, fecha de creación, etc.)
     const infoRes = await fetch(`https://users.roblox.com/v1/users/${userId}`)
     const info = await infoRes.json()
+
+    // 3. Obtener foto de perfil (headshot)
+    const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=420x420&format=Png&isCircular=false`)
+    const thumbData = await thumbRes.json()
+    const avatarUrl = thumbData.data && thumbData.data[0] ? thumbData.data[0].imageUrl : null
+
+    // 4. Obtener seguidores y amigos (si la API responde)
+    let seguidores = 'N/A'
+    let amigos = 'N/A'
+    try {
+      const [followRes, friendRes] = await Promise.all([
+        fetch(`https://friends.roblox.com/v1/users/${userId}/followers/count`),
+        fetch(`https://friends.roblox.com/v1/users/${userId}/friends/count`)
+      ])
+      if (followRes.ok) { const fData = await followRes.json(); seguidores = fData.count?.toLocaleString() || '0' }
+      if (friendRes.ok) { const aData = await friendRes.json(); amigos = aData.count?.toLocaleString() || '0' }
+    } catch (e) { /* Silencioso si falla la API social */ }
+
     const estado = info.isBanned ? '❌ Baneado' : '✅ Activo'
     const premium = info.isPremium ? '⭐ Premium' : 'No'
-    const caption = `👤 *${info.displayName}* (@${info.name})\n📊 Estado: ${estado}\n⭐ Premium: ${premium}\n📅 Creado: ${new Date(info.created).toLocaleDateString('es-HN')}`
-    await sock.sendMessage(jid, { text: caption }, { quoted: m })
+    const creado = new Date(info.created).toLocaleDateString('es-HN')
+    const bio = info.description ? info.description.substring(0, 80).replace(/\n/g, ' ') : 'Sin descripción'
+
+    const caption = `👤 *${info.displayName}* (@${info.name})\\n` +
+                    `🆔 ID: ${info.id}\\n` +
+                    `📊 Estado: ${estado}\\n` +
+                    `⭐ Premium: ${premium}\\n` +
+                    `📅 Creado: ${creado}\\n` +
+                    `👥 Amigos: ${amigos}\\n` +
+                    `👣 Seguidores: ${seguidores}\\n` +
+                    `📝 Bio: ${bio}`
+
+    if (avatarUrl) {
+      await sock.sendMessage(jid, { image: { url: avatarUrl }, caption }, { quoted: m })
+    } else {
+      await sock.sendMessage(jid, { text: caption }, { quoted: m })
+    }
   } catch (e) {
     console.log('Error .robloxstatus:', e.message)
-    await responder('❌ Error al consultar estado.')
+    await responder('❌ Error al consultar el estado.')
   }
   break
 }
