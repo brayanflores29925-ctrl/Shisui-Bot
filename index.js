@@ -606,21 +606,7 @@ const GACHA_RARITIES = [
 ];
 
 
-function calcularSimilitud(a, b) {
-  const matriz = Array.from({ length: b.length + 1 }, () => Array(a.length + 1).fill(0));
-  for (let i = 0; i <= b.length; i++) matriz[i][0] = i;
-  for (let j = 0; j <= a.length; j++) matriz[0][j] = j;
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      if (b.charAt(i - 1) === a.charAt(j - 1)) {
-        matriz[i][j] = matriz[i - 1][j - 1];
-      } else {
-        matriz[i][j] = Math.min(matriz[i - 1][j - 1] + 1, Math.min(matriz[i][j - 1] + 1, matriz[i - 1][j] + 1));
-      }
-    }
-  }
-  return matriz[b.length][a.length];
-}
+
 
 global.listaComandos = ['sticker', 'robloxgame', 'trabajar', 'robloxgroups', 'ranknazis', 'mediafire', 'antisticker', 'bored', 'antiaudio', 'stickername', 'despedida', 'yawn', '12vs12', 'advertencia', 'limpiar', 'card', 'bn', 'diario', 'descargarapk', 'horca', 'np', 'topricos', 'chatpgt', 'felicitar', 'setred', 'pin', 'video', 'robloxuser', 'fp', 'autoread', 'imagina', 'stare', 'grave', 'attp3', 'disco', 'random', 'piropo', 'yeet', 'adv', 'reverse', 'subs', 'pt', 'promote', 'patear', 'fake', 'instagram', 'videorapido', 'clima', 'delcode', 'imagine', 'horario', 'robloxrandom', 'arbol', 'smug', 'aspam', 'ram', 'yt', 'admins', 'cambiarlink', 'stats', 'aceptarracha', 'perfil', 'v', 'kiss', 'fd', 'piti', 'cd', 'nd', 'highfive', 'resphorca', 'musica', 'activarbot', 'dr', 'pfp', 'robloxavatar', 'as', 'roll', 'sticker2', 'gpt', 'tbcookie', 'w', 'tovideo', 'balance', 'voz', 'shoot', 'code', 'invitacion', 'dados', 'setmenu', 'invitar', 'shrug', 'audiorapido', 'bite', 'wink', 'baka', 'nod', 'antiestafas', 'ar', 'work', 'desactivarracha', 'ayudagacha', 'reglas', '6vs6', 'antilink', 'setowner', 'bt', 'feo', 'gacha', 'attp', 'setupdate', 'bass', 'p', 'toimg', 'setprotect', 'dn', 'setperfil', 'gay', 'rankotaku', 'cambiarenlace', 'k', 'facebook', 'casino', 'fix', 'coleccion', 'poke', 'sg', 'kick', 'bl', 'chatgpt', 'setoficial', 'handshake', 'hs', 'po', 'descripcion', 'sensibilidad', 'cuddle', 'setnsfw', 'aceptarinv', 'hp', 'an', 'lf', 'ardilla', 'e', 'robloxbadges', 'status', 'gpfp', 'verdad', 'thumbsup', 'tf', 'desmutear', 'rn', 'antibots', 'bonk', 'play', 'setprimary', 'videocontrario', 'yn', 'setnombre', 'downloadlink', 'fotogrupo', 'hf', 'ranklesbianas', 'dance', 'simi', 'vender', 'yonunca', 'toqr', 'think', 'link', 'aviso', 'cry', 'fb', 'aprobartodo', 'mr', 'testvideo', 'facepalm', 'slap', 'sleep', 'tag', 'modoadmin', 'guerra', 'reto', 'buscartt', 'x', 'menu', 'clear', 'sl', 'nope', 'audiolento', 'bd', 'aa', 'rankinfieles', 'navidad', 'cmd', 'r', 'horoscopo', 'borrar', 'eco', 'gachaprof', 'a2v', 'hd', 'fantasmas', 'handhold', 'setdespedida', 'owners', 'juegospro', 'rc', 'reporte', 'fq', 'stik', 'espacio', 'herramientas', 'monedas', 'setbienvenida', 'tirar', 'ae', 'robot', 'ttp', 'antistatus', 'attp2', 'lk', 'angry', 'alteradores', 'play2', 'tableflip', 'gachamenu', 'error', 'run', 'videolento', 'anonuevo', 'nom', 'togif', 'consola', 'ping', 'daily', 'delowner', 'mispj', 'wikipedia', 'ap', 'ab', 'blush', 'pk', 'removemoney', 'ranktherian', 'tt', 'tiktok', 'mute', 'actualizar', 'apostar', 'hh', 'setbotprincipal', 'setpfp', '4vs4', 'attp4', 'cerrar', 'buscar', 'setapi', 'menuclan', 'pat', 'st', 'rankbromistas', 'attp6', 'rr', 'tk', 'nombregrupo', 'wv', 'rechazarracha', 'bal', 'ban', 'robloxfriends', 'robloxfollowers', 'miracha', 'miid', 'peck', 'mutear', 'google', 'playdoc', 'sticker3', 'sh', 'ig', 'h', 'rankcornudos', 'bot', 'desactivarbot', 'tickle', 'sr', 'reiniciar', 'flipp', 'key', 'cartera', 'abrir', 'th', 'party', 'nochebuena', 'happy', 'ytsearch', 'antivideos', 'laugh', 'pc', 'smile', 'rankfieles', 'tu', 'pu', 'demote', 'sell', 'del', 'setban', 's', 'botlist', 'wave', 'restart', 'patada', 'punch', 'pout', 'zz', 'robloxstatus', 'nm', 'bk', 'unmute', 'g', 'addmoney', 'tomp3', 'rechazarinv', 'm', 'cr', 'attp5', 'av', 'robloxplayers', 'd', 'col', 'bienvenida', 'ranklindo', 'topactive', 'feed', 'llama', 'consejo', 'sm', 'wn', 'estado', 'racha', 'enigma', 'rankgay', 'gprof', 'topmoney', 'antispam', 'playvideo', 'botones', 'lurk', 'ppt', 'c', 'packname', 'hug', 'topactivos'];
 
@@ -1087,34 +1073,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     // --- FIN GUARDIÁN ---
     
     
-    // --- GUARDIÁN INTELIGENTE ---
-    if (typeof comando !== 'undefined' && comando && global.listaComandos) {
-      const cmdLimpio = comando.toLowerCase().trim();
-      if (!global.listaComandos.includes(cmdLimpio) && cmdLimpio.length > 1) {
-        let sug = '';
-        let min = 3;
-        const p = (typeof prefijo !== 'undefined' && prefijo) ? prefijo : (comando && comando[0]) ? comando[0] : '#';
-        for (const val of global.listaComandos) {
-          const m = Array.from({ length: val.length + 1 }, () => Array(cmdLimpio.length + 1).fill(0));
-          for (let i = 0; i <= val.length; i++) m[i][0] = i;
-          for (let j = 0; j <= cmdLimpio.length; j++) m[0][j] = j;
-          for (let i = 1; i <= val.length; i++) {
-            for (let j = 1; j <= cmdLimpio.length; j++) {
-              m[i][j] = val[i - 1] === cmdLimpio[j - 1] ? m[i - 1][j - 1] : Math.min(m[i - 1][j - 1] + 1, Math.min(m[i][j - 1] + 1, m[i - 1][j] + 1));
-            }
-          }
-          const d = m[val.length][cmdLimpio.length];
-          if (d < min && d > 0) { min = d; sug = val; }
-        }
-        if (sug) {
-          await responder(`❌ El comando *${comando}* no existe.\n\n💡 ¿Quizás quisiste decir *${p}${sug}*?`);
-        } else {
-          await responder(`❌ Lo siento, el comando *${comando}* no está disponible.\n📋 Usa ${p}menu.`);
-        }
-        return;
-      }
-    }
-    // ----------------------------
+    
     
     switch (comando) {
       case 'racha': case 'rc': {
@@ -3898,40 +3857,10 @@ case 'fixapi': case 'testapi': case 'repararapi': {
   break;
 }
 
-case 'villancico': {
-  const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #villancico <nombre>'); break; }
-  await responder('🔍 Buscando: ' + query + '...');
-  try {
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
-    const fs = require('fs');
-    const target = 'ytsearch1:"' + query + ' villancico"';
-    
-    const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
-    const info = JSON.parse(stdout.trim().split('\n')[0]);
-    
-    const txt = '🎄 Villancico › *' + info.title + '*\n\n❖ Canal › *' + (info.channel || 'Desconocido') + '*';
-    if (info.thumbnail) await sock.sendMessage(jid, { image: { url: info.thumbnail }, caption: txt }, { quoted: m });
-    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-    
-    const fileNameBase = 'villan_' + Date.now();
-    await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -R 3 --no-part -f 140/bestaudio[ext=m4a]/bestaudio -o "/tmp/' + fileNameBase + '.%(ext)s" "' + info.webpage_url + '"', { timeout: 120000 });
-    
-    const files = fs.readdirSync('/tmp').filter(f => f.startsWith(fileNameBase));
-    if (files.length > 0) {
-      const buffer = fs.readFileSync('/tmp/' + files[0]);
-      await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
-      fs.unlinkSync('/tmp/' + files[0]);
-    }
-  } catch (e) { console.log('Error villancico:', e.message); await responder('❌ Error al descargar.'); }
-  break;
-}
-
 case 'musica':
       case 'm':
       case 'play':
+case 'villancico':
       case 'video':
       case 'v':
       case 'tiktok': case 'tt': {
