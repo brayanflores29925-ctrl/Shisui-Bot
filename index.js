@@ -2836,6 +2836,173 @@ Ej: #google Shakira`); break; }
   await responder('🔍 Buscando en la web...');
   
   try {
+    // 1. Buscar en DuckDuckGo
+    const res = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query), {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    });
+    const html = await res.text();
+    
+    const links = [...html.matchAll(/<a rel="nofollow" class="result__a" href="([^"]+)">(.*?)<\/a>/gs)];
+    const snippets = [...html.matchAll(/<a class="result__snippet" href="[^"]*">(.*?)<\/a>/gs)];
+    
+    if (links.length === 0) {
+      await responder('❌ No encontré resultados para: ' + query);
+      break;
+    }
+
+    // Limpiar etiquetas HTML
+    const limpiar = (texto) => texto.replace(/<[^>]*>?/gm, '').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&aacute;/g, 'á').replace(/&eacute;/g, 'é').replace(/&iacute;/g, 'í').replace(/&oacute;/g, 'ó').replace(/&uacute;/g, 'ú').replace(/&ntilde;/g, 'ñ');
+
+    // 2. Preparar el primer resultado para la imagen
+    let primeraUrl = links[0][1];
+    if (primeraUrl.startsWith('//duckduckgo.com/l/?uddg=')) {
+      primeraUrl = decodeURIComponent(primeraUrl.split('uddg=')[1].split('&')[0]);
+    }
+    const primerTitulo = limpiar(links[0][2]);
+    const primerSnippet = snippets[0] ? limpiar(snippets[0][1]) : 'Sin descripción.';
+    
+    let imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(query)}?width=512&height=512&nologo=true&seed=1`;
+    const domain = primeraUrl ? new URL(primeraUrl).hostname.replace('www.', '') : 'Web';
+
+    // 3. Texto de la imagen (sin lo de "Abriendo resultado")
+    const caption = `⇨ Buscando > *${primerTitulo.substring(0, 60)}*\n\n` +
+                    `❖ Dominio > ${domain}\n` +
+                    `📝 Descripción > ${primerSnippet.substring(0, 100)}...\n` +
+                    `□ Enlace > ${primeraUrl}`;
+
+    // 4. Enviar la imagen
+    try {
+      const imgRes = await fetch(imgUrl);
+      const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+      await sock.sendMessage(jid, { image: imgBuffer, caption }, { quoted: m });
+    } catch (imgErr) {
+      await sock.sendMessage(jid, { text: caption }, { quoted: m });
+    }
+
+    // 5. Armar la lista de los otros resultados y enviarla en un NUEVO mensaje
+    let txtResultados = `📚 *Más resultados de:* ${query}\n\n`;
+    let count = 0;
+    
+    for (let i = 1; i < links.length && count < 4; i++) {
+      let linkUrl = links[i][1];
+      if (linkUrl.startsWith('//duckduckgo.com/l/?uddg=')) {
+        linkUrl = decodeURIComponent(linkUrl.split('uddg=')[1].split('&')[0]);
+      }
+      const title = limpiar(links[i][2]);
+      txtResultados += `${count+1}. *${title}*\n🔗 ${linkUrl}\n\n`;
+      count++;
+    }
+
+    if (count > 0) {
+      await sock.sendMessage(jid, { text: txtResultados.trim() }, { quoted: m });
+    }
+
+  } catch (e) {
+    console.log('Error .google:', e.message);
+    await responder('❌ Error buscando. Intenta de nuevo.');
+  }
+  break;
+}
+case 'buscar': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder(`Uso: #google <búsqueda>
+Ej: #google Shakira`); break; }
+  
+  await responder('🔍 Buscando en la web...');
+  
+  try {
+    let title = query;
+    let snippet = 'Sin descripción.';
+    let url = '';
+    let imgUrl = '';
+
+    // 1. Intentar obtener un resumen rápido y una imagen con la API de DuckDuckGo
+    try {
+      const ddgRes = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
+      const ddgData = await ddgRes.json();
+      
+      if (ddgData.Image) {
+        imgUrl = ddgData.Image.startsWith('http') ? ddgData.Image : 'https://duckduckgo.com' + ddgData.Image;
+      }
+      if (ddgData.AbstractText) {
+        snippet = ddgData.AbstractText;
+        url = ddgData.AbstractURL;
+        title = ddgData.Heading || query;
+      }
+    } catch (e) {}
+
+    // 2. Si no hay resumen, extraer el primer resultado del HTML de DuckDuckGo
+    if (!url) {
+      const res = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query), {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+      });
+      const html = await res.text();
+      
+      const links = [...html.matchAll(/<a rel="nofollow" class="result__a" href="([^"]+)">(.*?)<\/a>/gs)];
+      const snippets = [...html.matchAll(/<a class="result__snippet" href="[^"]*">(.*?)<\/a>/gs)];
+      
+      if (links.length > 0) {
+        let linkUrl = links[0][1];
+        if (linkUrl.startsWith('//duckduckgo.com/l/?uddg=')) {
+          linkUrl = decodeURIComponent(linkUrl.split('uddg=')[1].split('&')[0]);
+        }
+        title = links[0][2].replace(/<[^>]*>?/gm, '');
+        url = linkUrl;
+        snippet = snippets[0] ? snippets[0][1].replace(/<[^>]*>?/gm, '') : 'Sin descripción.';
+      }
+    }
+
+    // Limpiar caracteres raros del HTML
+    title = title.replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&aacute;/g, 'á').replace(/&eacute;/g, 'é').replace(/&iacute;/g, 'í').replace(/&oacute;/g, 'ó').replace(/&uacute;/g, 'ú').replace(/&ntilde;/g, 'ñ');
+    snippet = snippet.replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&aacute;/g, 'á').replace(/&eacute;/g, 'é').replace(/&iacute;/g, 'í').replace(/&oacute;/g, 'ó').replace(/&uacute;/g, 'ú').replace(/&ntilde;/g, 'ñ');
+
+    // 3. Si no hay imagen, buscar en Wikipedia o generarla con IA
+    if (!imgUrl) {
+      try {
+        const wikiRes = await fetch(`https://es.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(query)}&prop=pageimages&format=json&pithumbsize=500`);
+        const wikiData = await wikiRes.json();
+        const pages = wikiData.query.pages;
+        for (const key in pages) {
+          if (pages[key].thumbnail) { imgUrl = pages[key].thumbnail.source; break; }
+        }
+      } catch(e) {}
+    }
+    if (!imgUrl) {
+      imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(query)}?width=512&height=512&nologo=true&seed=1`;
+    }
+
+    const domain = url ? new URL(url).hostname.replace('www.', '') : 'Web';
+
+    // 4. Formatear el mensaje igual que el comando .play
+    const caption = `⇨ Buscando > *${title.substring(0, 60)}*\n\n` +
+                    `❖ Dominio > ${domain}\n` +
+                    `📝 Descripción > ${snippet.substring(0, 150)}...\n` +
+                    `□ Enlace > ${url}\n\n` +
+                    `⌛ Abriendo resultado...`;
+
+    // 5. Enviar la foto con el texto abajo
+    try {
+      const imgRes = await fetch(imgUrl);
+      const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+      await sock.sendMessage(jid, { image: imgBuffer, caption }, { quoted: m });
+    } catch (imgErr) {
+      await sock.sendMessage(jid, { text: caption }, { quoted: m });
+    }
+
+  } catch (e) {
+    console.log('Error .google:', e.message);
+    await responder('❌ Error buscando. Intenta de nuevo.');
+  }
+  break;
+}
+case 'buscar': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder(`Uso: #google <búsqueda>
+Ej: #google Shakira`); break; }
+  
+  await responder('🔍 Buscando en la web...');
+  
+  try {
     let title = query;
     let snippet = 'Sin descripción.';
     let url = '';
