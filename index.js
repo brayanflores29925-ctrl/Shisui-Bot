@@ -657,8 +657,8 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
           
           if (esAdmin || esDuenoBot) {
             // Verificar que el bot sea admin
-            const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-            const botParticipant = groupMetadata.participants.find(p => p.id === botId);
+            const botNumber = sock.user.id.split(':')[0].split('@')[0];
+            const botParticipant = groupMetadata.participants.find(p => p.id.startsWith(botNumber));
             
             if (botParticipant && botParticipant.admin) {
               // Expulsar
@@ -4139,6 +4139,9 @@ case 'robloxinventario': {
 }
 
 
+
+
+
 case 'villancico': {
   const villancicos = [
     '🎵 *Noche de paz, noche de amor...* 🎵\nTodos duermen en derredor...',
@@ -4860,9 +4863,9 @@ case 'fotogrupo':
   
   // Verificar que el bot sea admin
   const groupMetadata = await sock.groupMetadata(jid);
-  const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-  const botParticipant = groupMetadata.participants.find(p => p.id === botId);
-  if (!botParticipant || !botParticipant.admin) {
+  const botNumber = sock.user.id.split(':')[0].split('@')[0];
+  const botParticipant = groupMetadata.participants.find(p => p.id.startsWith(botNumber));
+  if (!botParticipant || (botParticipant.admin !== 'admin' && botParticipant.admin !== 'superadmin')) {
     await responder('❌ Necesito ser administrador para borrar mensajes.');
     break;
   }
@@ -5204,9 +5207,9 @@ case 'borrar': {
   if (!jid.endsWith('@g.us')) { await responder('❌ Este comando solo funciona en grupos.'); break; }
   
   const groupMetadata = await sock.groupMetadata(jid);
-  const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-  const botParticipant = groupMetadata.participants.find(p => p.id === botId);
-  if (!botParticipant || !botParticipant.admin) {
+  const botNumber = sock.user.id.split(':')[0].split('@')[0];
+  const botParticipant = groupMetadata.participants.find(p => p.id.startsWith(botNumber));
+  if (!botParticipant || (botParticipant.admin !== 'admin' && botParticipant.admin !== 'superadmin')) {
     await responder('❌ Necesito ser administrador para banear y borrar mensajes.');
     break;
   }
@@ -5217,8 +5220,8 @@ case 'borrar': {
     break;
   }
 
-  const targetParticipant = groupMetadata.participants.find(p => p.id === mencionado);
-  if (targetParticipant && targetParticipant.admin) {
+  const targetParticipant = groupMetadata.participants.find(p => p.id.split('@')[0].split(':')[0] === mencionado.split('@')[0].split(':')[0]);
+  if (targetParticipant && (targetParticipant.admin === 'admin' || targetParticipant.admin === 'superadmin')) {
     await responder('❌ No puedo banear a un administrador. Quítale el rango primero.');
     break;
   }
