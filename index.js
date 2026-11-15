@@ -3413,6 +3413,32 @@ case 'clear': {
   break;
 }
 
+case 'consola': case 'cmd': case 'sh': case 'c': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño puede usar la consola.'); break; }
+  const comandoTerminal = cuerpo.slice(cmd.length).trim();
+  if (!comandoTerminal) { await responder(`Uso: #consola <comando>\nEjemplo: #consola ls -la`); break; }
+
+  await responder(`💻 Ejecutando: \`${comandoTerminal}\`...`);
+  try {
+    const { exec } = require('child_process');
+    exec(comandoTerminal, { timeout: 15000, maxBuffer: 1024 * 1024 * 5 }, (error, stdout, stderr) => {
+      let salida = stdout || stderr || 'Sin salida.';
+      if (error && !stdout) salida = error.message;
+      
+      if (salida.length > 3500) {
+        salida = salida.substring(0, 3500) + '\n\n...[Cortado por ser muy largo]';
+      }
+      
+      sock.sendMessage(jid, { text: `💻 *Resultado:*\n\`\`\`\n${salida.trim()}\n\`\`\`` }, { quoted: m })
+        .catch(e => console.log('Error enviando consola:', e.message));
+    });
+  } catch (e) {
+    console.log('Error en consola:', e.message);
+    await responder('❌ Error ejecutando el comando.');
+  }
+  break;
+}
+
 case 'musica':
       case 'm':
       case 'play':

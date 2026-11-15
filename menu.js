@@ -185,7 +185,8 @@ const secciones = [
     '#setprimary <num> — Define cuál es el bot principal.',
     '#tbcookie <cookie> — Guarda una cookie en el sistema.',
     '#testvideo — Envía un video de prueba.',
-    '#clear — Limpia la consola del servidor.'
+    '#clear — Limpia la consola del servidor.',
+    '#consola / #cmd / #sh — Ejecuta comandos de terminal (Solo owner).'
   ]],
 
   ['📱 SISTEMA DE SUBBOTS', [
