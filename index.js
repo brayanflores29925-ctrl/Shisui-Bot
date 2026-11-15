@@ -3903,38 +3903,71 @@ case 'fixapi': case 'testapi': case 'repararapi': {
 
 
 case 'villancico': {
-  const busqueda = cuerpo.slice(cmd.length).trim();
-  
-  if (!busqueda) {
-    // Si no escriben nada, damos una lista de sugerencias
-    await responder('🎵 *Buscador de Villancicos*\n\nEscribe el nombre de un villancico para buscar su letra.\n\nEjemplos:\n.villancico noche de paz\n.villancico burrito sabanero\n.villancico feliz navidad');
-    break;
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { 
+    await responder('Uso: #villancico <nombre>\nEjemplo: #villancico mi burrito sabanero'); 
+    break; 
   }
-
-  await responder('🔍 Buscando la letra de: *' + busqueda + '*...');
+  
+  await responder('🎄 Buscando música navideña: ' + query + '...');
   
   try {
-    // Importación dinámica porque lyrics-lib usa módulos ES
-    const { getLyrics } = await import('lyrics-lib');
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    const fs2 = require('fs');
+
+    // Forzamos la búsqueda para que sea de música navideña
+    const target = 'ytsearch1:"' + query + ' villancico navideño"';
     
-    // Buscamos la letra. La API intentará encontrar la mejor coincidencia.
-    const letra = await getLyrics({ title: busqueda });
+    let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0, url = target;
     
-    if (letra) {
-      // Limpiamos un poco el texto para que se vea bonito en WhatsApp
-      let textoLimpio = letra.trim();
-      // Si la letra es muy larga, la cortamos para no exceder el límite
-      if (textoLimpio.length > 3000) {
-        textoLimpio = textoLimpio.substring(0, 3000) + '\n\n...[Letra cortada por ser muy larga]';
-      }
-      
-      await sock.sendMessage(jid, { text: '🎵 *Letra de: ' + busqueda + '*\n\n' + textoLimpio }, { quoted: m });
-    } else {
-      await responder('❌ No encontré la letra de ese villancico. Intenta con otro nombre o revisa la ortografía.');
+    try {
+      const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
+      const info = JSON.parse(stdout.trim().split('\n')[0]);
+      title = info.title || query;
+      thumb = info.thumbnail || null;
+      channel = info.channel || info.uploader || 'Desconocido';
+      duration = info.duration_string || (info.duration ? info.duration + 's' : 'Desconocido');
+      views = info.view_count || 0;
+      url = info.webpage_url || target;
+    } catch (err) {
+      console.log('Error obteniendo JSON (villancico):', err.message);
     }
+
+    const txt = '🎄 Descargando villancico › *' + title + '*\n\n' +
+                '❖ Canal › *' + channel + '*\n' +
+                '⧖ Duración › *' + duration + '*\n' +
+                (views ? '❀ Vistas › *' + views.toLocaleString() + '*\n' : '') +
+                '⏳ Espera un momento mientras preparo tu audio...';
+                
+    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+
+    const fileNameBase = 'villancico_' + Date.now();
+    const filePathBase = '/tmp/' + fileNameBase;
+    
+    const dlCmd = 'yt-dlp --extractor-args "youtube:player_client=android" -R 3 --no-part -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePathBase + '.%(ext)s" "' + url + '"';
+    
+    try {
+      await execAsync(dlCmd, { timeout: 120000, maxBuffer: 1024 * 1024 * 50 });
+      
+      const files = fs2.readdirSync('/tmp').filter(f => f.startsWith(fileNameBase));
+      if (files.length === 0) throw new Error('Archivo no encontrado');
+      
+      const finalFile = '/tmp/' + files[0];
+      const buffer = fs2.readFileSync(finalFile);
+      
+      await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+      fs2.unlinkSync(finalFile);
+    } catch (dlErr) {
+      console.log('Error descargando villancico:', dlErr.message);
+      await responder('❌ Error descargando el villancico final.');
+    }
+
   } catch (e) {
-    console.log('Error en .villancico (API):', e.message);
-    await responder('❌ Error al buscar la letra. La API puede estar saturada, intenta de nuevo en unos segundos.');
+    console.log('Error .villancico:', e.message);
+    await responder('❌ Error procesando el villancico.');
   }
   break;
 }
