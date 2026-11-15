@@ -491,6 +491,61 @@ function calcularPorcentaje(comando, userId) {
 }
 
 const ANIME_MAP = {"hug": "hug", "kiss": "kiss", "pat": "pat", "slap": "slap", "punch": "punch", "patear": "kick", "poke": "poke", "tickle": "tickle", "cuddle": "cuddle", "bite": "bite", "feed": "feed", "nom": "nom", "smile": "smile", "wink": "wink", "blush": "blush", "smug": "smug", "happy": "happy", "angry": "angry", "bored": "bored", "cry": "cry", "laugh": "laugh", "pout": "pout", "baka": "baka", "bonk": "bonk", "wave": "wave", "nod": "nod", "shrug": "shrug", "nope": "nope", "thumbsup": "thumbsup", "handshake": "handshake", "handhold": "handhold", "highfive": "highfive", "dance": "dance", "run": "run", "sleep": "sleep", "yawn": "yawn", "lurk": "lurk", "stare": "stare", "think": "think", "facepalm": "facepalm", "tableflip": "tableflip", "shoot": "shoot", "yeet": "yeet", "peck": "peck"};
+
+async function descargarRespondido(m, sock) {
+  const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+  const msg = m.message || {};
+  let ctx = {};
+  for (const k of Object.keys(msg)) {
+    const sub = msg[k];
+    if (sub && sub.contextInfo) { ctx = sub.contextInfo; break; }
+  }
+  if (!ctx.quotedMessage) return null;
+  const quotedMsg = {
+    message: ctx.quotedMessage,
+    key: { remoteJid: m.key.remoteJid, id: ctx.stanzaId, participant: ctx.participant || m.key.participant }
+  };
+  return await downloadMediaMessage(quotedMsg, 'buffer', {}, { logger: console, reuploadRequest: sock.updateMediaMessage });
+}
+
+async function ffmpegProcess(input, inputExt, args, outputExt) {
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+  const { execFile } = require('child_process');
+  const { promisify } = require('util');
+  const execFileAsync = promisify(execFile);
+  const base = path.join(os.tmpdir(), 'fx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+  const inputFile = base + inputExt;
+  const outputFile = base + outputExt;
+  fs.writeFileSync(inputFile, input);
+  try {
+    await execFileAsync('ffmpeg', ['-y', '-i', inputFile, ...args, outputFile], { timeout: 45000, maxBuffer: 50 * 1024 * 1024 });
+    return fs.readFileSync(outputFile);
+  } finally {
+    try { fs.unlinkSync(inputFile); } catch (e) {}
+    try { fs.unlinkSync(outputFile); } catch (e) {}
+  }
+}
+
+async function audioEfecto(buffer, filtro) {
+  try {
+    return await ffmpegProcess(buffer, '.ogg', ['-filter:a', filtro, '-b:a', '128k', '-vn'], '.mp3');
+  } catch (e) {
+    // Fallback: intentar como mp4 por si viene de video
+    return await ffmpegProcess(buffer, '.mp4', ['-vn', '-filter:a', filtro, '-b:a', '128k'], '.mp3');
+  }
+}
+
+async function imagenASticker(buffer, tipo) {
+  if (tipo === 'circle') {
+    const vf = "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='if(gt(pow(X-256,2)+pow(Y-256,2),256*256),0,255)'";
+    return await ffmpegProcess(buffer, '.jpg', ['-vf', vf, '-c:v', 'libwebp', '-quality', '80', '-loop', '0'], '.webp');
+  }
+  const vf = "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0";
+  return await ffmpegProcess(buffer, '.jpg', ['-vf', vf, '-c:v', 'libwebp', '-quality', '80', '-loop', '0'], '.webp');
+}
+
 global.antiPorno = false
 global.antiaudio = false
 global.antivideos = false
@@ -2069,6 +2124,157 @@ case 'ranktherian':
   }
   break;
 }
+case 'alteradores': {
+  const lista = '🎧 *EFECTOS DISPONIBLES*\n\n' +
+    '*Audio (responde a un audio):*\n' +
+    '• #audiolento\n• #audiorapido\n• #grave\n• #ardilla\n• #bass\n• #robot\n• #eco\n• #reverse\n\n' +
+    '*Video (responde a un video):*\n' +
+    '• #videolento\n• #videorapido\n• #videocontrario\n\n' +
+    '*Stickers:*\n' +
+    '• #sticker2 (cuadrado)\n• #sticker3 (circular)\n• #attp4/5/6 #ttp (texto)\n• #togif (video→sticker)\n• #tomp3 (video→audio)\n\n' +
+    '*IA:*\n• #imagine (imagen)';
+  await responder(lista);
+  break;
+}
+case 'audiolento': case 'audiorapido': case 'grave': case 'ardilla':
+case 'bass': case 'robot': case 'eco': case 'reverse': {
+  const ctx = m.message?.extendedTextMessage?.contextInfo || {};
+  const quoted = ctx.quotedMessage;
+  if (!quoted || (!quoted.audioMessage && !quoted.videoMessage)) {
+    await responder('🎧 Responde a un audio o video con #' + cmd);
+    break;
+  }
+  await responder('🎧 Procesando audio...');
+  try {
+    const buffer = await descargarRespondido(m, sock);
+    if (!buffer) { await responder('❌ No pude descargar el audio.'); break; }
+    const filtros = {
+      audiolento: 'atempo=0.7',
+      audiorapido: 'atempo=1.4',
+      grave: 'asetrate=35280,aresample=44100,atempo=1.25',
+      ardilla: 'asetrate=57330,aresample=44100,atempo=0.77',
+      bass: 'bass=g=15',
+      robot: "afftfilt=real='hypot(re,im)*sin(0)':imag='hypot(re,im)*cos(0)':win_size=512:overlap=0.75",
+      eco: 'aecho=0.8:0.88:60:0.4',
+      reverse: 'areverse'
+    };
+    const out = await audioEfecto(buffer, filtros[cmd]);
+    await sock.sendMessage(jid, { audio: out, mimetype: 'audio/mp4', ptt: true }, { quoted: m });
+  } catch (e) {
+    console.log('Error .' + cmd + ':', e.message);
+    await responder('❌ Error procesando audio: ' + e.message);
+  }
+  break;
+}
+case 'videolento': case 'videorapido': case 'videocontrario': {
+  const ctx = m.message?.extendedTextMessage?.contextInfo || {};
+  const quoted = ctx.quotedMessage;
+  if (!quoted || !quoted.videoMessage) {
+    await responder('🎬 Responde a un video con #' + cmd);
+    break;
+  }
+  await responder('🎬 Procesando video... (puede tardar)');
+  try {
+    const buffer = await descargarRespondido(m, sock);
+    if (!buffer) { await responder('❌ No pude descargar el video.'); break; }
+    let vf, af, extra = [];
+    if (cmd === 'videolento') { vf = 'setpts=2.0*PTS'; af = 'atempo=0.5'; }
+    else if (cmd === 'videorapido') { vf = 'setpts=0.5*PTS'; af = 'atempo=2.0'; }
+    else { vf = 'reverse'; af = 'areverse'; extra = ['-t', '15']; }
+    let out;
+    try {
+      out = await ffmpegProcess(buffer, '.mp4', [...extra, '-vf', vf, '-af', af, '-c:v', 'libx264', '-preset', 'fast', '-crf', '28', '-c:a', 'aac', '-b:a', '128k'], '.mp4');
+    } catch (e) {
+      out = await ffmpegProcess(buffer, '.mp4', [...extra, '-vf', vf, '-c:v', 'libx264', '-preset', 'fast', '-crf', '28', '-an'], '.mp4');
+    }
+    await sock.sendMessage(jid, { video: out, caption: '✅ #' + cmd }, { quoted: m });
+  } catch (e) {
+    console.log('Error .' + cmd + ':', e.message);
+    await responder('❌ Error procesando video: ' + e.message);
+  }
+  break;
+}
+case 'tomp3': {
+  const buffer = await descargarRespondido(m, sock);
+  if (!buffer) { await responder('🎵 Responde a un video o audio con #tomp3'); break; }
+  await responder('🎵 Convirtiendo a MP3...');
+  try {
+    const out = await ffmpegProcess(buffer, '.mp4', ['-vn', '-acodec', 'libmp3lame', '-b:a', '128k'], '.mp3');
+    await sock.sendMessage(jid, { audio: out, mimetype: 'audio/mpeg' }, { quoted: m });
+  } catch (e) {
+    console.log('Error .tomp3:', e.message);
+    await responder('❌ Error convirtiendo.');
+  }
+  break;
+}
+case 'togif': {
+  const ctx = m.message?.extendedTextMessage?.contextInfo || {};
+  const quoted = ctx.quotedMessage;
+  if (!quoted || !quoted.videoMessage) {
+    await responder('🎞️ Responde a un video con #togif');
+    break;
+  }
+  await responder('🎞️ Creando sticker animado...');
+  try {
+    const buffer = await descargarRespondido(m, sock);
+    const vf = 'fps=10,scale=320:-1:flags=lanczos';
+    const out = await ffmpegProcess(buffer, '.mp4', ['-t', '5', '-vf', vf, '-c:v', 'libwebp', '-quality', '70', '-loop', '0', '-an'], '.webp');
+    await sock.sendMessage(jid, { sticker: out }, { quoted: m });
+  } catch (e) {
+    console.log('Error .togif:', e.message);
+    await responder('❌ Error creando GIF.');
+  }
+  break;
+}
+case 'sticker2': case 'sticker3': {
+  const buffer = await descargarRespondido(m, sock);
+  if (!buffer) { await responder('🖼️ Responde a una imagen o sticker con #' + cmd); break; }
+  await responder('🖼️ Creando sticker...');
+  try {
+    const out = await imagenASticker(buffer, cmd === 'sticker3' ? 'circle' : 'square');
+    await sock.sendMessage(jid, { sticker: out }, { quoted: m });
+  } catch (e) {
+    console.log('Error .' + cmd + ':', e.message);
+    await responder('❌ Error creando sticker: ' + e.message);
+  }
+  break;
+}
+case 'attp4': case 'attp5': case 'attp6': case 'ttp': {
+  const texto = cuerpo.slice(cmd.length).trim();
+  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
+  await responder('✨ Generando sticker de texto...');
+  try {
+    const estilos = { attp4: 'neon glowing letters', attp5: '3d glossy letters', attp6: 'handwritten graffiti', ttp: 'colorful cute letters' };
+    const prompt = 'The text "' + texto + '" written in ' + estilos[cmd] + ', centered, solid black background, sticker style, high contrast, bold typography';
+    const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) + '?width=512&height=512&nologo=true&seed=' + Date.now();
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const out = await imagenASticker(buffer, 'square');
+    await sock.sendMessage(jid, { sticker: out }, { quoted: m });
+  } catch (e) {
+    console.log('Error .' + cmd + ':', e.message);
+    await responder('❌ Error generando sticker de texto.');
+  }
+  break;
+}
+case 'imagine': case 'imagina': {
+  const prompt = cuerpo.slice(cmd.length).trim();
+  if (!prompt) { await responder('Uso: #imagine <descripción>\nEjemplo: #imagine un gato astronauta'); break; }
+  await responder('🎨 Generando imagen con IA...');
+  try {
+    const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) + '?width=768&height=768&nologo=true&seed=' + Date.now();
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    await sock.sendMessage(jid, { image: buffer, caption: '🎨 *' + prompt + '*' }, { quoted: m });
+  } catch (e) {
+    console.log('Error .imagine:', e.message);
+    await responder('❌ Error generando imagen.');
+  }
+  break;
+}
+
 case 'musica':
       case 'm':
       case 'play':
