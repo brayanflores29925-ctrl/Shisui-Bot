@@ -76,28 +76,35 @@ function esperar(ms) {
 }
 
 async function bajarMiniatura(url) {
+  let t
   try {
     const control = new AbortController()
-    const t = setTimeout(() => control.abort(), 12000)
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: control.signal, redirect: 'follow' })
-    clearTimeout(t)
+    t = setTimeout(() => control.abort(), 15000)
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/jpeg,image/png,image/webp,*/*' },
+      signal: control.signal,
+      redirect: 'follow'
+    })
     if (!res.ok) return null
-    if (!/jpe?g|png/i.test(String(res.headers.get('content-type') || ''))) return null
+    const tipo = String(res.headers.get('content-type') || '').toLowerCase()
+    if (!/^image\/(jpeg|jpg|png|webp)(;|$)/i.test(tipo)) return null
     const buf = Buffer.from(await res.arrayBuffer())
-    return buf.length < 3 * 1024 * 1024 ? buf : null
+    return buf.length > 0 && buf.length < 3 * 1024 * 1024 ? buf : null
   } catch {
     return null
+  } finally {
+    if (t) clearTimeout(t)
   }
 }
 
 function miniaturasDe(d) {
   const urls = (d.thumbnails || [])
-    .filter(x => x.url && (x.url.includes('.jpg') || x.url.includes('.jpeg')))
+    .filter(x => x.url && /^https?:\/\//i.test(x.url))
     .map(x => x.url)
     .reverse()
-    .slice(0, 3)
-  if (d.thumbnail) urls.push(d.thumbnail)
-  return urls
+    .slice(0, 5)
+  if (d.thumbnail && /^https?:\/\//i.test(d.thumbnail)) urls.push(d.thumbnail)
+  return [...new Set(urls)]
 }
 
 function armarTarjeta(d, tipo) {
