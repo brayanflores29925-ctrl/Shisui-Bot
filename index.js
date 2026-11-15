@@ -451,8 +451,8 @@ async function convertirGifAWebp(gifBuffer) {
   try {
     await execFileAsync('ffmpeg', [
       '-y', '-i', input,
-      '-vf', 'scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0',
-      '-c:v', 'libwebp', '-quality', '80', '-loop', '0', '-an', '-vsync', '0',
+      '-vf', 'scale=512:512:force_original_aspect_ratio=decrease,fps=15,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=#00000000',
+      '-c:v', 'libwebp', '-lossless', '1', '-q:v', '70', '-loop', '0', '-preset', 'default', '-an', '-vsync', '0',
       output
     ], { timeout: 20000 });
     return fs.readFileSync(output);
@@ -462,35 +462,44 @@ async function convertirGifAWebp(gifBuffer) {
   }
 }
 
-async function enviarStickerAnime(accion, jid, m, sock, mencionado) {
+
+async function enviarStickerAnime(cmd, jid, m, sock, mencionado) {
+  const accionApi = ANIME_MAP[cmd] || cmd;
+  const textoAccion = ANIME_TXT[cmd] || 'interactúa contigo';
   try {
-    const res = await fetch('https://nekos.best/api/v2/' + accion);
+    // Usamos otakugifs que tiene endpoints más estables para todos los comandos
+    const res = await fetch('https://api.otakugifs.xyz/gif?reaction=' + accionApi);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    const urlGif = data.results && data.results[0] && data.results[0].url;
+    const urlGif = data.url;
     if (!urlGif) throw new Error('Sin GIF');
+    
     const gifRes = await fetch(urlGif);
     const gifBuffer = Buffer.from(await gifRes.arrayBuffer());
     const webpBuffer = await convertirGifAWebp(gifBuffer);
+
+    // Enviamos el sticker animado
     await sock.sendMessage(jid, { sticker: webpBuffer }, { quoted: m });
-    const mencionTexto = mencionado ? `@${mencionado.split('@')[0]} ` : '';
+
+    // Enviamos el texto igual que el bot Akame
+    const nombre = mencionado ? '@' + mencionado.split('@')[0] : 'Alguien';
+    const texto = '*' + nombre + '* ' + textoAccion + ' 🤗';
     await sock.sendMessage(jid, {
-      text: mencionTexto + 'te da un ' + accion + ' 🤗',
+      text: texto,
       mentions: mencionado ? [mencionado] : []
     }, { quoted: m });
+    
   } catch (e) {
-    console.log('Error sticker anime (' + accion + '):', e.message);
-    await sock.sendMessage(jid, { text: '❌ No pude obtener el sticker de ' + accion }, { quoted: m });
+    console.log('Error sticker anime (' + accionApi + '):', e.message);
+    await sock.sendMessage(jid, { text: '❌ No pude obtener el sticker de ' + accionApi }, { quoted: m });
   }
 }
-
 function calcularPorcentaje(comando, userId) {
   const crypto = require('crypto');
   const hash = crypto.createHash('md5').update(comando + userId).digest('hex');
   return parseInt(hash.substring(0, 8), 16) % 101;
 }
 
-const ANIME_MAP = {"hug": "hug", "kiss": "kiss", "pat": "pat", "slap": "slap", "punch": "punch", "patear": "kick", "poke": "poke", "tickle": "tickle", "cuddle": "cuddle", "bite": "bite", "feed": "feed", "nom": "nom", "smile": "smile", "wink": "wink", "blush": "blush", "smug": "smug", "happy": "happy", "angry": "angry", "bored": "bored", "cry": "cry", "laugh": "laugh", "pout": "pout", "baka": "baka", "bonk": "bonk", "wave": "wave", "nod": "nod", "shrug": "shrug", "nope": "nope", "thumbsup": "thumbsup", "handshake": "handshake", "handhold": "handhold", "highfive": "highfive", "dance": "dance", "run": "run", "sleep": "sleep", "yawn": "yawn", "lurk": "lurk", "stare": "stare", "think": "think", "facepalm": "facepalm", "tableflip": "tableflip", "shoot": "shoot", "yeet": "yeet", "peck": "peck"};
 
 async function descargarRespondido(m, sock) {
   const { downloadMediaMessage } = require('@whiskeysockets/baileys');
@@ -545,6 +554,9 @@ async function imagenASticker(buffer, tipo) {
   const vf = "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0";
   return await ffmpegProcess(buffer, '.jpg', ['-vf', vf, '-c:v', 'libwebp', '-quality', '80', '-loop', '0'], '.webp');
 }
+
+const ANIME_MAP = {"hug":"hug","kiss":"kiss","pat":"pat","slap":"slap","punch":"punch","patear":"kick","poke":"poke","tickle":"tickle","cuddle":"cuddle","bite":"bite","feed":"feed","nom":"feed","smile":"smile","wink":"wink","blush":"blush","smug":"smug","happy":"happy","angry":"angry","bored":"bored","cry":"cry","laugh":"laugh","pout":"pout","baka":"baka","bonk":"bonk","wave":"wave","nod":"nod","shrug":"shrug","nope":"nope","thumbsup":"thumbsup","handshake":"handshake","handhold":"handhold","highfive":"highfive","dance":"dance","run":"run","sleep":"sleep","yawn":"yawn","lurk":"lurk","stare":"stare","think":"think","facepalm":"facepalm","tableflip":"tableflip","shoot":"shoot","yeet":"yeet","peck":"peck"};
+const ANIME_TXT = {"hug":"te abraza","kiss":"te da un beso","pat":"te acaricia","slap":"te da una bofetada","punch":"te da un puñetazo","patear":"te da una patada","poke":"te molesta","tickle":"te hace cosquillas","cuddle":"se acurruca contigo","bite":"te muerde","feed":"te da de comer","nom":"come contigo","smile":"te sonríe","wink":"te guiña el ojo","blush":"se sonroja por ti","smug":"presume frente a ti","happy":"se alegra por ti","angry":"se enoja contigo","bored":"se aburre contigo","cry":"llora por ti","laugh":"se ríe de ti","pout":"te hace puchero","baka":"te dice baka","bonk":"te da un golpecito","wave":"te saluda","nod":"te asiente","shrug":"se encoge de hombros","nope":"te niega","thumbsup":"te da pulgar arriba","handshake":"te da la mano","handhold":"toma tu mano","highfive":"choca los cinco contigo","dance":"baila contigo","run":"corre contigo","sleep":"duerme contigo","yawn":"bosteza contigo","lurk":"te espía","stare":"te mira fijamente","think":"piensa en ti","facepalm":"se da una palmada por ti","tableflip":"voltea la mesa por ti","shoot":"te dispara","yeet":"te lanza lejos","peck":"te da un besito"};
 
 global.antiPorno = false
 global.antiaudio = false
@@ -2077,8 +2089,7 @@ case 'peck':
     await responder('❌ Menciona a alguien. Ejemplo: #hug @usuario');
     break;
   }
-  const accion = ANIME_MAP[cmd];
-  await enviarStickerAnime(accion, jid, m, sock, mencionado);
+  await enviarStickerAnime(cmd, jid, m, sock, mencionado);
   break;
 }
 case 'gay':
