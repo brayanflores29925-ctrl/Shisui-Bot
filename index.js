@@ -3730,17 +3730,48 @@ case 'card': case 'stats': {
   break;
 }
 
-case 'testbotones': {
-  await sock.sendMessage(jid, {
-    text: '🤖 *Prueba de Botones*\n\nEste es un mensaje con botones. Si los ves en tu pantalla, ¡funciona!',
-    footer: 'Shisui Bot v1.5.0',
-    buttons: [
-      { buttonId: '.hug', buttonText: { displayText: '🤗 Dar Abrazo' }, type: 1 },
-      { buttonId: '.kiss', buttonText: { displayText: '😘 Dar Beso' }, type: 1 },
-      { buttonId: '.menu', buttonText: { displayText: '📋 Ver Menú' }, type: 1 }
-    ],
-    headerType: 1
-  }, { quoted: m });
+
+
+case 'botones': {
+  try {
+    // 1. Intentar con Lista Interactiva (Menú desplegable)
+    const sections = [
+      {
+        title: 'Opciones del Bot',
+        rows: [
+          { title: '🤗 Dar Abrazo', rowId: '.hug', description: 'Envía un sticker de abrazo' },
+          { title: '😘 Dar Beso', rowId: '.kiss', description: 'Envía un sticker de beso' },
+          { title: '📋 Ver Menú', rowId: '.menu', description: 'Muestra el menú principal' }
+        ]
+      }
+    ];
+    
+    await sock.sendMessage(jid, {
+      text: '🤖 *Prueba de Lista Interactiva*\n\nToca el botón de abajo para ver las opciones.',
+      footer: 'Shisui Bot v1.5.0',
+      buttonText: '📌 Abrir Opciones',
+      sections: sections
+    }, { quoted: m });
+    
+    // 2. Intentar con Botón de Enlace (Template)
+    await sock.sendMessage(jid, {
+      text: '🌐 *Prueba de Botón de Enlace*\n\nEste es un botón que te lleva a un sitio web (suele funcionar mejor).',
+      footer: 'Shisui Bot',
+      templateButtons: [
+        {
+          index: 1,
+          urlButton: {
+            displayText: '📢 Ir al Canal',
+            url: 'https://whatsapp.com/channel/0029VbDBJk4BfxoCBx5ov41y'
+          }
+        }
+      ]
+    }, { quoted: m });
+
+  } catch (e) {
+    console.log('Error .botones:', e.message);
+    await responder('❌ Error enviando los botones.');
+  }
   break;
 }
 
