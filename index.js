@@ -5092,8 +5092,63 @@ case 'fotogrupo':
         break
       }
 
-      case 'ban':
-      case 'kick': {
+      case 'ban': case 'kick': {
+  if (!jid.endsWith('@g.us')) { await responder('❌ Este comando solo funciona en grupos.'); break; }
+  
+  const groupMetadata = await sock.groupMetadata(jid);
+  const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+  const botParticipant = groupMetadata.participants.find(p => p.id === botId);
+  if (!botParticipant || !botParticipant.admin) {
+    await responder('❌ Necesito ser administrador para banear y borrar mensajes.');
+    break;
+  }
+
+  const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0] || m.message?.extendedTextMessage?.contextInfo?.participant;
+  if (!mencionado) {
+    await responder('❌ Menciona a alguien o responde a su mensaje para banearlo.');
+    break;
+  }
+
+  const targetParticipant = groupMetadata.participants.find(p => p.id === mencionado);
+  if (targetParticipant && targetParticipant.admin) {
+    await responder('❌ No puedo banear a un administrador. Quítale el rango primero.');
+    break;
+  }
+
+  // Reaccionar con la bota 👢
+  try {
+    await sock.sendMessage(jid, { react: { text: '👢', key: m.key } });
+  } catch (e) {}
+
+  // Expulsar al usuario
+  try {
+    await sock.groupParticipantsUpdate(jid, [mencionado], 'remove');
+    await sock.sendMessage(jid, { text: `👢 @${mencionado.split('@')[0]} ha sido pateado del grupo.`, mentions: [mencionado] }, { quoted: m });
+  } catch (e) {
+    console.log('Error al expulsar:', e.message);
+    await responder('❌ No pude expulsar al usuario.');
+  }
+
+  // Borrar mensajes recientes del usuario (si están en caché)
+  try {
+    let borrados = 0;
+    if (global.mensajes && global.mensajes[jid]) {
+      const mensajesUsuario = global.mensajes[jid].filter(msg => msg.key.participant === mencionado || msg.key.remoteJid === mencionado);
+      for (const msg of mensajesUsuario) {
+        try {
+          await sock.sendMessage(jid, { delete: msg.key });
+          borrados++;
+        } catch (err) {}
+      }
+    }
+    if (borrados > 0) console.log(`🗑️ Se borraron ${borrados} mensajes de ${mencionado.split('@')[0]}`);
+  } catch (e) {
+    console.log('Error al intentar borrar mensajes:', e.message);
+  }
+
+  break;
+}
+case 'kick': {
         if (!jid.endsWith('@g.us')) {
           await responder('Este comando solo funciona en grupos.')
           break
