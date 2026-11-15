@@ -3878,7 +3878,12 @@ case 'botones': {
 
 
 case 'robloxinventario': {
-      await sock.sendMessage(jid, { text: '❌ *Aviso:* Roblox tiene bloqueada la API pública de inventarios. Es imposible ver el inventario de una cuenta desde un bot de WhatsApp sin tener sus cookies de inicio de sesión.\n\nSi quieres ver tus objetos, entra directamente a tu perfil en la página web de Roblox.' }, { quoted: m });
+      console.log('🔥 RASTREO: El comando .robloxinventario SÍ fue detectado y está ejecutándose.');
+      try {
+        await responder('❌ *Aviso:* Roblox tiene bloqueada la API pública de inventarios. Es imposible ver el inventario de una cuenta desde un bot de WhatsApp sin tener sus cookies de inicio de sesión.\n\nSi quieres ver tus objetos, entra directamente a tu perfil en la página web de Roblox.');
+      } catch (err) {
+        console.log('🔥 Error al enviar el mensaje:', err.message);
+      }
       break;
     }
     case 'bloxstock': case 'stockfrutas': {
