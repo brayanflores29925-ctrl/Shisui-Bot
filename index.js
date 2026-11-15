@@ -434,7 +434,12 @@ async function iniciar(opciones = {}) {
     }
   })
 
-  sock.ev.on('messages.upsert', async ({ messages }) => {
+  
+// Sistema de invitaciones pendientes (en memoria)
+const invitacionesPendientes = new Map()
+let contadorInvitaciones = 0
+
+sock.ev.on('messages.upsert', async ({ messages }) => {
   // --- DETECCIÓN ANTIPORNO AUTOMÁTICA ---
   try {
     if (antiPorno && !m.key.fromMe) {
@@ -1337,6 +1342,91 @@ case 'buscartt': {
   }
   break
 }
+case 'invitar':
+case 'invitacion': {
+  const enlace = cuerpo.slice(cmd.length).trim()
+  if (!enlace) {
+    await responder('Uso: #invitar <enlace>\nEjemplos:\n#invitar https://chat.whatsapp.com/XXXXX\n#invitar https://whatsapp.com/channel/XXXXX')
+    break
+  }
+  const matchGrupo = enlace.match(/chat\.whatsapp\.com\/([A-Za-z0-9]+)/)
+  const matchCanal = enlace.match(/whatsapp\.com\/channel\/([A-Za-z0-9]+)/)
+  if (!matchGrupo && !matchCanal) {
+    await responder('❌ Enlace no válido. Debe ser de grupo (chat.whatsapp.com/...) o canal (whatsapp.com/channel/...).')
+    break
+  }
+  const tipo = matchGrupo ? 'grupo' : 'canal'
+  const codigo = matchGrupo ? matchGrupo[1] : matchCanal[1]
+  const id = ++contadorInvitaciones
+  const remitente = (m.key.participant || m.key.remoteJid || '').replace(/[^0-9]/g, '')
+  invitacionesPendientes.set(id, { tipo, codigo, enlace, remitente, jid: m.key.remoteJid })
+  await responder('📨 Solicitud #' + id + ' enviada al dueño del bot. Te aviso cuando responda.')
+  const OWNERS = ['50493482934', '50495939120']
+  for (const num of OWNERS) {
+    const ownerJid = num + '@s.whatsapp.net'
+    try {
+      await sock.sendMessage(ownerJid, {
+        text: '📩 *Solicitud de invitación #' + id + '*\n\n' +
+              '👤 De: +' + remitente + '\n' +
+              '📋 Tipo: ' + tipo + '\n' +
+              '🔗 ' + enlace + '\n\n' +
+              'Responde:\n*#aceptar ' + id + '* para unirme\n*#rechazar ' + id + '* para rechazar'
+      })
+    } catch (e) {
+      console.log('No se pudo notificar al owner ' + num + ':', e.message)
+    }
+  }
+  break
+}
+case 'aceptar':
+case 'rechazar': {
+  const OWNERS = ['50493482934', '50495939120']
+  const remitente = (m.key.participant || m.key.remoteJid || '').replace(/[^0-9]/g, '')
+  const esOwner = OWNERS.some(n => remitente.includes(n))
+  if (!esOwner) {
+    await responder('❌ Solo el owner del bot puede aceptar o rechazar invitaciones.')
+    break
+  }
+  const idStr = cuerpo.slice(cmd.length).trim()
+  const id = parseInt(idStr, 10)
+  if (!id || !invitacionesPendientes.has(id)) {
+    await responder('❌ No hay solicitud con ID ' + idStr + '. Revisa el número.')
+    break
+  }
+  const sol = invitacionesPendientes.get(id)
+  invitacionesPendientes.delete(id)
+  if (cmd === 'rechazar') {
+    await responder('🗑️ Solicitud #' + id + ' rechazada.')
+    try { await sock.sendMessage(sol.jid, { text: '❌ El dueño rechazó la invitación #' + id + '.' }) } catch (e) {}
+    break
+  }
+  if (sol.tipo === 'grupo') {
+    try {
+      await sock.groupAcceptInvite(sol.codigo)
+      await responder('✅ Aceptada #' + id + '. Ya estoy en el grupo.')
+      try { await sock.sendMessage(sol.jid, { text: '✅ El dueño aceptó. El bot se unió al grupo.' }) } catch (e) {}
+    } catch (e) {
+      await responder('❌ No pude unirme: ' + e.message)
+    }
+  } else {
+    const jidCanal = sol.codigo + '@newsletter'
+    try {
+      if (typeof sock.newsletterFollow === 'function') {
+        await sock.newsletterFollow(jidCanal)
+      } else if (typeof sock.subscribeNewsletter === 'function') {
+        await sock.subscribeNewsletter(jidCanal)
+      } else {
+        throw new Error('Tu Baileys no soporta seguir canales.')
+      }
+      await responder('✅ Aceptada #' + id + '. Ahora sigo el canal.')
+      try { await sock.sendMessage(sol.jid, { text: '✅ El dueño aceptó. El bot sigue el canal.' }) } catch (e) {}
+    } catch (e) {
+      await responder('❌ No pude seguir el canal: ' + e.message)
+    }
+  }
+  break
+}
+
 case 'musica':
       case 'm':
       case 'play':
