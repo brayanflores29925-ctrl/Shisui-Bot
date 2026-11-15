@@ -173,6 +173,7 @@ process.on('SIGINT', () => {
 const mensajesRecientes = {}
 const partyReciente = {}
 const nombres = {}
+const DUENO_JID = '50494874330@s.whatsapp.net'
 const reportesRecientes = {}
 const ARCHIVO_CONFIG = './config.json'
 let numero = null
@@ -3991,19 +3992,10 @@ case 'musica':
           }
         }
         try {
-          let enviadosRep = 0
-          for (const numOwner of DUENOS) {
-            try {
-              await sock.sendMessage(numOwner + '@s.whatsapp.net', {
-                text: '📩 Nuevo reporte\n\n👤 De: ' + (m.pushName || 'Sin nombre') + ' (+' + numRep + ')\n💬 Chat: ' + chatRep + '\n\n📝 ' + textoRep
-              })
-              enviadosRep++
-            } catch (err) {
-              console.log('Error notificando al OWNER ' + numOwner + ':', err.message)
-            }
-          }
-          if (!enviadosRep) throw new Error('No se pudo notificar a ningún OWNER')
-          await responder('✅ Reporte enviado a los propietarios. ¡Gracias!')
+          await sock.sendMessage(DUENO_JID, {
+            text: '📩 Nuevo reporte\n\n👤 De: ' + (m.pushName || 'Sin nombre') + ' (+' + numRep + ')\n💬 Chat: ' + chatRep + '\n\n📝 ' + textoRep
+          })
+          await responder('✅ Reporte enviado al dueño. ¡Gracias!')
         } catch (e) {
           console.log('Error al enviar reporte:', e.message)
           await responder('❌ No pude enviar el reporte. Intenta más tarde.')
