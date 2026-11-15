@@ -2345,61 +2345,9 @@ case 'simi': {
   }
   break;
 }
-case 'chatgpt': {
-  const prompt = cuerpo.slice(cmd.length).trim();
-  if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
-  await responder('🤖 Consultando a ChatGPT...');
-  try {
-    const getGPT4js = require('gpt4js');
-    const GPT4js = await getGPT4js();
-    const messages = [{ role: 'user', content: prompt }];
-    const options = { provider: 'Nextway', model: 'gpt-4o-free' };
-    const provider = GPT4js.createProvider(options.provider);
-    const text = await provider.chatCompletion(messages, options, () => {});
-    await sock.sendMessage(jid, { text: '🤖 ' + text }, { quoted: m });
-  } catch (e) {
-    console.log('Error .chatgpt:', e.message);
-    await responder('❌ Error consultando a ChatGPT.');
-  }
-  break;
-}
-case 'llama': {
-  const prompt = cuerpo.slice(cmd.length).trim();
-  if (!prompt) { await responder('Uso: #llama <pregunta>'); break; }
-  await responder('🦙 Consultando a Llama...');
-  try {
-    const OpenAI = require('ainative-openai');
-    const client = new OpenAI();
-    const response = await client.chat.completions.create({
-      model: 'llama-3.3-70b',
-      messages: [{ role: 'user', content: prompt }]
-    });
-    await sock.sendMessage(jid, { text: '🦙 ' + response.choices[0].message.content }, { quoted: m });
-  } catch (e) {
-    console.log('Error .llama:', e.message);
-    await responder('❌ Error consultando a Llama.');
-  }
-  break;
-}
-case 'google': {
-  const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #google <búsqueda>'); break; }
-  await responder('🔍 Buscando en Google...');
-  try {
-    const { search, OrganicResult } = require('google-sr');
-    const results = await search({ query, parsers: [OrganicResult] });
-    if (!results.length) { await responder('❌ Sin resultados.'); break; }
-    let txt = '🔍 *Resultados de Google:*\n\n';
-    results.slice(0, 5).forEach((r, i) => {
-      txt += `*${i+1}. ${r.title}*\n${r.link}\n${r.description || ''}\n\n`;
-    });
-    await sock.sendMessage(jid, { text: txt }, { quoted: m });
-  } catch (e) {
-    console.log('Error .google:', e.message);
-    await responder('❌ Error buscando en Google.');
-  }
-  break;
-}
+
+
+
 case 'wikipedia': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #wikipedia <tema>'); break; }
@@ -2417,21 +2365,7 @@ case 'wikipedia': {
   }
   break;
 }
-case 'clima': {
-  const ciudad = cuerpo.slice(cmd.length).trim();
-  if (!ciudad) { await responder('Uso: #clima <ciudad>'); break; }
-  await responder('🌤️ Consultando clima...');
-  try {
-    const { getWeather } = require('c-weather');
-    const data = await getWeather(ciudad);
-    const txt = `🌤️ *Clima en ${data.location}*\n🌡️ Temperatura: ${data.temperature}°C\n💨 Viento: ${data.windspeed} km/h\n📅 ${data.time}`;
-    await sock.sendMessage(jid, { text: txt }, { quoted: m });
-  } catch (e) {
-    console.log('Error .clima:', e.message);
-    await responder('❌ No encontré esa ciudad.');
-  }
-  break;
-}
+
 case 'attp': case 'attp2': case 'attp3': {
   const texto = cuerpo.slice(cmd.length).trim();
   if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
@@ -2736,6 +2670,81 @@ case 'setbotprincipal': {
     await responder('❌ Error guardando la configuración.')
   }
   break
+}
+case 'llama': {
+  const prompt = cuerpo.slice(cmd.length).trim();
+  if (!prompt) { await responder('Uso: #llama <pregunta>'); break; }
+  await responder('🦙 Consultando a Llama...');
+  try {
+    const res = await fetch('https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=llama');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    await sock.sendMessage(jid, { text: '🦙 ' + text.trim() }, { quoted: m });
+  } catch (e) {
+    console.log('Error .llama:', e.message);
+    await responder('❌ Error consultando a Llama. Intenta de nuevo.');
+  }
+  break;
+}
+case 'chatgpt': case 'chatpgt': case 'gpt': {
+  const prompt = cuerpo.slice(cmd.length).trim();
+  if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
+  await responder('🤖 Consultando a ChatGPT...');
+  try {
+    const res = await fetch('https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    await sock.sendMessage(jid, { text: '🤖 ' + text.trim() }, { quoted: m });
+  } catch (e) {
+    console.log('Error .chatgpt:', e.message);
+    await responder('❌ Error consultando a ChatGPT.');
+  }
+  break;
+}
+case 'google': case 'buscar': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #google <búsqueda>'); break; }
+  await responder('🔍 Buscando en la web...');
+  try {
+    const { search, SafeSearchType } = require('duck-duck-scrape');
+    const searchResults = await search(query, { safeSearch: SafeSearchType.MODERATE });
+    if (!searchResults.results || searchResults.results.length === 0) {
+      await responder('❌ No encontré resultados.');
+      break;
+    }
+    let txt = '🔍 *Resultados de búsqueda:*\n\n';
+    searchResults.results.slice(0, 5).forEach((r, i) => {
+      txt += `*${i+1}. ${r.title}*\n🔗 ${r.url}\n📝 ${r.description || 'Sin descripción'}\n\n`;
+    });
+    await sock.sendMessage(jid, { text: txt }, { quoted: m });
+  } catch (e) {
+    console.log('Error .google:', e.message);
+    await responder('❌ Error buscando. Intenta de nuevo.');
+  }
+  break;
+}
+case 'clima': {
+  const ciudad = cuerpo.slice(cmd.length).trim();
+  if (!ciudad) { await responder('Uso: #clima <ciudad>\nEj: #clima Tegucigalpa'); break; }
+  await responder('🌤️ Consultando clima de ' + ciudad + '...');
+  try {
+    const geoRes = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(ciudad) + '&count=1&language=es&format=json');
+    const geoData = await geoRes.json();
+    if (!geoData.results || geoData.results.length === 0) {
+      await responder('❌ No encontré esa ciudad. Verifica el nombre.');
+      break;
+    }
+    const { latitude, longitude, name, country } = geoData.results[0];
+    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&timezone=auto`);
+    const weatherData = await weatherRes.json();
+    const w = weatherData.current_weather;
+    const txt = `🌤️ *Clima en ${name}, ${country}*\n🌡️ Temperatura: ${w.temperature}°C\n💨 Viento: ${w.windspeed} km/h\n🧭 Dirección: ${w.winddirection}°\n🕒 Hora local: ${w.time}`;
+    await sock.sendMessage(jid, { text: txt }, { quoted: m });
+  } catch (e) {
+    console.log('Error .clima:', e.message);
+    await responder('❌ Error consultando el clima. Intenta de nuevo.');
+  }
+  break;
 }
 case 'musica':
       case 'm':
