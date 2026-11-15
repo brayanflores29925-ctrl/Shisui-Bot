@@ -3781,8 +3781,46 @@ case 'musica':
       case 'play':
       case 'video':
       case 'v':
-      case 'tiktok':
-      case 'tt':
+      case 'tiktok': case 'tt': {
+  const url = cuerpo.slice(cmd.length).trim();
+  if (!url || !url.includes('tiktok.com')) {
+    await responder('Uso: #tiktok <enlace de TikTok>\\nEjemplo: #tiktok https://vm.tiktok.com/...');
+    break;
+  }
+  
+  await responder('⬇️ Descargando video de TikTok (rápido)...');
+  
+  try {
+    // Usamos la API de TikWM (sin marca de agua y muy rápida)
+    const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`);
+    const json = await res.json();
+    
+    if (json.code !== 0 || !json.data) {
+      await responder('❌ No se pudo obtener el video. Asegúrate de que el enlace sea público.');
+      break;
+    }
+    
+    const videoUrl = json.data.play;
+    const titulo = json.data.title || 'Video de TikTok';
+    const autor = json.data.author ? json.data.author.nickname : 'Desconocido';
+    
+    // Descargar el video a la memoria
+    const videoRes = await fetch(videoUrl);
+    const buffer = Buffer.from(await videoRes.arrayBuffer());
+    
+    // Enviarlo por WhatsApp
+    await sock.sendMessage(jid, { 
+      video: buffer, 
+      caption: `🎬 *${titulo}*\\n👤 Autor: ${autor}` 
+    }, { quoted: m });
+    
+  } catch (e) {
+    console.log('Error .tiktok:', e.message);
+    await responder('❌ Error descargando de TikTok. Revisa el enlace.');
+  }
+  break;
+}
+case 'tt':
       case 'facebook':
       case 'fb':
       case 'x':
