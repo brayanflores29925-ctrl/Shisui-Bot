@@ -32,7 +32,8 @@ const secciones = [
     '#facebook / #fb — Descarga contenido de Facebook.',
     '#instagram / #ig — Descarga contenido de Instagram.',
     '#pinterest — Descarga contenido de Pinterest.',
-    '#x — Ejecuta herramientas para X.'
+    '#x — Ejecuta herramientas para X.',
+    '#buscar <nombre> — Busca y envía un video de TikTok.'
   ]],
 
   ['🎭 STICKERS Y MULTIMEDIA', [
@@ -119,7 +120,12 @@ const secciones = [
     '#ban / #kick — Expulsa a un usuario.',
     '#advertencia / #adv — Gestiona advertencias.',
     '#aviso — Envía un aviso.',
-    '#aprobartodo — Gestiona solicitudes de ingreso.'
+    '#aprobartodo — Gestiona solicitudes de ingreso.',
+    '#horario 23:00 07:00 — Programa el cierre y apertura automáticos.',
+    '#nombregrupo <texto> — Cambia el nombre del grupo.',
+    '#descripcion <texto> — Cambia la descripción del grupo.',
+    '#admins — Menciona a los administradores.',
+    '#fantasmas — Muestra los miembros sin actividad registrada.'
   ]],
 
   ['👑 COMANDOS DEL DUEÑO', [
