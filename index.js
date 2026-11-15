@@ -585,6 +585,26 @@ function saveRachaDB(db) {
   fs.writeFileSync('./rachas.json', JSON.stringify(db, null, 2));
 }
 
+
+function getGachaDB() {
+  const fs = require('fs');
+  try { return JSON.parse(fs.readFileSync('./gacha.json', 'utf8')); } catch { return {}; }
+}
+function saveGachaDB(db) {
+  const fs = require('fs');
+  fs.writeFileSync('./gacha.json', JSON.stringify(db, null, 2));
+}
+function getGachaUser(db, id) {
+  if (!db[id]) db[id] = { coins: 100, level: 1, xp: 0, lastDaily: 0, lastWork: 0, chars: [] };
+  return db[id];
+}
+const GACHA_RARITIES = [
+  { name: 'Común', emoji: '⚪', chance: 0.60, value: 10 },
+  { name: 'Raro', emoji: '🔵', chance: 0.30, value: 30 },
+  { name: 'Épico', emoji: '🟣', chance: 0.08, value: 100 },
+  { name: 'Legendario', emoji: '🟡', chance: 0.02, value: 500 }
+];
+
 global.antiPorno = false
 global.antiaudio = false
 global.antivideos = false
@@ -2471,6 +2491,162 @@ case 'hd': {
   break;
 }
 
+case 'gacha': case 'g': case 'roll': case 'tirar':
+case 'gachamenu': case 'ayudagacha': {
+  if (cmd === 'gachamenu' || cmd === 'ayudagacha') {
+    await responder('🎮 *SISTEMA GACHA*\n\nUsa #gacha para tirar (50 monedas).\nUsa #daily para tu recompensa.\nUsa #w para trabajar.\nUsa #coleccion para ver tus personajes.\nUsa #apostar para jugar monedas.\nUsa #gachaprof para ver tu perfil.');
+    break;
+  }
+  const sender = m.key.participant || m.key.remoteJid;
+  const db = getGachaDB();
+  const u = getGachaUser(db, sender);
+  
+  if (u.coins < 50) { await responder('❌ No tienes suficientes monedas. Necesitas 50 para tirar. Usa #daily o #w.'); break; }
+  u.coins -= 50;
+  
+  let rand = Math.random();
+  let rarity = GACHA_RARITIES[0];
+  for (const r of GACHA_RARITIES) { if (rand < r.chance) { rarity = r; break; } rand -= r.chance; }
+  
+  const personajes = ['Goku', 'Naruto', 'Levi', 'Gojo', 'Luffy', 'Zoro', 'Eren', 'Saitama', 'Miku', 'Rem', 'Asuna', 'Kirito', 'Tanjiro', 'Nezuko', 'Kakashi', 'Itachi', 'Sukuna', 'Anya', 'Killua', 'Hisoka'];
+  const pj = personajes[Math.floor(Math.random() * personajes.length)];
+  
+  const id = Date.now().toString().slice(-4);
+  u.chars.push({ id, name: pj, rarity: rarity.name, emoji: rarity.emoji, value: rarity.value });
+  
+  u.xp += 15;
+  if (u.xp >= u.level * 100) { u.xp -= u.level * 100; u.level++; }
+  saveGachaDB(db);
+  
+  const txt = `🎰 *¡INVOCACIÓN!*\n\nHas obtenido a:\n${rarity.emoji} *${pj}*\n🌟 Rareza: ${rarity.name}\n🆔 ID: ${id}\n\n💰 Monedas restantes: ${u.coins}`;
+  await sock.sendMessage(jid, { text: txt }, { quoted: m });
+  break;
+}
+case 'daily': case 'd': case 'diario': {
+  const sender = m.key.participant || m.key.remoteJid;
+  const db = getGachaDB();
+  const u = getGachaUser(db, sender);
+  const ahora = Date.now();
+  
+  if (ahora - u.lastDaily < 86400000) {
+    const h = Math.ceil((86400000 - (ahora - u.lastDaily)) / 3600000);
+    await responder(`⏳ Ya reclamaste tu recompensa hoy. Vuelve en ${h} horas.`);
+    break;
+  }
+  
+  u.coins += 100;
+  u.lastDaily = ahora;
+  u.xp += 20;
+  if (u.xp >= u.level * 100) { u.xp -= u.level * 100; u.level++; }
+  saveGachaDB(db);
+  await responder(`🎁 ¡Recompensa diaria reclamada!\n💰 +100 monedas\n⭐ +20 XP\n\nAhora tienes: ${u.coins} monedas.`);
+  break;
+}
+case 'w': case 'work': case 'trabajar': {
+  const sender = m.key.participant || m.key.remoteJid;
+  const db = getGachaDB();
+  const u = getGachaUser(db, sender);
+  const ahora = Date.now();
+  
+  if (ahora - u.lastWork < 3600000) {
+    const m_rest = Math.ceil((3600000 - (ahora - u.lastWork)) / 60000);
+    await responder(`⏳ Estás cansado. Descansa ${m_rest} minutos antes de volver a trabajar.`);
+    break;
+  }
+  
+  const ganancia = Math.floor(Math.random() * 30) + 20;
+  u.coins += ganancia;
+  u.lastWork = ahora;
+  u.xp += 10;
+  if (u.xp >= u.level * 100) { u.xp -= u.level * 100; u.level++; }
+  saveGachaDB(db);
+  await responder(`💼 ¡Has trabajado duro!\n💰 +${ganancia} monedas\n⭐ +10 XP\n\nAhora tienes: ${u.coins} monedas.`);
+  break;
+}
+case 'monedas': case 'bal': case 'balance': case 'cartera': {
+  const sender = m.key.participant || m.key.remoteJid;
+  const db = getGachaDB();
+  const u = getGachaUser(db, sender);
+  await sock.sendMessage(jid, { text: `💰 *Tus Monedas:* ${u.coins}\n📊 *Nivel:* ${u.level} (${u.xp}/${u.level * 100} XP)`, mentions: [sender] }, { quoted: m });
+  break;
+}
+case 'coleccion': case 'col': case 'mispj': {
+  const sender = m.key.participant || m.key.remoteJid;
+  const db = getGachaDB();
+  const u = getGachaUser(db, sender);
+  if (u.chars.length === 0) { await responder('📭 No tienes personajes. Usa #gacha para tirar.'); break; }
+  
+  let txt = `📚 *COLECCIÓN DE @${sender.split('@')[0]}*\n\n`;
+  u.chars.forEach((c, i) => {
+    txt += `${i+1}. ${c.emoji} *${c.name}* (${c.rarity}) — ID: ${c.id}\n`;
+  });
+  await sock.sendMessage(jid, { text: txt, mentions: [sender] }, { quoted: m });
+  break;
+}
+case 'apostar': case 'ap': {
+  const sender = m.key.participant || m.key.remoteJid;
+  const cantidad = parseInt(cuerpo.slice(cmd.length).trim());
+  if (isNaN(cantidad) || cantidad <= 0) { await responder('Uso: #apostar <cantidad>\nEjemplo: #apostar 50'); break; }
+  
+  const db = getGachaDB();
+  const u = getGachaUser(db, sender);
+  if (u.coins < cantidad) { await responder('❌ No tienes suficientes monedas.'); break; }
+  
+  const gano = Math.random() > 0.5;
+  if (gano) {
+    u.coins += cantidad;
+    await responder(`🎲 ¡GANASTE!\n💰 +${cantidad} monedas\nAhora tienes: ${u.coins}`);
+  } else {
+    u.coins -= cantidad;
+    await responder(`🎲 ¡PERDISTE!\n💸 -${cantidad} monedas\nAhora tienes: ${u.coins}`);
+  }
+  saveGachaDB(db);
+  break;
+}
+case 'vender': case 'sell': {
+  const sender = m.key.participant || m.key.remoteJid;
+  const idVenta = cuerpo.slice(cmd.length).trim();
+  if (!idVenta) { await responder('Uso: #vender <ID del personaje>\nMira tus IDs con #coleccion'); break; }
+  
+  const db = getGachaDB();
+  const u = getGachaUser(db, sender);
+  const index = u.chars.findIndex(c => c.id === idVenta);
+  if (index === -1) { await responder('❌ No tienes ningún personaje con ese ID.'); break; }
+  
+  const pj = u.chars[index];
+  u.coins += pj.value;
+  u.chars.splice(index, 1);
+  saveGachaDB(db);
+  await responder(`💸 Has vendido a ${pj.emoji} *${pj.name}* por *${pj.value} monedas*.\nAhora tienes: ${u.coins}`);
+  break;
+}
+case 'gachaprof': case 'gprof': {
+  const sender = m.key.participant || m.key.remoteJid;
+  const db = getGachaDB();
+  const u = getGachaUser(db, sender);
+  
+  let mejor = 'Ninguno';
+  if (u.chars.length > 0) {
+    const top = [...u.chars].sort((a,b) => b.value - a.value)[0];
+    mejor = `${top.emoji} ${top.name} (${top.rarity})`;
+  }
+  
+  const txt = `👤 *PERFIL GACHA*\n\n📊 Nivel: ${u.level}\n⭐ XP: ${u.xp}/${u.level * 100}\n💰 Monedas: ${u.coins}\n🎴 Personajes: ${u.chars.length}\n🏆 Mejor PJ: ${mejor}`;
+  await sock.sendMessage(jid, { text: txt, mentions: [sender] }, { quoted: m });
+  break;
+}
+case 'topricos': case 'topmoney': {
+  const db = getGachaDB();
+  const lista = Object.keys(db).map(id => ({ id, coins: db[id].coins || 0 })).sort((a,b) => b.coins - a.coins).slice(0, 5);
+  if (lista.length === 0) { await responder('No hay usuarios con monedas aún.'); break; }
+  
+  let txt = '💎 *TOP 5 MÁS RICOS*\n\n';
+  lista.forEach((u, i) => {
+    txt += `${i+1}. @${u.id.split('@')[0]} — ${u.coins} monedas\n`;
+  });
+  await sock.sendMessage(jid, { text: txt, mentions: lista.map(u => u.id) }, { quoted: m });
+  break;
+}
 case 'musica':
       case 'm':
       case 'play':
