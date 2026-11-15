@@ -1005,6 +1005,36 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     }
     // --- FIN GUARDIÁN ---
     
+    
+    // --- GUARDIÁN INTELIGENTE ---
+    if (typeof comando !== 'undefined' && comando && global.listaComandos) {
+      const cmdLimpio = comando.toLowerCase().trim();
+      if (!global.listaComandos.includes(cmdLimpio) && cmdLimpio.length > 1) {
+        let sug = '';
+        let min = 3;
+        const p = (typeof prefijo !== 'undefined' && prefijo) ? prefijo : (comando && comando[0]) ? comando[0] : '#';
+        for (const val of global.listaComandos) {
+          const m = Array.from({ length: val.length + 1 }, () => Array(cmdLimpio.length + 1).fill(0));
+          for (let i = 0; i <= val.length; i++) m[i][0] = i;
+          for (let j = 0; j <= cmdLimpio.length; j++) m[0][j] = j;
+          for (let i = 1; i <= val.length; i++) {
+            for (let j = 1; j <= cmdLimpio.length; j++) {
+              m[i][j] = val[i - 1] === cmdLimpio[j - 1] ? m[i - 1][j - 1] : Math.min(m[i - 1][j - 1] + 1, Math.min(m[i][j - 1] + 1, m[i - 1][j] + 1));
+            }
+          }
+          const d = m[val.length][cmdLimpio.length];
+          if (d < min && d > 0) { min = d; sug = val; }
+        }
+        if (sug) {
+          await responder(`❌ El comando *${comando}* no existe.\n\n💡 ¿Quizás quisiste decir *${p}${sug}*?`);
+        } else {
+          await responder(`❌ Lo siento, el comando *${comando}* no está disponible.\n📋 Usa ${p}menu.`);
+        }
+        return;
+      }
+    }
+    // ----------------------------
+    
     switch (comando) {
       case 'racha': case 'rc': {
   const sender = m.key.participant || m.key.remoteJid;
@@ -4215,42 +4245,21 @@ case 'musica':
       }
 
       case 'pfp':
-      case 'perfil': {
-        const ctxF = m.message.extendedTextMessage?.contextInfo
-        let objetivoF = (ctxF?.mentionedJid || [])[0] || ctxF?.participant || ''
-        if (!objetivoF && args[0]) {
-          const dig = args[0].replace(/\D/g, '')
-          if (dig) objetivoF = dig + '@s.whatsapp.net'
-        }
-        const usoDefault = !objetivoF
-        if (usoDefault) objetivoF = m.key.participant || m.key.remoteJid
-        const candidatosF = [objetivoF]
-        if (usoDefault) candidatosF.push(m.key.participantAlt, m.key.remoteJidAlt)
-        let urlFoto = null
-        for (const c of candidatosF.filter(Boolean)) {
-          try {
-            urlFoto = await sock.profilePictureUrl(c, 'image')
-            objetivoF = c
-            break
-          } catch {}
-        }
-        if (!urlFoto) {
-          await responder('⚠️ No pude obtener la foto. Puede que no tenga o que la tenga oculta.')
-          break
-        }
-        await sock.sendMessage(
-          jid,
-          {
-            image: { url: urlFoto },
-            caption: '🖼️ Foto de perfil de @' + objetivoF.split('@')[0].split(':')[0],
-            mentions: [objetivoF]
-          },
-          { quoted: m }
-        )
-        break
-      }
-
-      case 'fotogrupo':
+      case 'perfil': case 'pr': {
+  const sender = m.key.participant || m.key.remoteJid;
+  const user = sender.split('@')[0];
+  const db = getPerfilDB();
+  const p = db[sender] || {};
+  let txt = `👤 *PERFIL DE @${user}*\n\n`;
+  txt += `📝 *Descripción:* ${p.desc || 'No establecida'}\n`;
+  txt += `🚻 *Género:* ${p.genero || 'No establecido'}\n`;
+  txt += `🎂 *Cumpleaños:* ${p.cumple || 'No establecido'}\n`;
+  txt += `💍 *Pareja:* ${p.pareja ? '@' + p.pareja.split('@')[0] : 'Solter@'}\n`;
+  const menciones = [sender]; if (p.pareja) menciones.push(p.pareja);
+  await sock.sendMessage(jid, { text: txt, mentions: menciones }, { quoted: m });
+  break;
+}
+case 'fotogrupo':
       case 'gpfp': {
         if (!jid.endsWith('@g.us')) {
           await responder('Este comando solo funciona en grupos.')
