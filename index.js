@@ -3690,7 +3690,9 @@ case 'ytsearch': {
   break;
 }
 
-case 'play2': case 'playdoc': 
+
+
+
 case 'playvideo': case 'play2': case 'playdoc': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
@@ -3699,69 +3701,68 @@ case 'playvideo': case 'play2': case 'playdoc': {
   
   try {
     const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    const fs2 = require('fs');
+
     const esDoc = cmd === 'playdoc';
     const esAudio = cmd === 'play2';
     const target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
     
-    const jsonCmd = 'yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"';
+    let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0, url = target;
     
-    exec(jsonCmd, { timeout: 30000, maxBuffer: 1024 * 1024 * 10 }, async (err, stdout) => {
-      let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0, url = query;
+    // 1. Intentar obtener info (con try/catch para que no falle si YouTube bloquea)
+    try {
+      const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
+      const info = JSON.parse(stdout.trim().split('\n')[0]);
+      title = info.title || query;
+      thumb = info.thumbnail || null;
+      channel = info.channel || info.uploader || 'Desconocido';
+      duration = info.duration_string || (info.duration ? info.duration + 's' : 'Desconocido');
+      views = info.view_count || 0;
+      url = info.webpage_url || target;
+    } catch (err) {
+      console.log('Error obteniendo JSON (se usará descarga directa):', err.message);
+      // Si falla, usamos el target (ytsearch1:...) para descargar y dejamos los datos por defecto
+    }
+
+    // 2. Enviar la tarjeta (con o sin foto)
+    const txt = '➩ Descargando › *' + title + '*\n\n' +
+                '❖ Canal › *' + channel + '*\n' +
+                '⧖ Duración › *' + duration + '*\n' +
+                (views ? '❀ Vistas › *' + views.toLocaleString() + '*\n' : '') +
+                '⏳ Espera un momento...';
+                
+    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+
+    // 3. Descargar el archivo final
+    const fileName = 'media_' + Date.now();
+    const ext = esAudio ? 'm4a' : 'mp4';
+    const filePath = '/tmp/' + fileName + '.' + ext;
+    
+    const ytArgs = esAudio ? '-f "ba[ext=m4a]/ba" -x --audio-format m4a' : '-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"';
+    const dlCmd = 'yt-dlp --extractor-args "youtube:player_client=android" ' + ytArgs + ' -o "' + filePath + '" "' + url + '"';
+    
+    try {
+      await execAsync(dlCmd, { timeout: 120000, maxBuffer: 1024 * 1024 * 50 });
       
-      if (!err && stdout) {
-        try {
-          const info = JSON.parse(stdout.trim().split('\n')[0]);
-          title = info.title;
-          thumb = info.thumbnail;
-          channel = info.channel || info.uploader;
-          duration = info.duration_string || (info.duration + 's');
-          views = info.view_count || 0;
-          url = info.webpage_url || info.url;
-        } catch(e) {}
+      if (!fs2.existsSync(filePath)) throw new Error('Archivo no encontrado');
+      const buffer = fs2.readFileSync(filePath);
+      
+      if (esDoc) {
+        await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: title.substring(0,20) + '.mp4' }, { quoted: m });
+      } else if (esAudio) {
+        await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+      } else {
+        await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
       }
+      fs2.unlinkSync(filePath);
+    } catch (dlErr) {
+      console.log('Error descargando:', dlErr.message);
+      await responder('❌ Error descargando el archivo. Puede que YouTube esté bloqueando el servidor.');
+    }
 
-      const txt = '➩ Descargando › *' + title + '*\n\n' +
-                  '❖ Canal › *' + channel + '*\n' +
-                  '⧖ Duración › *' + duration + '*\n' +
-                  (views ? '❀ Vistas › *' + views.toLocaleString() + '*\n' : '') +
-                  '❐ Enlace › ' + url + '\n\n' +
-                  '⏳ Espera un momento mientras preparo tu ' + (esAudio ? 'audio' : 'video') + '...';
-                  
-      if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
-      else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-
-      const fileName = 'media_' + Date.now();
-      const ext = esAudio ? 'm4a' : 'mp4';
-      const filePath = '/tmp/' + fileName + '.' + ext;
-      
-      // VARIABLE RENOMBRADA A ytArgs
-      const ytArgs = esAudio ? '-f "ba[ext=m4a]/ba" -x --audio-format m4a' : '-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"';
-      const dlCmd = 'yt-dlp --extractor-args "youtube:player_client=android" ' + ytArgs + ' -o "' + filePath + '" "' + url + '"';
-      
-      exec(dlCmd, { timeout: 120000, maxBuffer: 1024 * 1024 * 50 }, async (dlErr) => {
-        if (dlErr) {
-          console.log('Error yt-dlp:', dlErr.message);
-          return responder('❌ Error descargando el archivo.');
-        }
-        try {
-          const fs2 = require('fs');
-          if (!fs2.existsSync(filePath)) throw new Error('Archivo no encontrado');
-          const buffer = fs2.readFileSync(filePath);
-          
-          if (esDoc) {
-            await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: title.substring(0,20) + '.mp4' }, { quoted: m });
-          } else if (esAudio) {
-            await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
-          } else {
-            await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
-          }
-          fs2.unlinkSync(filePath);
-        } catch (e) {
-          console.log('Error enviando:', e.message);
-          await responder('❌ Error enviando el archivo.');
-        }
-      });
-    });
   } catch (e) {
     console.log('Error .' + cmd + ':', e.message);
     await responder('❌ Error procesando la descarga.');
@@ -4476,6 +4477,40 @@ case 'fotogrupo':
 
       case 'del': case 'borrar': {
   if (!jid.endsWith('@g.us')) { await responder('❌ Solo en grupos.'); break; }
+  
+  let target = m.message?.extendedTextMessage?.contextInfo?.participant;
+  if (!target) { await responder('❌ Responde al mensaje de la persona a la que le quieres borrar todo.'); break; }
+  
+  let borrados = 0;
+  try {
+    if (global.msgCache && global.msgCache[jid]) {
+      const msgsABorrar = global.msgCache[jid].filter(k => k.participant === target || (k.participant && k.participant.includes(target.split('@')[0])));
+      for (const k of msgsABorrar) {
+        try { 
+          await sock.sendMessage(jid, { delete: k }); 
+          borrados++; 
+          await new Promise(r => setTimeout(r, 250)); 
+        } catch(err) {
+          console.log('Error al borrar mensaje individual:', err.message);
+        }
+      }
+    }
+    
+    if (borrados > 0) {
+      try { await sock.sendMessage(jid, { react: { text: '🗑️', key: m.key } }); } catch (e) {}
+      await sock.sendMessage(jid, { text: '🗑️ Se eliminaron ' + borrados + ' mensajes de @' + target.split('@')[0] + '.', mentions: [target] }, { quoted: m });
+    } else {
+      await responder('⚠️ No encontré mensajes recientes en caché de este usuario, o no soy administrador.');
+    }
+  } catch(e) {
+    if (e.message.includes('forbidden') || e.message.includes('not-authorized')) {
+       await responder('❌ Necesito ser administrador para borrar mensajes.');
+    }
+  }
+  break;
+}
+case 'borrar': {
+  if (!jid.endsWith('@g.us')) { await responder('❌ Solo en grupos.'); break; }
   try {
     
     const groupMetadata = await sock.groupMetadata(jid);
@@ -4893,6 +4928,37 @@ case 'borrar': {
       }
 
       case 'ban': case 'kick': {
+  if (!jid.endsWith('@g.us')) { await responder('❌ Solo en grupos.'); break; }
+  
+  let mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0] || m.message?.extendedTextMessage?.contextInfo?.participant;
+  if (!mencionado) { await responder('❌ Menciona o responde a alguien.'); break; }
+  
+  try {
+    // Intentar expulsar directamente. Si el bot no es admin, WhatsApp lanzará el error aquí.
+    await sock.groupParticipantsUpdate(jid, [mencionado], 'remove');
+    
+    // Si llegó aquí, funcionó
+    try { await sock.sendMessage(jid, { react: { text: '👢', key: m.key } }); } catch (e) {}
+    await sock.sendMessage(jid, { text: '👢 @' + mencionado.split('@')[0] + ' ha sido pateado.', mentions: [mencionado] }, { quoted: m });
+    
+    // Borrar mensajes en caché
+    if (global.msgCache && global.msgCache[jid]) {
+      const msgsABorrar = global.msgCache[jid].filter(k => (k.participant === mencionado || (k.participant && k.participant.includes(mencionado.split('@')[0]))));
+      for (const k of msgsABorrar) {
+        try { await sock.sendMessage(jid, { delete: k }); await new Promise(r => setTimeout(r, 200)); } catch(err) {}
+      }
+    }
+  } catch (e) {
+    console.log('Error al banear:', e.message);
+    if (e.message.includes('forbidden') || e.message.includes('not-authorized') || e.message.includes('admin')) {
+      await responder('❌ Necesito ser administrador del grupo para expulsar.');
+    } else {
+      await responder('❌ Error al expulsar. El usuario pudo haber salido o no tengo permisos.');
+    }
+  }
+  break;
+}
+case 'kick': {
   if (!jid.endsWith('@g.us')) { await responder('❌ Solo en grupos.'); break; }
   try {
     
