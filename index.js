@@ -2084,9 +2084,13 @@ case 'shoot': case 'sh':
 case 'yeet': case 'yt':
 case 'peck': case 'pc':
 {
-  const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
+  let mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
+  const citado = m.message?.extendedTextMessage?.contextInfo?.participant;
+  if (!mencionado && citado) {
+    mencionado = citado; // Si responde a un mensaje, usa al autor del mensaje
+  }
   if (!mencionado) {
-    await responder('❌ Menciona a alguien. Ejemplo: #hug @usuario');
+    await responder('❌ Menciona a alguien o responde a su mensaje. Ejemplo: #hug @usuario o (responde) #hug');
     break;
   }
   await enviarStickerAnime(cmd, jid, m, sock, mencionado);
