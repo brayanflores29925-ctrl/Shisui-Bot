@@ -72,6 +72,7 @@ const {
 const pino = require('pino')
 const readline = require('readline')
 const { generarMenu } = require('./menu')
+const rapido = require('./rapido')
 const herramientas = require('./herramientas')
 const { ejecutar: navidadEjecutar } = require('./navidad')
 const limpieza = require('./limpieza')
@@ -1236,7 +1237,7 @@ case 'buscartt': {
   break
 }
 
-case 'musica':
+      case 'musica':
       case 'm':
       case 'play':
       case 'video':
@@ -1247,105 +1248,63 @@ case 'musica':
       case 'fb':
       case 'x':
       case 'instagram':
-      case 'ig':
-      case 'pinterest': {
-        const tipos = {
+      case 'ig': {
+        const tiposDl = {
           musica: 'musica', m: 'musica', play: 'musica', video: 'video', v: 'video',
           tiktok: 'tiktok', tt: 'tiktok', facebook: 'facebook', fb: 'facebook',
-          x: 'x', instagram: 'instagram', ig: 'instagram', pinterest: 'pinterest'
+          x: 'x', instagram: 'instagram', ig: 'instagram'
         }
-        const tipo = tipos[comando]
-        const entrada = cuerpo.slice(cmd.length).trim()
-        const ejemplos = {
+        const tipoDl = tiposDl[comando]
+        const entradaDl = cuerpo.slice(cmd.length).trim()
+        const ejemplosDl = {
           musica: '#musica nombre de la canción',
           video: '#video nombre del video',
           tiktok: '#tiktok <enlace>',
           facebook: '#facebook <enlace>',
           x: '#x <enlace>',
-          instagram: '#instagram <enlace>', pinterest: '#pinterest <enlace>'
+          instagram: '#instagram <enlace>'
         }
-        if (!entrada) {
-          await responder('Uso: ' + ejemplos[tipo])
+        if (!entradaDl) {
+          await responder('Uso: ' + ejemplosDl[tipoDl])
           break
         }
-        if (tipo === 'pinterest' && !/^https?:\/\//i.test(entrada)) {
-          await responder('🔎 Buscando 3 imágenes de: ' + entrada)
-          try {
-            const resultados = await buscarImagenes(entrada, 3)
-            if (!resultados.length) {
-              await responder('❌ No encontré imágenes. Prueba con otro nombre.')
-              break
-            }
-
-            let enviadas = 0
-            for (const imagen of resultados) {
-              try {
-                const buffer = await bajarMedia(imagen.url, 10)
-                await sock.sendMessage(jid, {
-                  image: buffer,
-                  caption: '🖼️ ' + imagen.titulo + '\n🔎 Búsqueda: ' + entrada
-                }, { quoted: m })
-                enviadas++
-              } catch (e) {
-                console.log('Error enviando imagen Pinterest:', e.message)
-              }
-            }
-
-            if (!enviadas) await responder('❌ No pude enviar las imágenes encontradas.')
-          } catch (e) {
-            console.log('Error buscando imágenes:', e.message)
-            await responder('❌ ' + String(e.message || 'Error al buscar imágenes.').slice(0, 150))
+        const dominiosDl = {
+          tiktok: ['tiktok.com'],
+          facebook: ['facebook.com', 'fb.watch', 'fb.com'],
+          x: ['x.com', 'twitter.com'],
+          instagram: ['instagram.com']
+        }
+        if (dominiosDl[tipoDl] && !dominiosDl[tipoDl].some(d => entradaDl.toLowerCase().includes(d))) {
+          await responder('⚠️ Envía un enlace válido de ' + tipoDl + '. Uso: ' + ejemplosDl[tipoDl])
+          break
+        }
+        const rDl = await rapido.procesar({
+          tipo: tipoDl,
+          entrada: entradaDl,
+          usuario: m.key.participant || m.key.remoteJid,
+          tarjeta: async (texto, miniatura) => {
+            if (miniatura) await sock.sendMessage(jid, { image: miniatura, caption: texto }, { quoted: m })
+            else await sock.sendMessage(jid, { text: texto }, { quoted: m })
           }
+        })
+        if (!rDl.ok) {
+          await responder('❌ ' + rDl.error)
           break
-        }
-
-        const validar = {
-          tiktok: /tiktok\.com/i,
-          facebook: /(facebook\.com|fb\.watch)/i,
-          x: /(x\.com|twitter\.com)/i,
-          instagram: /instagram\.com/i, pinterest: /(pinterest\.com|pin\.it)/i
-        }
-        if (validar[tipo] && !validar[tipo].test(entrada)) {
-          await responder('⚠️ Envía un enlace válido de ' + tipo + '.\nUso: ' + ejemplos[tipo])
-          break
-        }
-        const claveApi = leerConfig().apikey || 'local'
-        if (!claveApi) {
-          await responder('⚠️ Falta la API key. El dueño debe guardarla con #key <clave>')
-          break
-        }
-        let objetivoDl = entrada
-        const inf = await informacion(tipo, entrada, m.key.participant || m.key.remoteJid)
-        if (inf.espera) {
-          await responder('❌ ' + inf.error)
-          break
-        }
-        if (inf.ok) {
-          objetivoDl = inf.objetivo
-          if (inf.miniatura) {
-            await sock.sendMessage(jid, { image: inf.miniatura, caption: inf.texto }, { quoted: m })
-          } else {
-            await sock.sendMessage(jid, { text: inf.texto }, { quoted: m })
-          }
-        } else {
-          await responder('⏳ Descargando, espera un momento...')
         }
         try {
-          const r = await descargar(tipo, objetivoDl, claveApi, null)
-          if (!r.ok) {
-            await responder('❌ ' + (r.error || 'No pude descargarlo.'))
-            break
-          }
-          if (r.tipo === 'audio') {
-            await sock.sendMessage(jid, { audio: await bajarMedia(r.url), mimetype: 'audio/mpeg' }, { quoted: m })
-          } else if (r.tipo === 'image') {
-            await sock.sendMessage(jid, { image: await bajarMedia(r.url), caption: r.titulo || '' }, { quoted: m })
+          const bufDl = fs.readFileSync(rDl.ruta)
+          if (rDl.tipo === 'audio') {
+            await sock.sendMessage(jid, { audio: bufDl, mimetype: rDl.mimetype }, { quoted: m })
+          } else if (rDl.tipo === 'image') {
+            await sock.sendMessage(jid, { image: bufDl, caption: rDl.titulo || '' }, { quoted: m })
           } else {
-            await sock.sendMessage(jid, { video: await bajarMedia(r.url), mimetype: 'video/mp4', caption: r.titulo || '' }, { quoted: m })
+            await sock.sendMessage(jid, { video: bufDl, mimetype: 'video/mp4', caption: rDl.titulo || '' }, { quoted: m })
           }
         } catch (e) {
-          console.log('Error de descarga:', e.message)
-          await responder('❌ Error al descargar: ' + String(e.message || '').slice(0, 120))
+          console.log('Error al enviar la descarga:', e.message)
+          await responder('❌ Error al enviar el archivo.')
+        } finally {
+          try { fs.unlinkSync(rDl.ruta) } catch {}
         }
         break
       }
