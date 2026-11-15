@@ -442,17 +442,68 @@ let contadorInvitaciones = 0
 sock.ev.on('messages.upsert', async ({ messages }) => {
   // --- DETECCIÓN ANTIPORNO AUTOMÁTICA ---
   try {
-    if (antiPorno && !m.key.fromMe) {
-      const msg = m.message || {}
-      const mediaMsg = msg.imageMessage || msg.videoMessage || msg.stickerMessage
-      if (mediaMsg) {
-        const { downloadMediaMessage } = require('@whiskeysockets/baileys')
-        const buffer = await downloadMediaMessage(m, 'buffer', {}, {
-          logger: console,
-          reuploadRequest: sock.updateMediaMessage
-        })
+    if (typeof antiPorno !== 'undefined' && antiPorno && !m.key.fromMe) {
+      const { downloadMediaMessage } = require('@whiskeysockets/baileys')
+      let innerMsg = m.message || {}
+      if (innerMsg.ephemeralMessage) innerMsg = innerMsg.ephemeralMessage.message || {}
+      if (innerMsg.viewOnceMessage) innerMsg = innerMsg.viewOnceMessage.message || {}
+      if (innerMsg.viewOnceMessageV2) innerMsg = innerMsg.viewOnceMessageV2.message || {}
+      if (innerMsg.documentWithCaptionMessage) innerMsg = innerMsg.documentWithCaptionMessage.message || {}
+
+      const imageMsg = innerMsg.imageMessage
+      const videoMsg = innerMsg.videoMessage
+      const stickerMsg = innerMsg.stickerMessage
+
+      let bufferToCheck = null
+
+      if (imageMsg || stickerMsg) {
+        try {
+          bufferToCheck = await downloadMediaMessage(m, 'buffer', {}, {
+            logger: console,
+            reuploadRequest: sock.updateMediaMessage
+          })
+          console.log('[antiporno] Imagen/sticker descargado:', bufferToCheck.length, 'bytes')
+        } catch (e) {
+          console.log('[antiporno] Error descargando imagen/sticker:', e.message)
+        }
+      } else if (videoMsg) {
+        console.log('[antiporno] Video detectado, analizando...')
+        if (videoMsg.jpegThumbnail && videoMsg.jpegThumbnail.length > 100) {
+          bufferToCheck = Buffer.from(videoMsg.jpegThumbnail)
+          console.log('[antiporno] Usando thumbnail del video:', bufferToCheck.length, 'bytes')
+        } else {
+          try {
+            const videoBuffer = await downloadMediaMessage(m, 'buffer', {}, {
+              logger: console,
+              reuploadRequest: sock.updateMediaMessage
+            })
+            const { execFile } = require('child_process')
+            const { promisify } = require('util')
+            const fs = require('fs')
+            const path = require('path')
+            const os = require('os')
+            const execFileAsync = promisify(execFile)
+            const base = path.join(os.tmpdir(), 'ttk_' + Date.now())
+            const tmpVideo = base + '.mp4'
+            const tmpFrame = base + '.jpg'
+            fs.writeFileSync(tmpVideo, videoBuffer)
+            try {
+              await execFileAsync('ffmpeg', ['-y', '-i', tmpVideo, '-ss', '00:00:01', '-vframes', '1', tmpFrame], { timeout: 15000 })
+              bufferToCheck = fs.readFileSync(tmpFrame)
+              console.log('[antiporno] Frame extraído con ffmpeg:', bufferToCheck.length, 'bytes')
+            } finally {
+              try { fs.unlinkSync(tmpVideo) } catch (e) {}
+              try { fs.unlinkSync(tmpFrame) } catch (e) {}
+            }
+          } catch (e) {
+            console.log('[antiporno] Error procesando video:', e.message)
+          }
+        }
+      }
+
+      if (bufferToCheck && bufferToCheck.length) {
         const { esNSFW } = require('./nsfw')
-        const malo = await esNSFW(buffer)
+        const malo = await esNSFW(bufferToCheck)
         if (malo) {
           await sock.sendMessage(m.key.remoteJid, { delete: m.key })
           await sock.sendMessage(m.key.remoteJid, {
