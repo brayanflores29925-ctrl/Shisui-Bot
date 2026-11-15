@@ -1,6 +1,9 @@
 if (!process.env.BOT_CHILD && !process.env.BOT_LOOP) {
   // Supervisor: mantiene vivo el bot y lo reinicia solo, sin depender del hosting
   const { spawn } = require('child_process')
+
+// Pre-cargando modelo NSFW para que la primera detección sea rápida
+try { require('./nsfw').cargarModelo().catch(e => console.log('[antiporno] No se pudo cargar modelo:', e.message)) } catch (e) { console.log('[antiporno] nsfw.js no cargó:', e.message) }
   const supFs = require('fs')
   const supPath = require('path')
   let hijo = null
@@ -432,6 +435,33 @@ async function iniciar(opciones = {}) {
   })
 
   sock.ev.on('messages.upsert', async ({ messages }) => {
+  // --- DETECCIÓN ANTIPORNO AUTOMÁTICA ---
+  try {
+    if (antiPorno && !m.key.fromMe) {
+      const msg = m.message || {}
+      const mediaMsg = msg.imageMessage || msg.videoMessage || msg.stickerMessage
+      if (mediaMsg) {
+        const { downloadMediaMessage } = require('@whiskeysockets/baileys')
+        const buffer = await downloadMediaMessage(m, 'buffer', {}, {
+          logger: console,
+          reuploadRequest: sock.updateMediaMessage
+        })
+        const { esNSFW } = require('./nsfw')
+        const malo = await esNSFW(buffer)
+        if (malo) {
+          await sock.sendMessage(m.key.remoteJid, { delete: m.key })
+          await sock.sendMessage(m.key.remoteJid, {
+            text: '🚫 Mensaje eliminado por contenido explícito.'
+          }, { quoted: m })
+          return
+        }
+      }
+    }
+  } catch (e) {
+    console.log('[antiporno] Error en chequeo:', e.message)
+  }
+  // --- FIN DETECCIÓN ANTIPORNO ---
+
     const m = messages[0]
     if (!m?.message) return
     if (process.env.DEBUG_MSG) console.log('[msg]', m.key.remoteJid, 'fromMe=' + !!m.key.fromMe, 'part=' + (m.key.participant || '-'), Object.keys(m.message).join(','))
