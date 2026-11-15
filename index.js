@@ -1827,7 +1827,7 @@ case 'robloxavatar': {
     await responder('Uso: #robloxavatar <nombre>\nEjemplo: #robloxavatar Roblox')
     break
   }
-  await responder('🖼️ Buscando avatar de: ' + nombre + '...')
+  await responder('🖼️ Buscando skin de: ' + nombre + '...')
   try {
     const idRes = await fetch('https://users.roblox.com/v1/usernames/users', {
       method: 'POST',
@@ -1840,16 +1840,16 @@ case 'robloxavatar': {
       break
     }
     const userId = idData.data[0].id
-    const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=420x420&format=Png&isCircular=false`)
+    const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=720x720&format=Png&isCircular=false`)
     const thumbData = await thumbRes.json()
     if (!thumbData.data || !thumbData.data[0] || !thumbData.data[0].imageUrl) {
-      await responder('❌ No se pudo obtener el avatar.')
+      await responder('❌ No se pudo obtener la skin.')
       break
     }
-    await sock.sendMessage(jid, { image: { url: thumbData.data[0].imageUrl }, caption: `🖼️ Avatar de *${nombre}*` }, { quoted: m })
+    await sock.sendMessage(jid, { image: { url: thumbData.data[0].imageUrl }, caption: `🖼️ Skin de *${nombre}*` }, { quoted: m })
   } catch (e) {
     console.log('Error .robloxavatar:', e.message)
-    await responder('❌ Error al obtener el avatar.')
+    await responder('❌ Error al obtener la skin.')
   }
   break
 }
@@ -1894,19 +1894,20 @@ case 'robloxgroups': {
 case 'robloxgame': {
   const nombre = cuerpo.slice(cmd.length).trim()
   if (!nombre) {
-    await responder('Uso: #robloxgame <nombre del juego>\nEjemplo: #robloxgame Adopt Me')
+    await responder('Uso: #robloxgame <nombre del juego>\nEjemplo: #robloxgame Blox Fruits')
     break
   }
   await responder('🎮 Buscando juego: ' + nombre + '...')
   try {
-    const searchRes = await fetch('https://games.roblox.com/v1/games/list?model.searchTerm=' + encodeURIComponent(nombre) + '&model.maxRows=1')
-    const searchData = await searchRes.json()
-    if (!searchData.games || searchData.games.length === 0) {
+    const res = await fetch(`https://apis.roblox.com/search-api/omni-search?searchQuery=${encodeURIComponent(nombre)}&pageType=games`)
+    const data = await res.json()
+    const resultados = data.searchResults?.[0]?.contents || []
+    const juego = resultados.find(r => r.name)
+    if (!juego) {
       await responder('❌ No encontré ese juego.')
       break
     }
-    const juego = searchData.games[0]
-    const caption = `🎮 *${juego.name}*\n🆔 Place ID: ${juego.placeId}\n👤 Creador: ${juego.creatorName}\n📊 Visitas: ${juego.visits.toLocaleString()}`
+    const caption = `🎮 *${juego.name}*\n🆔 Universe ID: ${juego.id || juego.universeId}\n👤 Creador: ${juego.creatorName || 'Desconocido'}\n📊 Visitas: ${(juego.playerCount || juego.visits || 0).toLocaleString()}\n🔗 https://www.roblox.com/games/${juego.id}`
     await sock.sendMessage(jid, { text: caption }, { quoted: m })
   } catch (e) {
     console.log('Error .robloxgame:', e.message)
@@ -3542,7 +3543,7 @@ case 'play2': case 'playdoc': case 'playvideo': {
     if (esAudio) args = `-f "ba[ext=m4a]/ba" -x --audio-format m4a`;
     else args = `-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"`;
 
-    exec(`yt-dlp ${args} -o "${filePath}" "${url}"`, { timeout: 90000, maxBuffer: 1024 * 1024 * 10 }, async (error, stdout, stderr) => {
+    exec(`yt-dlp --extractor-args "youtube:player_client=android" ${args} -o "${filePath}" "${url}"`, { timeout: 90000, maxBuffer: 1024 * 1024 * 10 }, async (error, stdout, stderr) => {
       if (error) {
         console.log('Error yt-dlp:', error.message);
         return responder('❌ Error descargando. El video puede ser privado o muy largo.');
@@ -5365,7 +5366,7 @@ case 'musica':
         if (a0 === 'herramientas') {
           const v = (args[1] || '').toLowerCase()
           if (v !== 'on' && v !== 'off') {
-            await responder('Uso: #setupdate herramientas on|off\nActivado, el bot descarga yt-dlp y ffmpeg (unos 120 MB). Solo para servidores con espacio.')
+            await responder('Uso: #setupdate herramientas on|off\nActivado, el bot descarga yt-dlp --extractor-args "youtube:player_client=android" y ffmpeg (unos 120 MB). Solo para servidores con espacio.')
             break
           }
           cfgUp.herramientas = v === 'on'
@@ -5472,7 +5473,7 @@ case 'musica':
         const cfgH = leerConfig()
         if (subH === 'instalar') {
           if ((process.env.PREFIX || '').includes('com.termux')) {
-            await responder('ℹ️ En Termux se instalan con: pkg install yt-dlp ffmpeg')
+            await responder('ℹ️ En Termux se instalan con: pkg install yt-dlp --extractor-args "youtube:player_client=android" ffmpeg')
             break
           }
           if (libreH !== null && libreH < 300) {
@@ -5481,7 +5482,7 @@ case 'musica':
           }
           cfgH.herramientas = true
           guardarConfig(cfgH)
-          await responder('⏳ Instalando yt-dlp y ffmpeg. Esto puede tardar uno o dos minutos...')
+          await responder('⏳ Instalando yt-dlp --extractor-args "youtube:player_client=android" y ffmpeg. Esto puede tardar uno o dos minutos...')
           const rH = await herramientas.instalar()
           await responder(
             (rH.ytdlp ? '✅ yt-dlp: ' + rH.ytdlp : '❌ yt-dlp: no quedó instalado') + '\n' +
