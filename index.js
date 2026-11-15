@@ -622,7 +622,7 @@ function calcularSimilitud(a, b) {
   return matriz[b.length][a.length];
 }
 
-global.listaComandos = ['nom', 'baka', '6vs6', 'coleccion', 'videolento', 'abrir', 'reglas', 'dance', 'modoadmin', 'ap', 'admins', 'wikipedia', 'rankinfieles', 'actualizar', 'ranklesbianas', 'nope', 'cambiarenlace', 'daily', 'slap', 'peck', 'play', 'sm', 'pk', 'subs', 'tu', 'yeet', 'gprof', 'fp', 'enigma', 'aa', 'play2', 'imagina', 'topmoney', 'wave', '4vs4', 'feed', 'owners', 'po', 'x', 'tag', 'rr', 'p', 'horca', 'smug', 'pout', 'ranktherian', 'setbienvenida', 'google', 'hp', 'juegospro', 'aviso', 'patada', 'cry', 'ppt', 'fake', '12vs12', 'antilink', 'sell', 'stats', 'menu', 'an', 'nombregrupo', 'robloxfollowers', 'buscartt', 'tbcookie', 'racha', 'wv', 'robot', 'resphorca', 'video', 'advertencia', 'botones', 'piti', 'bn', 'robloxrandom', 'mutear', 'smile', 'tickle', 'setban', 'guerra', 'llama', 'rankcornudos', 'audiorapido', 'shrug', 'demote', 'pt', 'link', 'robloxfriends', 'random', 'tableflip', 'espacio', 'tk', 'setoficial', 'verdad', 'sg', 'aprobartodo', 'menuclan', 'ayudagacha', 'robloxavatar', 'mispj', 'setapi', 'topactive', 'setdespedida', 'as', 'balance', 'stik', 'handshake', 'd', 'adv', 'removemoney', 'lurk', 'attp3', 'toqr', 'disco', 'yt', 'desactivarracha', 'rc', 'cambiarlink', 'a2v', 'invitacion', 'ab', 'sticker', 'ranklindo', 'antiestafas', 'mediafire', 'nm', 'ban', 'fantasmas', 'bal', 'key', 'work', 'bite', 'apostar', 'sl', 'attp5', 'stare', 'handhold', 'restart', 'fq', 'gachaprof', 'herramientas', 'robloxgroups', 'bienvenida', 'topactivos', 'yonunca', 'lf', 'descripcion', 'pfp', 'nod', 'hug', 'laugh', 'autoread', 'kiss', 'felicitar', 'tomp3', 'clear', 'ram', 'flipp', 'th', 'grave', 'ytsearch', 'reporte', 'arbol', 'playvideo', 'gpfp', 'simi', 'wink', 'hf', 'np', 'punch', 'cr', 'blush', 'sr', 'cd', 'shoot', 'card', 's', 'setred', 'testvideo', 'ping', 'consola', 'setupdate', 'dn', 'poke', 'bt', 'hs', 'attp', 'g', 'ar', 'audiolento', 'sensibilidad', 'h', 'fd', 'reverse', 'party', 'stickername', 'tovideo', 'k', 'limpiar', 'happy', 'angry', 'facepalm', 'playdoc', 'setprotect', 'despedida', 'tiktok', 'yawn', 'borrar', 'setperfil', 'dr', 'reto', 'attp2', 'antispam', 'mr', 'promote', 'pu', 'clima', 'reiniciar', 'r', 'rechazarracha', 'estado', 'antivideos', 'wn', 'imagine', 'setprimary', 'robloxbadges', 'setowner', 'robloxuser', 'rechazarinv', 'c', 'miid', 'consejo', 'delowner', 'col', 'miracha', 'ae', 'bl', 'tf', 'chatgpt', 'activarbot', 'fotogrupo', 'instagram', 'sleep', 'pat', 'zz', 'nd', 'ttp', 'desactivarbot', 'invitar', 'videorapido', 'pin', 'botlist', 'bd', 'kick', 'setnombre', 'gpt', 'gay', 'attp6', 'monedas', 'videocontrario', 'navidad', 'descargarapk', 'trabajar', 'rankgay', 'alteradores', 'setnsfw', 'cerrar', 'dados', 'nochebuena', 'topricos', 'perfil', 'aspam', 'facebook', 'av', 'm', 'code', 'rankfieles', 'downloadlink', 'eco', 'bored', 'tt', 'packname', 'diario', 'aceptarinv', 'antistatus', 'delcode', 'horoscopo', 'bonk', 'sh', 'ranknazis', 'error', 'vender', 'ig', 'gacha', 'bass', 'thumbsup', 'v', 'yn', 'rankbromistas', 'cuddle', 'run', 'addmoney', 'rankotaku', 'bk', 'rn', 'antisticker', 'mute', 'hd', 'piropo', 'e', 'w', 'buscar', 'fix', 'tirar', 'hh', 'cartera', 'sticker2', 'highfive', 'patear', 'lk', 'bot', 'attp4', 'casino', 'fb', 'gachamenu', 'pc', 'robloxplayers', 'think', 'del', 'setbotprincipal', 'anonuevo', 'musica', 'antibots', 'voz', 'unmute', 'st', 'desmutear', 'feo', 'status', 'ardilla', 'roll', 'setmenu', 'robloxgame', 'aceptarracha', 'cmd', 'horario', 'togif', 'sticker3', 'antiaudio', 'setpfp', 'toimg', 'chatpgt', 'robloxstatus'];
+global.listaComandos = ['sticker', 'robloxgame', 'trabajar', 'robloxgroups', 'ranknazis', 'mediafire', 'antisticker', 'bored', 'antiaudio', 'stickername', 'despedida', 'yawn', '12vs12', 'advertencia', 'limpiar', 'card', 'bn', 'diario', 'descargarapk', 'horca', 'np', 'topricos', 'chatpgt', 'felicitar', 'setred', 'pin', 'video', 'robloxuser', 'fp', 'autoread', 'imagina', 'stare', 'grave', 'attp3', 'disco', 'random', 'piropo', 'yeet', 'adv', 'reverse', 'subs', 'pt', 'promote', 'patear', 'fake', 'instagram', 'videorapido', 'clima', 'delcode', 'imagine', 'horario', 'robloxrandom', 'arbol', 'smug', 'aspam', 'ram', 'yt', 'admins', 'cambiarlink', 'stats', 'aceptarracha', 'perfil', 'v', 'kiss', 'fd', 'piti', 'cd', 'nd', 'highfive', 'resphorca', 'musica', 'activarbot', 'dr', 'pfp', 'robloxavatar', 'as', 'roll', 'sticker2', 'gpt', 'tbcookie', 'w', 'tovideo', 'balance', 'voz', 'shoot', 'code', 'invitacion', 'dados', 'setmenu', 'invitar', 'shrug', 'audiorapido', 'bite', 'wink', 'baka', 'nod', 'antiestafas', 'ar', 'work', 'desactivarracha', 'ayudagacha', 'reglas', '6vs6', 'antilink', 'setowner', 'bt', 'feo', 'gacha', 'attp', 'setupdate', 'bass', 'p', 'toimg', 'setprotect', 'dn', 'setperfil', 'gay', 'rankotaku', 'cambiarenlace', 'k', 'facebook', 'casino', 'fix', 'coleccion', 'poke', 'sg', 'kick', 'bl', 'chatgpt', 'setoficial', 'handshake', 'hs', 'po', 'descripcion', 'sensibilidad', 'cuddle', 'setnsfw', 'aceptarinv', 'hp', 'an', 'lf', 'ardilla', 'e', 'robloxbadges', 'status', 'gpfp', 'verdad', 'thumbsup', 'tf', 'desmutear', 'rn', 'antibots', 'bonk', 'play', 'setprimary', 'videocontrario', 'yn', 'setnombre', 'downloadlink', 'fotogrupo', 'hf', 'ranklesbianas', 'dance', 'simi', 'vender', 'yonunca', 'toqr', 'think', 'link', 'aviso', 'cry', 'fb', 'aprobartodo', 'mr', 'testvideo', 'facepalm', 'slap', 'sleep', 'tag', 'modoadmin', 'guerra', 'reto', 'buscartt', 'x', 'menu', 'clear', 'sl', 'nope', 'audiolento', 'bd', 'aa', 'rankinfieles', 'navidad', 'cmd', 'r', 'horoscopo', 'borrar', 'eco', 'gachaprof', 'a2v', 'hd', 'fantasmas', 'handhold', 'setdespedida', 'owners', 'juegospro', 'rc', 'reporte', 'fq', 'stik', 'espacio', 'herramientas', 'monedas', 'setbienvenida', 'tirar', 'ae', 'robot', 'ttp', 'antistatus', 'attp2', 'lk', 'angry', 'alteradores', 'play2', 'tableflip', 'gachamenu', 'error', 'run', 'videolento', 'anonuevo', 'nom', 'togif', 'consola', 'ping', 'daily', 'delowner', 'mispj', 'wikipedia', 'ap', 'ab', 'blush', 'pk', 'removemoney', 'ranktherian', 'tt', 'tiktok', 'mute', 'actualizar', 'apostar', 'hh', 'setbotprincipal', 'setpfp', '4vs4', 'attp4', 'cerrar', 'buscar', 'setapi', 'menuclan', 'pat', 'st', 'rankbromistas', 'attp6', 'rr', 'tk', 'nombregrupo', 'wv', 'rechazarracha', 'bal', 'ban', 'robloxfriends', 'robloxfollowers', 'miracha', 'miid', 'peck', 'mutear', 'google', 'playdoc', 'sticker3', 'sh', 'ig', 'h', 'rankcornudos', 'bot', 'desactivarbot', 'tickle', 'sr', 'reiniciar', 'flipp', 'key', 'cartera', 'abrir', 'th', 'party', 'nochebuena', 'happy', 'ytsearch', 'antivideos', 'laugh', 'pc', 'smile', 'rankfieles', 'tu', 'pu', 'demote', 'sell', 'del', 'setban', 's', 'botlist', 'wave', 'restart', 'patada', 'punch', 'pout', 'zz', 'robloxstatus', 'nm', 'bk', 'unmute', 'g', 'addmoney', 'tomp3', 'rechazarinv', 'm', 'cr', 'attp5', 'av', 'robloxplayers', 'd', 'col', 'bienvenida', 'ranklindo', 'topactive', 'feed', 'llama', 'consejo', 'sm', 'wn', 'estado', 'racha', 'enigma', 'rankgay', 'gprof', 'topmoney', 'antispam', 'playvideo', 'botones', 'lurk', 'ppt', 'c', 'packname', 'hug', 'topactivos'];
 global.antiPorno = false
 global.antiaudio = false
 global.antivideos = false
@@ -935,6 +935,31 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
     const conocido = COMANDOS.has(comando)
     if (conocido) await reaccionar('⏳')
+
+    
+    // --- FILTRO INTELIGENTE DE COMANDOS ---
+    if (global.listaComandos && comando && !global.listaComandos.includes(comando)) {
+      let sugerencia = '';
+      let menorDistancia = 3;
+      const comandoMalEscrito = comando.toLowerCase().trim();
+      if (comandoMalEscrito.length > 1) {
+        for (const comandoValido of global.listaComandos) {
+          const distancia = calcularSimilitud(comandoMalEscrito, comandoValido);
+          if (distancia < menorDistancia && distancia > 0) {
+            menorDistancia = distancia;
+            sugerencia = comandoValido;
+          }
+        }
+      }
+      
+      if (sugerencia) {
+        await responder(`❌ El comando *${comando}* no existe.\n\n💡 ¿Quizás quisiste decir *${prefijo}${sugerencia}*?`);
+      } else {
+        await responder(`❌ Lo siento, el comando *${comando}* no está disponible.\n📋 Usa ${prefijo}menu para ver los comandos.`);
+      }
+      return; // Detiene la ejecución para que no llegue al switch
+    }
+    // --------------------------------------
 
     switch (comando) {
       case 'racha': case 'rc': {
@@ -5561,28 +5586,7 @@ case 'musica':
             await responder('❌ Ocurrió un error en el sistema Gacha.')
           }
         } else {
-          {
-        let sugerencia = '';
-        let menorDistancia = 3;
-        const comandoMalEscrito = cmd ? cmd.toLowerCase().trim() : '';
-        if (global.listaComandos && comandoMalEscrito.length > 1) {
-          for (const comandoValido of global.listaComandos) {
-            const distancia = calcularSimilitud(comandoMalEscrito, comandoValido);
-            if (distancia < menorDistancia && distancia > 0) {
-              menorDistancia = distancia;
-              sugerencia = comandoValido;
-            }
-          }
-        }
-        if (sugerencia) {
-          await responder(`❌ El comando *${cmd}* no existe.
-
-💡 ¿Quizás quisiste decir *${prefijo}${sugerencia}*?`);
-        } else {
-          await responder(`❌ Lo siento, el comando *${cmd}* no está disponible.
-📋 Usa ${prefijo}menu para ver los comandos.`);
-        }
-      }
+          await responder('❌ Lo siento, ese comando no está disponible.\n📋 Usa #menu para ver los comandos disponibles.')
         }
         break
       }
