@@ -2330,25 +2330,23 @@ case 'imagine': case 'imagina': {
 case 'simi': {
   const texto = cuerpo.slice(cmd.length).trim();
   if (!texto) { await responder('Uso: #simi <mensaje>'); break; }
+  let apiKey = '';
+  try { apiKey = JSON.parse(require('fs').readFileSync('./config.json', 'utf8')).openaiKey; } catch {}
+  if (!apiKey) { await responder('❌ Primero configura tu API con el comando #setapi <tu_clave>'); break; }
   await responder('💬 Pensando...');
   try {
-    const prompt = 'Responde como SimSimi, un loro gracioso y sarcástico. Sé breve y divertido. El usuario dice: ' + texto;
-    const res = await fetch('https://api.blackbox.ai/api/chat', {
+    const prompt = 'Responde como SimSimi, un loro gracioso y sarcástico. Sé breve. El usuario dice: ' + texto;
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [{ role: 'user', content: prompt }],
-        model: 'gpt-4o'
-      })
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
-    let respuesta = text;
-    try { const json = JSON.parse(text); respuesta = json.choices?.[0]?.message?.content || json.response || text; } catch(e) {}
-    await sock.sendMessage(jid, { text: '🤖 ' + respuesta.trim() }, { quoted: m });
+    const data = await res.json();
+    await sock.sendMessage(jid, { text: '🤖 ' + data.choices[0].message.content.trim() }, { quoted: m });
   } catch (e) {
     console.log('Error .simi:', e.message);
-    await responder('❌ Simi no quiere hablar ahora. Intenta de nuevo.');
+    await responder('❌ Simi no quiere hablar. Revisa tu API Key o saldo.');
   }
   break;
 }
@@ -2678,24 +2676,22 @@ case 'setbotprincipal': {
 case 'llama': {
   const prompt = cuerpo.slice(cmd.length).trim();
   if (!prompt) { await responder('Uso: #llama <pregunta>'); break; }
+  let apiKey = '';
+  try { apiKey = JSON.parse(require('fs').readFileSync('./config.json', 'utf8')).openaiKey; } catch {}
+  if (!apiKey) { await responder('❌ Primero configura tu API con el comando #setapi <tu_clave>'); break; }
   await responder('🦙 Consultando a Llama...');
   try {
-    const res = await fetch('https://api.blackbox.ai/api/chat', {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [{ role: 'user', content: prompt }],
-        model: 'llama-3.1-70b'
-      })
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
-    let respuesta = text;
-    try { const json = JSON.parse(text); respuesta = json.choices?.[0]?.message?.content || json.response || text; } catch(e) {}
-    await sock.sendMessage(jid, { text: '🦙 ' + respuesta.trim() }, { quoted: m });
+    const data = await res.json();
+    await sock.sendMessage(jid, { text: '🦙 ' + data.choices[0].message.content.trim() }, { quoted: m });
   } catch (e) {
     console.log('Error .llama:', e.message);
-    await responder('❌ Error consultando a Llama. Intenta de nuevo.');
+    await responder('❌ Error consultando a Llama. Revisa tu API Key o saldo.');
   }
   break;
 }
