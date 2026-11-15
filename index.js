@@ -3857,6 +3857,67 @@ case 'fixapi': case 'testapi': case 'repararapi': {
   break;
 }
 
+
+case 'historia': case 'story': {
+  if (!jid.endsWith('@g.us')) { await responder('❌ Este comando solo funciona en grupos.'); break; }
+  
+  // 1. Verificar que quien lo usa sea Admin
+  try {
+    const groupMetadata = await sock.groupMetadata(jid);
+    const sender = m.key.participant || m.key.remoteJid;
+    const senderParticipant = groupMetadata.participants.find(p => p.id.split('@')[0].split(':')[0] === sender.split('@')[0].split(':')[0]);
+    
+    if (!senderParticipant || (senderParticipant.admin !== 'admin' && senderParticipant.admin !== 'superadmin')) {
+      await responder('❌ Solo los administradores pueden publicar historias en el grupo.');
+      break;
+    }
+  } catch (e) {
+    await responder('❌ Error al verificar permisos.');
+    break;
+  }
+
+  // 2. Verificar que esté respondiendo a una foto o video
+  const quoted = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+  
+  if (!quoted || (!quoted.imageMessage && !quoted.videoMessage)) {
+    await responder('❌ Responde a una foto o video con #historia para publicarlo en el grupo.');
+    break;
+  }
+
+  const texto = cuerpo.slice(cmd.length).trim() || '📸 Historia del grupo';
+  
+  // 3. Descargar y reenviar el archivo
+  try {
+    const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+    
+    // Creamos un objeto falso para descargar el mensaje citado
+    const msgFalso = {
+      message: quoted,
+      key: { 
+        remoteJid: jid, 
+        id: m.message.extendedTextMessage.contextInfo.stanzaId, 
+        participant: m.message.extendedTextMessage.contextInfo.participant 
+      }
+    };
+
+    const buffer = await downloadMediaMessage(msgFalso, 'buffer', {}, { logger: console, reuploadRequest: sock.updateMediaMessage });
+    
+    if (quoted.imageMessage) {
+      await sock.sendMessage(jid, { image: buffer, caption: texto }, { quoted: m });
+    } else {
+      await sock.sendMessage(jid, { video: buffer, caption: texto }, { quoted: m });
+    }
+    
+    // Reaccionar con un check
+    try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch(e) {}
+    
+  } catch (e) {
+    console.log('Error en .historia:', e.message);
+    await responder('❌ Error al descargar la foto/video. Intenta de nuevo.');
+  }
+  break;
+}
+
 case 'musica':
       case 'm':
       case 'play':
