@@ -215,6 +215,22 @@ const secciones = [
     '#imagine — Genera imagen con IA.'
   ]],
 
+  ['⚙️ HERRAMIENTAS', [
+    '#simi — Habla con el bot.',
+    '#chatgpt — Preguntas a una IA.',
+    '#llama — Preguntas a Llama IA.',
+    '#google — Busca en Google.',
+    '#wikipedia — Busca en Wikipedia.',
+    '#clima — Clima de una ciudad.',
+    '#sticker — Convierte imagen/video a sticker (ya existía).',
+    '#attp — Texto a sticker (estilo 1).',
+    '#attp2 — Texto a sticker (estilo 2).',
+    '#attp3 — Texto a sticker (estilo 3).',
+    '#horoscopo — Predicción de tu signo.',
+    '#toimg — Convierte sticker a imagen.',
+    '#hd — Mejora la calidad de una imagen.'
+  ]],
+
   ['🎮 ROBLOX', [
     '#robloxuser <nombre> — Busca un usuario y muestra su ID e info.',
     '#robloxavatar <nombre> — Muestra la imagen del avatar.',

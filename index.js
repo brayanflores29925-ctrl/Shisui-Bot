@@ -2290,6 +2290,189 @@ case 'imagine': case 'imagina': {
   break;
 }
 
+case 'simi': {
+  const texto = cuerpo.slice(cmd.length).trim();
+  if (!texto) { await responder('Uso: #simi <mensaje>'); break; }
+  await responder('💬 Pensando...');
+  try {
+    const simi = require('node-simipro');
+    const res = await simi.simitalk(texto, 'es');
+    if (res && res.success && res.message) {
+      await sock.sendMessage(jid, { text: '🤖 ' + res.message }, { quoted: m });
+    } else {
+      await responder('❌ Simi no respondió.');
+    }
+  } catch (e) {
+    console.log('Error .simi:', e.message);
+    await responder('❌ Error conectando con Simi.');
+  }
+  break;
+}
+case 'chatgpt': {
+  const prompt = cuerpo.slice(cmd.length).trim();
+  if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
+  await responder('🤖 Consultando a ChatGPT...');
+  try {
+    const getGPT4js = require('gpt4js');
+    const GPT4js = await getGPT4js();
+    const messages = [{ role: 'user', content: prompt }];
+    const options = { provider: 'Nextway', model: 'gpt-4o-free' };
+    const provider = GPT4js.createProvider(options.provider);
+    const text = await provider.chatCompletion(messages, options, () => {});
+    await sock.sendMessage(jid, { text: '🤖 ' + text }, { quoted: m });
+  } catch (e) {
+    console.log('Error .chatgpt:', e.message);
+    await responder('❌ Error consultando a ChatGPT.');
+  }
+  break;
+}
+case 'llama': {
+  const prompt = cuerpo.slice(cmd.length).trim();
+  if (!prompt) { await responder('Uso: #llama <pregunta>'); break; }
+  await responder('🦙 Consultando a Llama...');
+  try {
+    const OpenAI = require('ainative-openai');
+    const client = new OpenAI();
+    const response = await client.chat.completions.create({
+      model: 'llama-3.3-70b',
+      messages: [{ role: 'user', content: prompt }]
+    });
+    await sock.sendMessage(jid, { text: '🦙 ' + response.choices[0].message.content }, { quoted: m });
+  } catch (e) {
+    console.log('Error .llama:', e.message);
+    await responder('❌ Error consultando a Llama.');
+  }
+  break;
+}
+case 'google': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #google <búsqueda>'); break; }
+  await responder('🔍 Buscando en Google...');
+  try {
+    const { search, OrganicResult } = require('google-sr');
+    const results = await search({ query, parsers: [OrganicResult] });
+    if (!results.length) { await responder('❌ Sin resultados.'); break; }
+    let txt = '🔍 *Resultados de Google:*\n\n';
+    results.slice(0, 5).forEach((r, i) => {
+      txt += `*${i+1}. ${r.title}*\n${r.link}\n${r.description || ''}\n\n`;
+    });
+    await sock.sendMessage(jid, { text: txt }, { quoted: m });
+  } catch (e) {
+    console.log('Error .google:', e.message);
+    await responder('❌ Error buscando en Google.');
+  }
+  break;
+}
+case 'wikipedia': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #wikipedia <tema>'); break; }
+  await responder('📚 Buscando en Wikipedia...');
+  try {
+    const { searchAndSummary } = require('wiki-starlight-api');
+    const results = await searchAndSummary(query, 1);
+    if (!results.length) { await responder('❌ No encontré artículos.'); break; }
+    const art = results[0];
+    const txt = `📚 *${art.title}*\n\n${art.extract || art.snippet || 'Sin resumen.'}`;
+    await sock.sendMessage(jid, { text: txt }, { quoted: m });
+  } catch (e) {
+    console.log('Error .wikipedia:', e.message);
+    await responder('❌ Error buscando en Wikipedia.');
+  }
+  break;
+}
+case 'clima': {
+  const ciudad = cuerpo.slice(cmd.length).trim();
+  if (!ciudad) { await responder('Uso: #clima <ciudad>'); break; }
+  await responder('🌤️ Consultando clima...');
+  try {
+    const { getWeather } = require('c-weather');
+    const data = await getWeather(ciudad);
+    const txt = `🌤️ *Clima en ${data.location}*\n🌡️ Temperatura: ${data.temperature}°C\n💨 Viento: ${data.windspeed} km/h\n📅 ${data.time}`;
+    await sock.sendMessage(jid, { text: txt }, { quoted: m });
+  } catch (e) {
+    console.log('Error .clima:', e.message);
+    await responder('❌ No encontré esa ciudad.');
+  }
+  break;
+}
+case 'attp': case 'attp2': case 'attp3': {
+  const texto = cuerpo.slice(cmd.length).trim();
+  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
+  await responder('✨ Generando sticker de texto...');
+  try {
+    const estilos = { attp: 'neon glowing letters', attp2: '3d glossy letters', attp3: 'handwritten graffiti' };
+    const prompt = 'The text "' + texto + '" written in ' + estilos[cmd] + ', centered, solid black background, sticker style, high contrast, bold typography';
+    const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) + '?width=512&height=512&nologo=true&seed=' + Date.now();
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const out = await imagenASticker(buffer, 'square');
+    await sock.sendMessage(jid, { sticker: out }, { quoted: m });
+  } catch (e) {
+    console.log('Error .' + cmd + ':', e.message);
+    await responder('❌ Error generando sticker.');
+  }
+  break;
+}
+case 'horoscopo': {
+  const signo = cuerpo.slice(cmd.length).trim().toLowerCase();
+  if (!signo) { await responder('Uso: #horoscopo <signo>\nEj: #horoscopo aries'); break; }
+  const signos = ['aries','tauro','geminis','cancer','leo','virgo','libra','escorpio','sagitario','capricornio','acuario','piscis'];
+  if (!signos.includes(signo)) { await responder('❌ Signo no válido.'); break; }
+  const frases = [
+    'Hoy es un buen día para tomar decisiones importantes.',
+    'La energía fluye a tu favor, aprovecha para avanzar en tus proyectos.',
+    'Podrías recibir una noticia inesperada que cambiará tu perspectiva.',
+    'Es momento de cuidar tu salud y descansar un poco más.',
+    'Una conversación pendiente te dará claridad.'
+  ];
+  const prediccion = frases[Math.floor(Math.random() * frases.length)];
+  const txt = `🔮 *Horóscopo para ${signo.toUpperCase()}*\n\n${prediccion}`;
+  await sock.sendMessage(jid, { text: txt }, { quoted: m });
+  break;
+}
+case 'toimg': {
+  const ctx = m.message?.extendedTextMessage?.contextInfo || {};
+  const quoted = ctx.quotedMessage;
+  if (!quoted || !quoted.stickerMessage) {
+    await responder('🖼️ Responde a un sticker con #toimg');
+    break;
+  }
+  await responder('🖼️ Convirtiendo sticker a imagen...');
+  try {
+    const buffer = await descargarRespondido(m, sock);
+    const Jimp = require('jimp');
+    const img = await Jimp.read(buffer);
+    const pngBuffer = await img.getBufferAsync(Jimp.MIME_PNG);
+    await sock.sendMessage(jid, { image: pngBuffer, caption: '✅ Sticker convertido a PNG' }, { quoted: m });
+  } catch (e) {
+    console.log('Error .toimg:', e.message);
+    await responder('❌ Error convirtiendo sticker.');
+  }
+  break;
+}
+case 'hd': {
+  const ctx = m.message?.extendedTextMessage?.contextInfo || {};
+  const quoted = ctx.quotedMessage;
+  if (!quoted || (!quoted.imageMessage && !quoted.stickerMessage)) {
+    await responder('🖼️ Responde a una imagen con #hd');
+    break;
+  }
+  await responder('✨ Mejorando calidad...');
+  try {
+    const buffer = await descargarRespondido(m, sock);
+    const Jimp = require('jimp');
+    const img = await Jimp.read(buffer);
+    img.scale(2).quality(100);
+    const out = await img.getBufferAsync(Jimp.MIME_JPEG);
+    await sock.sendMessage(jid, { image: out, caption: '✅ Imagen mejorada (escala x2)' }, { quoted: m });
+  } catch (e) {
+    console.log('Error .hd:', e.message);
+    await responder('❌ Error mejorando la imagen.');
+  }
+  break;
+}
+
 case 'musica':
       case 'm':
       case 'play':
