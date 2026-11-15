@@ -2836,6 +2836,85 @@ Ej: #google Shakira`); break; }
   await responder('🔍 Buscando en la web...');
   
   try {
+    // 1. Intentar con DuckDuckGo con un límite de 10 segundos
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    const res = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query), {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const html = await res.text();
+    
+    // Extraer enlaces y descripciones
+    const links = [...html.matchAll(/<a rel="nofollow" class="result__a" href="([^"]+)">(.*?)<\/a>/gs)];
+    const snippets = [...html.matchAll(/<a class="result__snippet" href="[^"]*">(.*?)<\/a>/gs)];
+    
+    if (links.length === 0) throw new Error('Sin resultados');
+    
+    let txt = `🔍 *Resultados para:* ${query}
+
+`;
+    let count = 0;
+    for (let i = 0; i < links.length && count < 5; i++) {
+      let url = links[i][1];
+      if (url.startsWith('//duckduckgo.com/l/?uddg=')) {
+        url = decodeURIComponent(url.split('uddg=')[1].split('&')[0]);
+      }
+      const title = links[i][2].replace(/<[^>]*>?/gm, '');
+      const snippet = snippets[i] ? snippets[i][1].replace(/<[^>]*>?/gm, '').substring(0, 100) : '';
+      
+      txt += `*${count+1}. ${title}*
+🔗 ${url}
+`;
+      if (snippet) txt += `📝 ${snippet}...
+
+`;
+      count++;
+    }
+    
+    await sock.sendMessage(jid, { text: txt }, { quoted: m });
+    
+  } catch (e) {
+    console.log('Error .google (DuckDuckGo):', e.message);
+    // 2. Respaldo: Buscar en Wikipedia si falla o tarda mucho
+    try {
+      await responder('⚠️ El buscador principal falló. Buscando en Wikipedia...');
+      const wikiRes = await fetch(`https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`);
+      const wikiData = await wikiRes.json();
+      
+      if (wikiData.query && wikiData.query.search.length > 0) {
+        let wikiTxt = `📚 *Resultados en Wikipedia:*
+
+`;
+        wikiData.query.search.slice(0, 3).forEach((r, i) => {
+          wikiTxt += `*${i+1}. ${r.title}*
+🔗 https://es.wikipedia.org/wiki/${encodeURIComponent(r.title.replace(/ /g, '_'))}
+
+`;
+        });
+        await sock.sendMessage(jid, { text: wikiTxt }, { quoted: m });
+      } else {
+        await responder('❌ No encontré resultados. Intenta con otras palabras.');
+      }
+    } catch (e2) {
+      console.log('Error en Wikipedia:', e2.message);
+      await responder('❌ Error buscando. Intenta de nuevo.');
+    }
+  }
+  break;
+}
+case 'buscar': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder(`Uso: #google <búsqueda>
+Ej: #google Shakira`); break; }
+  
+  await responder('🔍 Buscando en la web...');
+  
+  try {
     const { search } = await import('ducksearch');
     const results = await search(query, { maxResults: 5 });
     
