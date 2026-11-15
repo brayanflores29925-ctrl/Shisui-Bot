@@ -3899,30 +3899,42 @@ case 'fixapi': case 'testapi': case 'repararapi': {
 }
 
 
+
+
+
 case 'villancico': {
-  // Lista ampliada de villancicos populares con sus letras
-  const villancicos = [
-    '🎵 *Noche de paz, noche de amor...* 🎵\nTodos duermen en derredor...',
-    '🎵 *Rodolfo el reno, tenía una nariz muy roja...* 🎵\nY si tú la vieras, dirías que brilla más que el sol.',
-    '🎵 *Campana sobre campana, y sobre campana una...* 🎵\nAsómate a la ventana, verás al niño en la cuna.',
-    '🎵 *Los peces en el río, se peinan de alegría...* 🎵',
-    '🎵 *Feliz Navidad, Feliz Navidad...* 🎵\nPróspero año y felicidad.',
-    '🎵 *Mi burrito sabanero, voy camino de Belén...* 🎵',
-    '🎵 *Arre borriquito, arre burro arre...* 🎵\nQue llegamos tarde.',
-    '🎵 *Blanca Navidad, sueño...* 🎵\nY con la nieve alrededor.',
-    '🎵 *Los pastores a Belén, corren presurosos...* 🎵',
-    '🎵 *Tutaina, tuturuma, tutaina, tuturumaina...* 🎵',
-    '🎵 *Venid fieles todos, a Belén marchemos...* 🎵',
-    '🎵 *Hacia Belén va una burra, rin, rin...* 🎵\nCargada de chocolate.'
-  ];
+  const busqueda = cuerpo.slice(cmd.length).trim();
   
-  // Seleccionar uno al azar
-  const elegido = villancicos[Math.floor(Math.random() * villancicos.length)];
+  if (!busqueda) {
+    // Si no escriben nada, damos una lista de sugerencias
+    await responder('🎵 *Buscador de Villancicos*\n\nEscribe el nombre de un villancico para buscar su letra.\n\nEjemplos:\n.villancico noche de paz\n.villancico burrito sabanero\n.villancico feliz navidad');
+    break;
+  }
+
+  await responder('🔍 Buscando la letra de: *' + busqueda + '*...');
   
   try {
-    await responder(elegido);
+    // Importación dinámica porque lyrics-lib usa módulos ES
+    const { getLyrics } = await import('lyrics-lib');
+    
+    // Buscamos la letra. La API intentará encontrar la mejor coincidencia.
+    const letra = await getLyrics({ title: busqueda });
+    
+    if (letra) {
+      // Limpiamos un poco el texto para que se vea bonito en WhatsApp
+      let textoLimpio = letra.trim();
+      // Si la letra es muy larga, la cortamos para no exceder el límite
+      if (textoLimpio.length > 3000) {
+        textoLimpio = textoLimpio.substring(0, 3000) + '\n\n...[Letra cortada por ser muy larga]';
+      }
+      
+      await sock.sendMessage(jid, { text: '🎵 *Letra de: ' + busqueda + '*\n\n' + textoLimpio }, { quoted: m });
+    } else {
+      await responder('❌ No encontré la letra de ese villancico. Intenta con otro nombre o revisa la ortografía.');
+    }
   } catch (e) {
-    console.log('Error enviando villancico:', e.message);
+    console.log('Error en .villancico (API):', e.message);
+    await responder('❌ Error al buscar la letra. La API puede estar saturada, intenta de nuevo en unos segundos.');
   }
   break;
 }
