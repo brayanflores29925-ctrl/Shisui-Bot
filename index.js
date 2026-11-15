@@ -2332,22 +2332,17 @@ case 'simi': {
   if (!texto) { await responder('Uso: #simi <mensaje>'); break; }
   await responder('💬 Pensando...');
   try {
-    const simi = require('node-simipro');
-    const res = await simi.simitalk(texto, 'es');
-    if (res && res.success && res.message) {
-      await sock.sendMessage(jid, { text: '🤖 ' + res.message }, { quoted: m });
-    } else {
-      await responder('❌ Simi no respondió.');
-    }
+    const prompt = 'Responde como SimSimi, un loro gracioso y sarcástico. Sé breve. El usuario dice: ' + texto;
+    const res = await fetch('https://gen.pollinations.ai/text/' + encodeURIComponent(prompt) + '?model=openai-fast');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    await sock.sendMessage(jid, { text: '🤖 ' + text.trim() }, { quoted: m });
   } catch (e) {
     console.log('Error .simi:', e.message);
-    await responder('❌ Error conectando con Simi.');
+    await responder('❌ Simi no quiere hablar ahora. Intenta de nuevo.');
   }
   break;
 }
-
-
-
 case 'wikipedia': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #wikipedia <tema>'); break; }
@@ -2676,7 +2671,7 @@ case 'llama': {
   if (!prompt) { await responder('Uso: #llama <pregunta>'); break; }
   await responder('🦙 Consultando a Llama...');
   try {
-    const res = await fetch('https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=mistral');
+    const res = await fetch('https://gen.pollinations.ai/text/' + encodeURIComponent(prompt) + '?model=openai-fast');
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
     await sock.sendMessage(jid, { text: '🦙 ' + text.trim() }, { quoted: m });
@@ -2739,8 +2734,7 @@ case 'clima': {
                 `🌡️ *Temperatura:* ${current.temp_C}°C (Sensación: ${current.FeelsLikeC}°C)\n` +
                 `☁️ *Clima:* ${current.weatherDesc[0].value}\n` +
                 `💧 *Humedad:* ${current.humidity}%\n` +
-                `💨 *Viento:* ${current.windspeedKmph} km/h\n` +
-                `🕒 *Hora local:* ${current.localObsDateTime.split(' ')[1]}`;
+                `💨 *Viento:* ${current.windspeedKmph} km/h`;
     await sock.sendMessage(jid, { text: txt }, { quoted: m });
   } catch (e) {
     console.log('Error .clima:', e.message);
