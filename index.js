@@ -3878,61 +3878,34 @@ case 'botones': {
 
 
 case 'robloxinventario': {
-      const nombre = cuerpo.slice(cmd.length).trim()
-      if (!nombre) {
-        await responder('Uso: #robloxinventario <usuario>\nEjemplo: #robloxinventario Victorneutro')
-        break
-      }
-      await responder('🎒 Buscando inventario de: ' + nombre + '...')
+      await sock.sendMessage(jid, { text: '❌ *Aviso:* Roblox tiene bloqueada la API pública de inventarios. Es imposible ver el inventario de una cuenta desde un bot de WhatsApp sin tener sus cookies de inicio de sesión.\n\nSi quieres ver tus objetos, entra directamente a tu perfil en la página web de Roblox.' }, { quoted: m });
+      break;
+    }
+    case 'bloxstock': case 'stockfrutas': {
+      await sock.sendMessage(jid, { text: '🍎 Consultando stock...' }, { quoted: m });
       try {
-        // Función para forzar el tiempo de espera
-        const fetchConTimeout = (url, options = {}, timeout = 8000) => {
-          return Promise.race([
-            fetch(url, options),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), timeout))
-          ])
-        }
-
-        const idRes = await fetchConTimeout('https://users.roblox.com/v1/usernames/users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ usernames: [nombre], excludeBannedUsers: false })
-        })
-        const idData = await idRes.json()
-        if (!idData.data || !idData.data[0]) {
-          await responder('❌ Usuario no encontrado.')
-          break
-        }
-        const userId = idData.data[0].id
-
-        const res = await fetchConTimeout(`https://inventory.roproxy.com/v2/users/${userId}/inventory?limit=10&sortOrder=Desc`)
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000); // 8 segundos max
+        const res = await fetch('https://api.anything.notte.cc/bloxfruits/stock', { signal: controller.signal });
+        clearTimeout(timeout);
         
-        if (!res.ok) throw new Error('HTTP ' + res.status)
-        const data = await res.json()
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
 
-        if (!data.data || data.data.length === 0) {
-          await responder('❌ El inventario de este usuario está vacío o es privado.')
-          break
-        }
-
-        let txt = `🎒 *Inventario de ${nombre}* (Mostrando 10)\n\n`
-        data.data.forEach((item, i) => {
-          txt += `${i+1}. ${item.assetName || 'Objeto'}\n`
-        })
-        txt += '\n*(Para ver más, visita su perfil en Roblox)*'
+        let txt = '🍎 *STOCK DE BLOX FRUITS*\n\n'
+        txt += `*Normal:*\n`
+        data.normal.forEach(f => { txt += `- ${f.name} (${f.price} Beli)\n` })
+        txt += `\n*Mirage:*\n`
+        data.mirage.forEach(f => { txt += `- ${f.name} (${f.price} Beli)\n` })
 
         await sock.sendMessage(jid, { text: txt }, { quoted: m })
       } catch (e) {
-        console.log('Error .robloxinventario:', e.message)
-        if (e.message === 'TIMEOUT') {
-          await responder('❌ La API de Roblox tardó demasiado en responder (8s). Intenta de nuevo más tarde.')
-        } else {
-          await responder('❌ No se pudo obtener el inventario. Roblox bloquea esta información si la cuenta es privada.')
-        }
+        console.log('Error .bloxstock:', e.message)
+        await sock.sendMessage(jid, { text: '❌ El servidor del stock está caído o tardando demasiado. Intenta más tarde.' }, { quoted: m })
       }
-      break
+      break;
     }
-    case 'bloxstock': case 'stockfrutas': {
+    case 'stockfrutas': {
       await responder('🍎 Consultando stock de frutas...')
       try {
         const controller = new AbortController()
