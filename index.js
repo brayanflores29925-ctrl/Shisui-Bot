@@ -3692,6 +3692,78 @@ case 'ytsearch': {
 
 case 'play2': case 'playdoc': case 'playvideo': {
   const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
+  
+  await responder('🔍 Buscando en YouTube...');
+  
+  try {
+    const YouTube = require('youtube-sr').default;
+    let videoUrl = query;
+    let videoInfo = null;
+
+    // Si no es un enlace, buscamos el primer resultado para obtener la info y la portada
+    if (!query.startsWith('http')) {
+      const res = await YouTube.searchOne(query);
+      if (!res) { await responder('❌ No encontré resultados para: ' + query); break; }
+      videoUrl = res.url;
+      videoInfo = res;
+    }
+
+    // Mensaje bonito (igual que .play)
+    if (videoInfo) {
+      const txt = `➩ Descargando › *${videoInfo.title}*\n\n❖ Canal › *${videoInfo.channel.name}*\n⧖ Duración › *${videoInfo.durationFormatted}*\n❀ Vistas › *${(videoInfo.views || 0).toLocaleString()}*\n❐ Enlace › ${videoInfo.url}\n\n⏳ Espera un momento mientras preparo tu archivo...`;
+      await sock.sendMessage(jid, { image: { url: videoInfo.thumbnail.url }, caption: txt }, { quoted: m });
+    } else {
+      await responder('⬇️ Descargando desde el enlace...');
+    }
+
+    // Descargar con yt-dlp
+    const { exec } = require('child_process');
+    const esDoc = cmd === 'playdoc';
+    const esAudio = cmd === 'play2';
+    
+    const fileName = 'media_' + Date.now();
+    let outExt = (esDoc || !esAudio) ? 'mp4' : 'm4a';
+    let filePath = '/tmp/' + fileName + '.' + outExt;
+
+    let args = esAudio ? '-f "ba[ext=m4a]/ba" -x --audio-format m4a' : '-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"';
+    const execCmd = 'yt-dlp --extractor-args "youtube:player_client=android" ' + args + ' -o "' + filePath + '" "' + videoUrl + '"';
+
+    exec(execCmd, { timeout: 120000, maxBuffer: 1024 * 1024 * 50 }, async (error, stdout, stderr) => {
+      if (error) {
+        console.log('Error yt-dlp:', error.message);
+        return responder('❌ Error descargando. El video puede ser privado o restringido.');
+      }
+      try {
+        const fs = require('fs');
+        if (!fs.existsSync(filePath)) {
+          const files = fs.readdirSync('/tmp').filter(f => f.startsWith(fileName));
+          if (files.length > 0) filePath = '/tmp/' + files[0];
+          else throw new Error('Archivo no encontrado');
+        }
+        const buffer = fs.readFileSync(filePath);
+        
+        if (esDoc) {
+          await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: (videoInfo ? videoInfo.title : query).substring(0,20) + '.mp4' }, { quoted: m });
+        } else if (esAudio) {
+          await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+        } else {
+          await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + (videoInfo ? videoInfo.title : query) }, { quoted: m });
+        }
+        fs.unlinkSync(filePath);
+      } catch (e) {
+        console.log('Error enviando:', e.message);
+        await responder('❌ Error enviando el archivo.');
+      }
+    });
+  } catch (e) {
+    console.log('Error .' + cmd + ':', e.message);
+    await responder('❌ Error procesando la descarga.');
+  }
+  break;
+}
+case 'playdoc': case 'playvideo': {
+  const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #playvideo <nombre o enlace>'); break; }
   await responder('⏳ *Cargando video, esto puede tardar un momento...*');
   
@@ -4836,6 +4908,49 @@ case 'fotogrupo':
       case 'del': case 'borrar': {
   if (!jid.endsWith('@g.us')) { await responder('❌ Solo en grupos.'); break; }
   try {
+    
+    const groupMetadata = await sock.groupMetadata(jid);
+    // Obtener el ID del bot de forma robusta
+    const botIdRaw = sock.user.id.split(':')[0];
+    const botJid = botIdRaw + '@s.whatsapp.net';
+    
+    // Buscar al bot en el grupo de 3 formas distintas por si WhatsApp cambia el formato
+    const botParticipant = groupMetadata.participants.find(p => 
+      p.id === botJid || 
+      p.id === sock.user.id || 
+      p.id.split('@')[0].split(':')[0] === botIdRaw
+    );
+    
+    // Verificar si es admin (true, 'admin' o 'superadmin')
+    const isBotAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin' || botParticipant.admin === true);
+    
+    if (!isBotAdmin) {
+      await responder('❌ Necesito ser administrador. (Asegúrate de que el bot tenga el rango de Admin en el grupo).');
+      break;
+    }
+
+    
+    let target = m.message?.extendedTextMessage?.contextInfo?.participant;
+    if (!target) { await responder('❌ Responde al mensaje de la persona a la que le quieres borrar todo.'); break; }
+    
+    try { await sock.sendMessage(jid, { react: { text: '🗑️', key: m.key } }); } catch (e) {}
+    
+    let borrados = 0;
+    if (global.msgCache && global.msgCache[jid]) {
+      const msgsABorrar = global.msgCache[jid].filter(k => k.participant === target || (k.participant && k.participant.includes(target.split('@')[0])));
+      for (const k of msgsABorrar) {
+        try { await sock.sendMessage(jid, { delete: k }); borrados++; await new Promise(r => setTimeout(r, 250)); } catch(err) {}
+      }
+    }
+    await sock.sendMessage(jid, { text: '🗑️ Se eliminaron ' + borrados + ' mensajes de @' + target.split('@')[0] + '.', mentions: [target] }, { quoted: m });
+  } catch (e) {
+    console.log('Error .del:', e.message);
+  }
+  break;
+}
+case 'borrar': {
+  if (!jid.endsWith('@g.us')) { await responder('❌ Solo en grupos.'); break; }
+  try {
     const groupMetadata = await sock.groupMetadata(jid);
     const botNumber = sock.user.id.split(':')[0].split('@')[0];
     const botParticipant = groupMetadata.participants.find(p => p.id.startsWith(botNumber));
@@ -5209,6 +5324,68 @@ case 'borrar': {
       }
 
       case 'ban': case 'kick': {
+  if (!jid.endsWith('@g.us')) { await responder('❌ Solo en grupos.'); break; }
+  try {
+    
+    const groupMetadata = await sock.groupMetadata(jid);
+    // Obtener el ID del bot de forma robusta
+    const botIdRaw = sock.user.id.split(':')[0];
+    const botJid = botIdRaw + '@s.whatsapp.net';
+    
+    // Buscar al bot en el grupo de 3 formas distintas por si WhatsApp cambia el formato
+    const botParticipant = groupMetadata.participants.find(p => 
+      p.id === botJid || 
+      p.id === sock.user.id || 
+      p.id.split('@')[0].split(':')[0] === botIdRaw
+    );
+    
+    // Verificar si es admin (true, 'admin' o 'superadmin')
+    const isBotAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin' || botParticipant.admin === true);
+    
+    if (!isBotAdmin) {
+      await responder('❌ Necesito ser administrador. (Asegúrate de que el bot tenga el rango de Admin en el grupo).');
+      break;
+    }
+
+    
+    let mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0] || m.message?.extendedTextMessage?.contextInfo?.participant;
+    if (!mencionado) { await responder('❌ Menciona o responde a alguien para banearlo.'); break; }
+    
+    const targetParticipant = groupMetadata.participants.find(p => p.id.split('@')[0].split(':')[0] === mencionado.split('@')[0].split(':')[0]);
+    if (targetParticipant && (targetParticipant.admin === 'admin' || targetParticipant.admin === 'superadmin')) {
+      await responder('❌ No puedo banear a un administrador.');
+      break;
+    }
+    
+    try { await sock.sendMessage(jid, { react: { text: '👢', key: m.key } }); } catch (e) {}
+    
+    let expulsado = false;
+    try {
+      await sock.groupParticipantsUpdate(jid, [mencionado], 'remove');
+      expulsado = true;
+      await sock.sendMessage(jid, { text: '👢 @' + mencionado.split('@')[0] + ' ha sido pateado.', mentions: [mencionado] }, { quoted: m });
+    } catch (e) {
+      try {
+        const num = mencionado.split('@')[0].split(':')[0];
+        await sock.groupParticipantsUpdate(jid, [num + '@s.whatsapp.net'], 'remove');
+        expulsado = true;
+        await sock.sendMessage(jid, { text: '👢 @' + num + ' ha sido pateado.', mentions: [num + '@s.whatsapp.net'] }, { quoted: m });
+      } catch (e2) {}
+    }
+    
+    if (expulsado && global.msgCache && global.msgCache[jid]) {
+      const msgsABorrar = global.msgCache[jid].filter(k => (k.participant === mencionado || (k.participant && k.participant.includes(mencionado.split('@')[0]))));
+      for (const k of msgsABorrar) {
+        try { await sock.sendMessage(jid, { delete: k }); await new Promise(r => setTimeout(r, 200)); } catch(err) {}
+      }
+    }
+  } catch (e) {
+    console.log('Error .ban:', e.message);
+    await responder('❌ Error interno al banear.');
+  }
+  break;
+}
+case 'kick': {
   if (!jid.endsWith('@g.us')) { await responder('❌ Este comando solo funciona en grupos.'); break; }
   try {
     const groupMetadata = await sock.groupMetadata(jid);
