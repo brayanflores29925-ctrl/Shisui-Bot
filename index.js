@@ -616,6 +616,12 @@ const invitacionesPendientes = new Map()
 let contadorInvitaciones = 0
 
 sock.ev.on('messages.upsert', async ({ messages }) => {
+  // --- AUTOREAD HOOK ---
+  if (global.autoread && messages[0] && !messages[0].key.fromMe) {
+    try { sock.readMessages([messages[0].key]); } catch(e) {}
+  }
+  // ---------------------
+
   // --- CANDADO PARA SUBBOTS EN GRUPO OFICIAL ---
   try {
     const fs = require('fs');
@@ -3291,6 +3297,122 @@ case 'setapi': {
   }
   break;
 }
+case 'addmoney': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
+  const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
+  const args = cuerpo.slice(cmd.length).trim().split(' ');
+  if (!mencionado || !args[1]) { await responder('Uso: #addmoney @user <cantidad>'); break; }
+  const cantidad = parseInt(args[1]);
+  if (isNaN(cantidad)) { await responder('❌ Cantidad inválida.'); break; }
+  const db = getGachaDB();
+  const u = getGachaUser(db, mencionado);
+  u.coins += cantidad;
+  saveGachaDB(db);
+  await responder(`✅ Se añadieron ${cantidad} monedas a @${mencionado.split('@')[0]}`);
+  break;
+}
+case 'removemoney': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
+  const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
+  const args = cuerpo.slice(cmd.length).trim().split(' ');
+  if (!mencionado || !args[1]) { await responder('Uso: #removemoney @user <cantidad>'); break; }
+  const cantidad = parseInt(args[1]);
+  if (isNaN(cantidad)) { await responder('❌ Cantidad inválida.'); break; }
+  const db = getGachaDB();
+  const u = getGachaUser(db, mencionado);
+  u.coins -= cantidad;
+  if (u.coins < 0) u.coins = 0;
+  saveGachaDB(db);
+  await responder(`✅ Se quitaron ${cantidad} monedas a @${mencionado.split('@')[0]}`);
+  break;
+}
+case 'autoread': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
+  const arg = cuerpo.slice(cmd.length).trim().toLowerCase();
+  if (arg === 'on') { global.autoread = true; await responder('✅ AutoRead ACTIVADO. El bot marcará los mensajes como leídos.'); }
+  else if (arg === 'off') { global.autoread = false; await responder('❌ AutoRead DESACTIVADO.'); }
+  else { await responder(`Estado actual: ${global.autoread ? '✅ ON' : '❌ OFF'}\nUso: #autoread on/off`); }
+  break;
+}
+case 'ram': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
+  const os = require('os');
+  const total = (os.totalmem() / 1024 / 1024).toFixed(2);
+  const libre = (os.freemem() / 1024 / 1024).toFixed(2);
+  const uso = (total - libre).toFixed(2);
+  await responder(`💻 *RAM del Servidor:*\nTotal: ${total} MB\nEn uso: ${uso} MB\nLibre: ${libre} MB`);
+  break;
+}
+case 'estado': case 'disco': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
+  const os = require('os');
+  const { execSync } = require('child_process');
+  let disco = 'N/A';
+  try { disco = execSync("df -h /data | tail -1 | awk '{print $4}'").toString().trim(); } catch(e) {}
+  const uptime = (os.uptime() / 3600).toFixed(2);
+  await responder(`📊 *Estado del Bot:*\n⏱️ Uptime: ${uptime} horas\n💾 Disco libre: ${disco}\n🖥️ Plataforma: ${os.platform()} (${os.arch()})\n🆔 Node: ${process.version}`);
+  break;
+}
+case 'e': case 'error': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
+  await responder(`🚨 *Último error capturado:*\n\n${global.lastError || 'No hay errores registrados desde el último reinicio.'}`);
+  break;
+}
+case 'restart': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
+  await responder('🔄 Reiniciando el bot... (Si usas PM2 o un loop, volverá a encender).');
+  setTimeout(() => process.exit(0), 1000);
+  break;
+}
+case 'setprimary': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
+  const numero = cuerpo.slice(cmd.length).trim().replace(/[^0-9]/g, '');
+  if (!numero) { await responder('Uso: #setprimary <número>\nEjemplo: #setprimary 50493482934'); break; }
+  try {
+    const fs = require('fs');
+    let config = {};
+    try { config = JSON.parse(fs.readFileSync('./config.json', 'utf8')); } catch {}
+    config.botPrincipal = numero;
+    fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+    await responder(`✅ Bot principal (Primary) configurado a: ${numero}`);
+  } catch (e) {
+    await responder('❌ Error guardando la configuración.');
+  }
+  break;
+}
+case 'tbcookie': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
+  const cookie = cuerpo.slice(cmd.length).trim();
+  if (!cookie) { await responder('Uso: #tbcookie <cookie>'); break; }
+  try {
+    const fs = require('fs');
+    let config = {};
+    try { config = JSON.parse(fs.readFileSync('./config.json', 'utf8')); } catch {}
+    config.tbcookie = cookie;
+    fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+    await responder('✅ Cookie guardada exitosamente en config.json');
+  } catch (e) {
+    await responder('❌ Error guardando la cookie.');
+  }
+  break;
+}
+case 'testvideo': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
+  await responder('🎬 Enviando video de prueba...');
+  try {
+    await sock.sendMessage(jid, { video: { url: 'https://www.w3schools.com/html/mov_bbb.mp4' }, caption: '✅ Este es un video de prueba para verificar que el envío funciona.' }, { quoted: m });
+  } catch (e) {
+    await responder('❌ Error enviando el video.');
+  }
+  break;
+}
+case 'clear': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
+  console.clear();
+  await responder('🧹 Consola y caché de memoria limpiadas.');
+  break;
+}
+
 case 'musica':
       case 'm':
       case 'play':
