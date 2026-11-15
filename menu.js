@@ -72,11 +72,11 @@ const secciones = [
   ]],
 
   ['🔥 RACHAS DE AMISTAD', [
-    '#racha @persona — Invita a alguien a crear una racha.',
-    '#aceptarracha — Acepta una invitación.',
-    '#miracha — Consulta tu racha y récord.',
-    '#rechazarracha — Rechaza una invitación.',
-    '#desactivarracha — Desactiva la racha.'
+    '#racha (#rc) — Invita a alguien a crear una racha.',
+    '#aceptarracha (#ar) — Acepta una invitación.',
+    '#miracha (#mr) — Consulta tu racha, nivel y récord.',
+    '#rechazarracha (#rr) — Rechaza una invitación.',
+    '#desactivarracha (#dr) — Desactiva la racha.'
   ]],
 
   ['🎮 SISTEMA GACHA', [
