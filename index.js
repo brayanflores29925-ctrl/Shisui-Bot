@@ -3631,6 +3631,68 @@ case 'ytsearch': {
 case 'play2': case 'playdoc': case 'playvideo': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
+  await responder('⬇️ Descargando ' + (cmd === 'playdoc' ? 'documento' : cmd === 'play2' ? 'audio (iPhone)' : 'video') + '...');
+  
+  try {
+    const { exec } = require('child_process');
+    const esDoc = cmd === 'playdoc';
+    const esAudio = cmd === 'play2';
+    
+    // Si no es un enlace, usar el buscador interno de yt-dlp (ytsearch1:)
+    let target = query;
+    if (!query.startsWith('http')) {
+      target = 'ytsearch1:"' + query + '"';
+    }
+
+    const fileName = 'descarga_' + Date.now();
+    let outExt = (esDoc || !esAudio) ? 'mp4' : 'm4a';
+    let filePath = '/tmp/' + fileName + '.' + outExt;
+
+    let args = '';
+    if (esAudio) args = '-f "ba[ext=m4a]/ba" -x --audio-format m4a';
+    else args = '-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"';
+
+    // Comando con el bypass de Android
+    const execCmd = 'yt-dlp --extractor-args "youtube:player_client=android" ' + args + ' -o "' + filePath + '" "' + target + '"';
+
+    exec(execCmd, { timeout: 90000, maxBuffer: 1024 * 1024 * 50 }, async (error, stdout, stderr) => {
+      if (error) {
+        console.log('Error yt-dlp:', error.message);
+        return responder('❌ Error descargando. Puede que YouTube esté bloqueando o el video sea privado.');
+      }
+      try {
+        const fs = require('fs');
+        if (!fs.existsSync(filePath)) {
+          // A veces yt-dlp guarda con otra extensión (webm, etc)
+          const files = fs.readdirSync('/tmp').filter(f => f.startsWith(fileName));
+          if (files.length > 0) filePath = '/tmp/' + files[0];
+          else throw new Error('Archivo no encontrado');
+        }
+        
+        const buffer = fs.readFileSync(filePath);
+        
+        if (esDoc) {
+          await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: query.substring(0,20) + '.mp4' }, { quoted: m });
+        } else if (esAudio) {
+          await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+        } else {
+          await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + query }, { quoted: m });
+        }
+        fs.unlinkSync(filePath);
+      } catch (e) {
+        console.log('Error enviando archivo:', e.message);
+        await responder('❌ Error enviando el archivo descargado.');
+      }
+    });
+  } catch (e) {
+    console.log('Error .' + cmd + ':', e.message);
+    await responder('❌ Error procesando la descarga.');
+  }
+  break;
+}
+case 'playdoc': case 'playvideo': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
   await responder(`⬇️ Descargando ${cmd === 'playdoc' ? 'documento' : cmd === 'play2' ? 'audio (iPhone)' : 'video'}...`);
   
   try {
