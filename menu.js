@@ -171,6 +171,8 @@ const secciones = [
     '#setnsfw — Activa o desactiva el filtro NSFW.',
     '#activarbot / #desactivarbot — Activa o desactiva el bot.',
     '#antiporno on/off — Activa o desactiva el filtro antiporno.',
+    '#setoficial <enlace> — Configura el grupo oficial (subbots no responderán ahí).',
+    '#setbotprincipal <número> — Define cuál es el bot principal.',
     '#aceptarinv <id> — Acepta una solicitud de invitación.',
     '#rechazarinv <id> — Rechaza una solicitud de invitación.'
   ]],

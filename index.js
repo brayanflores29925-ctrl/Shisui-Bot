@@ -896,6 +896,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     if (esBaneado(m) && !esDueno(m)) return
 
     const comandosSoloDueno = new Set([
+      'setoficial', 'setbotprincipal',
       'setowner', 'delowner',
       'activarbot', 'desactivarbot',
       'setnombre', 'setbienvenida', 'setdespedida',
