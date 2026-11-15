@@ -616,6 +616,24 @@ const invitacionesPendientes = new Map()
 let contadorInvitaciones = 0
 
 sock.ev.on('messages.upsert', async ({ messages }) => {
+  // --- CANDADO PARA SUBBOTS EN GRUPO OFICIAL ---
+  try {
+    const fs = require('fs');
+    let config = {};
+    try { config = JSON.parse(fs.readFileSync('./config.json', 'utf8')); } catch {}
+    
+    if (config.grupoOficial && config.botPrincipal) {
+      const miNumero = sock.user.id.split(':')[0];
+      // Si NO soy el bot principal (soy un subbot) Y el mensaje es del grupo oficial
+      if (miNumero !== config.botPrincipal && messages[0].key.remoteJid === config.grupoOficial) {
+        return; // El subbot ignora el mensaje y no responde
+      }
+    }
+  } catch (e) {
+    console.log('Error chequeando candado de subbot:', e.message);
+  }
+  // --- FIN CANDADO ---
+
   // --- DETECCIÓN ANTIPORNO AUTOMÁTICA ---
   try {
     if (global.antiPorno && !m.key.fromMe) {
@@ -2646,6 +2664,58 @@ case 'topricos': case 'topmoney': {
   });
   await sock.sendMessage(jid, { text: txt, mentions: lista.map(u => u.id) }, { quoted: m });
   break;
+}
+case 'setoficial': {
+  const OWNERS = ['50493482934', '50495939120']
+  const remitente = (m.key.participant || m.key.remoteJid || '').replace(/[^0-9]/g, '')
+  if (!OWNERS.some(n => remitente.includes(n))) {
+    await responder('❌ Solo el dueño puede usar este comando.')
+    break
+  }
+  const enlace = cuerpo.slice(cmd.length).trim()
+  const match = enlace.match(/chat\.whatsapp\.com\/([A-Za-z0-9]+)/)
+  if (!match) { await responder('Uso: #setoficial <enlace del grupo>\nEjemplo: #setoficial https://chat.whatsapp.com/XXXXX'); break; }
+  
+  try {
+    const fs = require('fs')
+    const codigo = match[1]
+    const info = await sock.groupGetInviteInfo(codigo)
+    const jidOficial = info.id
+    
+    let config = {}
+    try { config = JSON.parse(fs.readFileSync('./config.json', 'utf8')) } catch {}
+    config.grupoOficial = jidOficial
+    fs.writeFileSync('./config.json', JSON.stringify(config, null, 2))
+    
+    await responder(`✅ Grupo oficial configurado.\nID: ${jidOficial}\n\nLos subbots ya no responderán en este grupo.`)
+  } catch (e) {
+    console.log('Error en .setoficial:', e.message)
+    await responder('❌ No pude obtener la info del grupo. Asegúrate de que el bot ya esté en ese grupo.')
+  }
+  break
+}
+case 'setbotprincipal': {
+  const OWNERS = ['50493482934', '50495939120']
+  const remitente = (m.key.participant || m.key.remoteJid || '').replace(/[^0-9]/g, '')
+  if (!OWNERS.some(n => remitente.includes(n))) {
+    await responder('❌ Solo el dueño puede usar este comando.')
+    break
+  }
+  const numero = cuerpo.slice(cmd.length).trim().replace(/[^0-9]/g, '')
+  if (!numero) { await responder('Uso: #setbotprincipal <número>\nEjemplo: #setbotprincipal 50493482934'); break; }
+  
+  try {
+    const fs = require('fs')
+    let config = {}
+    try { config = JSON.parse(fs.readFileSync('./config.json', 'utf8')) } catch {}
+    config.botPrincipal = numero
+    fs.writeFileSync('./config.json', JSON.stringify(config, null, 2))
+    await responder(`✅ Bot principal configurado al número: ${numero}`)
+  } catch (e) {
+    console.log('Error en .setbotprincipal:', e.message)
+    await responder('❌ Error guardando la configuración.')
+  }
+  break
 }
 case 'musica':
       case 'm':
