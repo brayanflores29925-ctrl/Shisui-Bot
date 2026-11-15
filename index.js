@@ -2702,6 +2702,79 @@ case 'llama': {
 case 'chatgpt': case 'chatpgt': case 'gpt': {
   const prompt = cuerpo.slice(cmd.length).trim();
   if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
+  
+  let apiKey = '';
+  try { apiKey = JSON.parse(require('fs').readFileSync('./config.json', 'utf8')).openaiKey; } catch {}
+  if (!apiKey) { await responder('❌ Primero configura tu API con el comando #setapi <tu_clave>'); break; }
+  
+  await responder('🤖 Consultando a ChatGPT...');
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    await sock.sendMessage(jid, { text: '🤖 ' + data.choices[0].message.content.trim() }, { quoted: m });
+  } catch (e) {
+    console.log('Error .chatgpt:', e.message);
+    await responder('❌ Error consultando a ChatGPT. Revisa tu API Key o saldo.');
+  }
+  break;
+}
+case 'llama': {
+  const prompt = cuerpo.slice(cmd.length).trim();
+  if (!prompt) { await responder('Uso: #llama <pregunta>'); break; }
+  
+  let apiKey = '';
+  try { apiKey = JSON.parse(require('fs').readFileSync('./config.json', 'utf8')).openaiKey; } catch {}
+  if (!apiKey) { await responder('❌ Primero configura tu API con el comando #setapi <tu_clave>'); break; }
+  
+  await responder('🦙 Consultando a Llama...');
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'Eres un asistente útil.' }, { role: 'user', content: prompt }] })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    await sock.sendMessage(jid, { text: '🦙 ' + data.choices[0].message.content.trim() }, { quoted: m });
+  } catch (e) {
+    console.log('Error .llama:', e.message);
+    await responder('❌ Error consultando. Revisa tu API Key o saldo.');
+  }
+  break;
+}
+case 'simi': {
+  const texto = cuerpo.slice(cmd.length).trim();
+  if (!texto) { await responder('Uso: #simi <mensaje>'); break; }
+  
+  let apiKey = '';
+  try { apiKey = JSON.parse(require('fs').readFileSync('./config.json', 'utf8')).openaiKey; } catch {}
+  if (!apiKey) { await responder('❌ Primero configura tu API con el comando #setapi <tu_clave>'); break; }
+  
+  await responder('💬 Pensando...');
+  try {
+    const prompt = 'Responde como SimSimi, un loro gracioso y sarcástico. Sé breve. El usuario dice: ' + texto;
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    await sock.sendMessage(jid, { text: '🤖 ' + data.choices[0].message.content.trim() }, { quoted: m });
+  } catch (e) {
+    console.log('Error .simi:', e.message);
+    await responder('❌ Simi no quiere hablar. Revisa tu API Key o saldo.');
+  }
+  break;
+}
+case 'chatpgt': case 'gpt': {
+  const prompt = cuerpo.slice(cmd.length).trim();
+  if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
   await responder('🤖 Consultando a ChatGPT...');
   try {
     const res = await fetch('https://api.blackbox.ai/api/chat', {
@@ -2781,6 +2854,26 @@ case 'clima': {
   } catch (e) {
     console.log('Error .clima:', e.message);
     await responder('❌ Error consultando el clima. Intenta de nuevo.');
+  }
+  break;
+}
+case 'setapi': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño puede configurar la API.'); break; }
+  const clave = cuerpo.slice(cmd.length).trim();
+  if (!clave || !clave.startsWith('sk-')) {
+    await responder('❌ Uso: #setapi <tu_clave>\nEjemplo: #setapi sk-proj-123456...\n\nLa clave debe empezar con "sk-".');
+    break;
+  }
+  try {
+    const fs = require('fs');
+    let config = {};
+    try { config = JSON.parse(fs.readFileSync('./config.json', 'utf8')); } catch {}
+    config.openaiKey = clave;
+    fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+    await responder('✅ ¡API Key de OpenAI guardada con éxito!\nAhora los comandos .chatgpt, .llama y .simi funcionarán perfectamente.');
+  } catch (e) {
+    console.log('Error .setapi:', e.message);
+    await responder('❌ Error al guardar la API Key.');
   }
   break;
 }
