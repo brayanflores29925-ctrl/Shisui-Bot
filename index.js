@@ -2336,10 +2336,10 @@ case 'simi': {
   await responder('💬 Pensando...');
   try {
     const prompt = 'Responde como SimSimi, un loro gracioso y sarcástico. Sé breve. El usuario dice: ' + texto;
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }] })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
@@ -2681,10 +2681,10 @@ case 'llama': {
   if (!apiKey) { await responder('❌ Primero configura tu API con el comando #setapi <tu_clave>'); break; }
   await responder('🦙 Consultando a Llama...');
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }] })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
@@ -2705,10 +2705,10 @@ case 'chatgpt': case 'chatpgt': case 'gpt': {
   
   await responder('🤖 Consultando a ChatGPT...');
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }] })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
@@ -2729,10 +2729,10 @@ case 'llama': {
   
   await responder('🦙 Consultando a Llama...');
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'Eres un asistente útil.' }, { role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'system', content: 'Eres un asistente útil.' }, { role: 'user', content: prompt }] })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
@@ -2754,10 +2754,10 @@ case 'simi': {
   await responder('💬 Pensando...');
   try {
     const prompt = 'Responde como SimSimi, un loro gracioso y sarcástico. Sé breve. El usuario dice: ' + texto;
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }] })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
@@ -2856,8 +2856,8 @@ case 'clima': {
 case 'setapi': {
   if (!esDueno(m)) { await responder('❌ Solo el dueño puede configurar la API.'); break; }
   const clave = cuerpo.slice(cmd.length).trim();
-  if (!clave || !clave.startsWith('sk-')) {
-    await responder('❌ Uso: #setapi <tu_clave>\nEjemplo: #setapi sk-proj-123456...\n\nLa clave debe empezar con "sk-".');
+  if (!clave || (!clave.startsWith('sk-') && !clave.startsWith('gsk_'))) {
+    await responder('❌ Uso: #setapi <tu_clave>\nEjemplo: #setapi sk-proj-123456...\n\nLa clave debe empezar con "gsk_" (Groq) o "sk-" (OpenAI).');
     break;
   }
   try {
