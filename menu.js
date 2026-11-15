@@ -125,7 +125,8 @@ const secciones = [
     '#nombregrupo <texto> — Cambia el nombre del grupo.',
     '#descripcion <texto> — Cambia la descripción del grupo.',
     '#admins — Menciona a los administradores.',
-    '#fantasmas — Muestra los miembros sin actividad registrada.'
+    '#fantasmas — Muestra los miembros sin actividad registrada.',
+    '#invitar <enlace> — Solicita unir el bot a un grupo/canal.'
   ]],
 
   ['👑 COMANDOS DEL DUEÑO', [
@@ -141,7 +142,10 @@ const secciones = [
     '#setred — Cambia el canal oficial.',
     '#setprotect — Configura las protecciones.',
     '#setnsfw — Activa o desactiva el filtro NSFW.',
-    '#activarbot / #desactivarbot — Activa o desactiva el bot.'
+    '#activarbot / #desactivarbot — Activa o desactiva el bot.',
+    '#antiporno on/off — Activa o desactiva el filtro antiporno.',
+    '#aceptarinv <id> — Acepta una solicitud de invitación.',
+    '#rechazarinv <id> — Rechaza una solicitud de invitación.'
   ]],
 
   ['📱 SISTEMA DE SUBBOTS', [

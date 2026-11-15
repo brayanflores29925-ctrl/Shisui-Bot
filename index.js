@@ -1370,7 +1370,7 @@ case 'invitacion': {
               '👤 De: +' + remitente + '\n' +
               '📋 Tipo: ' + tipo + '\n' +
               '🔗 ' + enlace + '\n\n' +
-              'Responde:\n*#aceptar ' + id + '* para unirme\n*#rechazar ' + id + '* para rechazar'
+              'Responde:\n*#aceptarinv ' + id + '* para unirme\n*#rechazarinv ' + id + '* para rechazar'
       })
     } catch (e) {
       console.log('No se pudo notificar al owner ' + num + ':', e.message)
@@ -1378,8 +1378,8 @@ case 'invitacion': {
   }
   break
 }
-case 'aceptar':
-case 'rechazar': {
+case 'aceptarinv':
+case 'rechazarinv': {
   const OWNERS = ['50493482934', '50495939120']
   const remitente = (m.key.participant || m.key.remoteJid || '').replace(/[^0-9]/g, '')
   const esOwner = OWNERS.some(n => remitente.includes(n))
@@ -1395,7 +1395,7 @@ case 'rechazar': {
   }
   const sol = invitacionesPendientes.get(id)
   invitacionesPendientes.delete(id)
-  if (cmd === 'rechazar') {
+  if (cmd === 'rechazarinv') {
     await responder('🗑️ Solicitud #' + id + ' rechazada.')
     try { await sock.sendMessage(sol.jid, { text: '❌ El dueño rechazó la invitación #' + id + '.' }) } catch (e) {}
     break
