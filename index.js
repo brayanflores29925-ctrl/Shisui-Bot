@@ -3527,7 +3527,7 @@ case 'setapi': {
 case 'addmoney': {
   if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
   const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
-  const args = cuerpo.slice(cmd.length).trim().split(' ');
+
   if (!mencionado || !args[1]) { await responder('Uso: #addmoney @user <cantidad>'); break; }
   const cantidad = parseInt(args[1]);
   if (isNaN(cantidad)) { await responder('❌ Cantidad inválida.'); break; }
@@ -3541,7 +3541,7 @@ case 'addmoney': {
 case 'removemoney': {
   if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
   const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
-  const args = cuerpo.slice(cmd.length).trim().split(' ');
+
   if (!mencionado || !args[1]) { await responder('Uso: #removemoney @user <cantidad>'); break; }
   const cantidad = parseInt(args[1]);
   if (isNaN(cantidad)) { await responder('❌ Cantidad inválida.'); break; }
@@ -3690,513 +3690,82 @@ case 'ytsearch': {
   break;
 }
 
-case 'play2': case 'playdoc': case 'playvideo': {
+case 'play2': case 'playdoc': 
+case 'playvideo': case 'play2': case 'playdoc': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
   
-  await responder('🔍 Buscando en YouTube...');
-  
-  try {
-    const YouTube = require('youtube-sr').default;
-    let videoUrl = query;
-    let videoInfo = null;
-
-    // Si no es un enlace, buscamos el primer resultado para obtener la info y la portada
-    if (!query.startsWith('http')) {
-      const res = await YouTube.searchOne(query);
-      if (!res) { await responder('❌ No encontré resultados para: ' + query); break; }
-      videoUrl = res.url;
-      videoInfo = res;
-    }
-
-    // Mensaje bonito (igual que .play)
-    if (videoInfo) {
-      const txt = `➩ Descargando › *${videoInfo.title}*\n\n❖ Canal › *${videoInfo.channel.name}*\n⧖ Duración › *${videoInfo.durationFormatted}*\n❀ Vistas › *${(videoInfo.views || 0).toLocaleString()}*\n❐ Enlace › ${videoInfo.url}\n\n⏳ Espera un momento mientras preparo tu archivo...`;
-      await sock.sendMessage(jid, { image: { url: videoInfo.thumbnail.url }, caption: txt }, { quoted: m });
-    } else {
-      await responder('⬇️ Descargando desde el enlace...');
-    }
-
-    // Descargar con yt-dlp
-    const { exec } = require('child_process');
-    const esDoc = cmd === 'playdoc';
-    const esAudio = cmd === 'play2';
-    
-    const fileName = 'media_' + Date.now();
-    let outExt = (esDoc || !esAudio) ? 'mp4' : 'm4a';
-    let filePath = '/tmp/' + fileName + '.' + outExt;
-
-    let args = esAudio ? '-f "ba[ext=m4a]/ba" -x --audio-format m4a' : '-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"';
-    const execCmd = 'yt-dlp --extractor-args "youtube:player_client=android" ' + args + ' -o "' + filePath + '" "' + videoUrl + '"';
-
-    exec(execCmd, { timeout: 120000, maxBuffer: 1024 * 1024 * 50 }, async (error, stdout, stderr) => {
-      if (error) {
-        console.log('Error yt-dlp:', error.message);
-        return responder('❌ Error descargando. El video puede ser privado o restringido.');
-      }
-      try {
-        const fs = require('fs');
-        if (!fs.existsSync(filePath)) {
-          const files = fs.readdirSync('/tmp').filter(f => f.startsWith(fileName));
-          if (files.length > 0) filePath = '/tmp/' + files[0];
-          else throw new Error('Archivo no encontrado');
-        }
-        const buffer = fs.readFileSync(filePath);
-        
-        if (esDoc) {
-          await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: (videoInfo ? videoInfo.title : query).substring(0,20) + '.mp4' }, { quoted: m });
-        } else if (esAudio) {
-          await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
-        } else {
-          await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + (videoInfo ? videoInfo.title : query) }, { quoted: m });
-        }
-        fs.unlinkSync(filePath);
-      } catch (e) {
-        console.log('Error enviando:', e.message);
-        await responder('❌ Error enviando el archivo.');
-      }
-    });
-  } catch (e) {
-    console.log('Error .' + cmd + ':', e.message);
-    await responder('❌ Error procesando la descarga.');
-  }
-  break;
-}
-case 'playdoc': case 'playvideo': {
-  const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #playvideo <nombre o enlace>'); break; }
-  await responder('⏳ *Cargando video, esto puede tardar un momento...*');
-  
-  try {
-    const { exec } = require('child_process');
-    let target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
-    const fileName = 'vid_' + Date.now();
-    const filePath = '/tmp/' + fileName + '.mp4';
-
-    const execCmd = 'yt-dlp --extractor-args "youtube:player_client=android" -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]" -o "' + filePath + '" "' + target + '"';
-
-    exec(execCmd, { timeout: 90000, maxBuffer: 1024 * 1024 * 50 }, async (error, stdout, stderr) => {
-      if (error) {
-        console.log('Error yt-dlp:', error.message);
-        return responder('❌ Error descargando el video. Puede que esté privado o bloqueado.');
-      }
-      try {
-        const fs = require('fs');
-        if (!fs.existsSync(filePath)) {
-          const files = fs.readdirSync('/tmp').filter(f => f.startsWith(fileName));
-          if (files.length > 0) { /* usa la ruta encontrada */ } else throw new Error('No file');
-        }
-        const buffer = fs.readFileSync(filePath);
-        await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + query }, { quoted: m });
-        fs.unlinkSync(filePath);
-      } catch (e) {
-        await responder('❌ Error enviando el video.');
-      }
-    });
-  } catch (e) {
-    console.log('Error .playvideo:', e.message);
-    await responder('❌ Error procesando la descarga.');
-  }
-  break;
-}
-case 'playdoc': case 'playvideo': {
-  const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
-  await responder(`⬇️ Descargando ${cmd === 'playdoc' ? 'documento' : cmd === 'play2' ? 'audio (iPhone)' : 'video'}...`);
+  await responder('🔍 Buscando y preparando: ' + query + '...');
   
   try {
     const { exec } = require('child_process');
     const esDoc = cmd === 'playdoc';
     const esAudio = cmd === 'play2';
+    const target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
     
-    let url = query;
-    if (!query.startsWith('http')) {
-      const YouTube = require('youtube-sr').default;
-      const res = await YouTube.searchOne(query);
-      if (!res) throw new Error('No encontrado');
-      url = res.url;
-    }
-
-    const fileName = `descarga_${Date.now()}`;
-    let outExt = (esDoc || !esAudio) ? 'mp4' : 'm4a';
-    let filePath = `/tmp/${fileName}.${outExt}`;
-
-    let args = '';
-    if (esAudio) args = `-f "ba[ext=m4a]/ba" -x --audio-format m4a`;
-    else args = `-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"`;
-
-    exec(`yt-dlp --extractor-args "youtube:player_client=android" ${args} -o "${filePath}" "${url}"`, { timeout: 90000, maxBuffer: 1024 * 1024 * 10 }, async (error, stdout, stderr) => {
-      if (error) {
-        console.log('Error yt-dlp:', error.message);
-        return responder('❌ Error descargando. El video puede ser privado o muy largo.');
+    const jsonCmd = 'yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"';
+    
+    exec(jsonCmd, { timeout: 30000, maxBuffer: 1024 * 1024 * 10 }, async (err, stdout) => {
+      let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0, url = query;
+      
+      if (!err && stdout) {
+        try {
+          const info = JSON.parse(stdout.trim().split('\n')[0]);
+          title = info.title;
+          thumb = info.thumbnail;
+          channel = info.channel || info.uploader;
+          duration = info.duration_string || (info.duration + 's');
+          views = info.view_count || 0;
+          url = info.webpage_url || info.url;
+        } catch(e) {}
       }
-      try {
-        const fs = require('fs');
-        if (!fs.existsSync(filePath)) {
-          const files = fs.readdirSync('/tmp').filter(f => f.startsWith(fileName));
-          if (files.length > 0) filePath = `/tmp/${files[0]}`;
-          else throw new Error('Archivo no encontrado');
+
+      const txt = '➩ Descargando › *' + title + '*\n\n' +
+                  '❖ Canal › *' + channel + '*\n' +
+                  '⧖ Duración › *' + duration + '*\n' +
+                  (views ? '❀ Vistas › *' + views.toLocaleString() + '*\n' : '') +
+                  '❐ Enlace › ' + url + '\n\n' +
+                  '⏳ Espera un momento mientras preparo tu ' + (esAudio ? 'audio' : 'video') + '...';
+                  
+      if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+      else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+
+      const fileName = 'media_' + Date.now();
+      const ext = esAudio ? 'm4a' : 'mp4';
+      const filePath = '/tmp/' + fileName + '.' + ext;
+      
+      // VARIABLE RENOMBRADA A ytArgs
+      const ytArgs = esAudio ? '-f "ba[ext=m4a]/ba" -x --audio-format m4a' : '-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"';
+      const dlCmd = 'yt-dlp --extractor-args "youtube:player_client=android" ' + ytArgs + ' -o "' + filePath + '" "' + url + '"';
+      
+      exec(dlCmd, { timeout: 120000, maxBuffer: 1024 * 1024 * 50 }, async (dlErr) => {
+        if (dlErr) {
+          console.log('Error yt-dlp:', dlErr.message);
+          return responder('❌ Error descargando el archivo.');
         }
-        
-        const buffer = fs.readFileSync(filePath);
-        
-        if (esDoc) {
-          await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: `${query.substring(0,20)}.mp4` }, { quoted: m });
-        } else if (esAudio) {
-          await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
-        } else {
-          await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + query }, { quoted: m });
-        }
-        fs.unlinkSync(filePath);
-      } catch (e) {
-        console.log('Error enviando archivo:', e.message);
-        await responder('❌ Error enviando el archivo.');
-      }
-    });
-  } catch (e) {
-    console.log('Error .' + cmd + ':', e.message);
-    await responder('❌ Error procesando la descarga.');
-  }
-  break;
-}
-
-case 'mediafire': {
-  const url = cuerpo.slice(cmd.length).trim();
-  if (!url || !url.includes('mediafire.com')) { await responder('Uso: #mediafire <enlace de MediaFire>'); break; }
-  await responder('⬇️ Descargando de MediaFire...');
-  try {
-    const mediafireDl = require('mediafire-dl');
-    const res = await mediafireDl(url);
-    if (!res || !res.link) throw new Error('No se pudo obtener el enlace');
-    
-    const bufferRes = await fetch(res.link);
-    const arrayBuffer = await bufferRes.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    
-    await sock.sendMessage(jid, {
-      document: buffer,
-      mimetype: bufferRes.headers.get('content-type') || 'application/octet-stream',
-      fileName: res.name || 'archivo_mediafire'
-    }, { quoted: m });
-  } catch (e) {
-    console.log('Error .mediafire:', e.message);
-    await responder('❌ Error descargando de MediaFire.');
-  }
-  break;
-}
-
-case 'descargarapk': {
-  const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #descargarapk <nombre de la app>'); break; }
-  await responder(`🔍 Buscando APK de *${query}*...`);
-  try {
-    const res = await fetch(`https://ws75.aptoide.com/api/7/apps/search?query=${encodeURIComponent(query)}&limit=1`);
-    const json = await res.json();
-    if (!json.datalist || !json.datalist.list || json.datalist.list.length === 0) {
-      await responder('❌ No encontré la aplicación.');
-      break;
-    }
-    const app = json.datalist.list[0];
-    const apkUrl = app.file.path;
-    const appName = app.name;
-    const appSize = (app.size / 1024 / 1024).toFixed(2) + ' MB';
-    const icon = app.icon;
-    
-    await sock.sendMessage(jid, {
-      image: { url: icon },
-      caption: `📱 *${appName}*\n⚖️ Tamaño: ${appSize}\n\n⬇️ Descargando APK...`
-    }, { quoted: m });
-
-    const apkRes = await fetch(apkUrl);
-    const buffer = Buffer.from(await apkRes.arrayBuffer());
-
-    await sock.sendMessage(jid, {
-      document: buffer,
-      mimetype: 'application/vnd.android.package-archive',
-      fileName: `${appName.replace(/ /g, '_')}.apk`
-    }, { quoted: m });
-
-  } catch (e) {
-    console.log('Error .descargarapk:', e.message);
-    await responder('❌ Error descargando la APK.');
-  }
-  break;
-}
-
-case 'downloadlink': {
-  const url = cuerpo.slice(cmd.length).trim();
-  if (!url || !url.startsWith('http')) { await responder('Uso: #downloadlink <enlace directo>'); break; }
-  await responder('⬇️ Descargando archivo del enlace...');
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const contentType = res.headers.get('content-type') || '';
-    const buffer = Buffer.from(await res.arrayBuffer());
-    
-    const urlParts = url.split('/');
-    let fileName = urlParts[urlParts.length - 1].split('?')[0] || 'archivo_descargado';
-
-    if (contentType.includes('image')) {
-      await sock.sendMessage(jid, { image: buffer, caption: '✅ Archivo descargado' }, { quoted: m });
-    } else if (contentType.includes('video')) {
-      await sock.sendMessage(jid, { video: buffer, caption: '✅ Archivo descargado' }, { quoted: m });
-    } else if (contentType.includes('audio')) {
-      await sock.sendMessage(jid, { audio: buffer, mimetype: contentType }, { quoted: m });
-    } else {
-      await sock.sendMessage(jid, { document: buffer, mimetype: contentType, fileName }, { quoted: m });
-    }
-  } catch (e) {
-    console.log('Error .downloadlink:', e.message);
-    await responder('❌ Error descargando el enlace.');
-  }
-  break;
-}
-
-case 'juegospro': {
-  await responder(`🎲 *JUEGOS PRO*\n\n• #ppt <piedra/papel/tijera>\n• #dados\n• #flipp\n• #casino <cantidad>\n• #enigma\n• #horca / #resphorca\n• #guerra @user\n• #4vs4 @users\n• #sensibilidad\n• #card\n• #stats`);
-  break;
-}
-case 'menuclan': {
-  await responder(`🛡️ *MENÚ CLAN FREE FIRE*\n\n• #card <nombre> — Tarjeta de jugador.\n• #stats <nombre> — Estadísticas.\n• #sensibilidad — Configuración de sensibilidad.\n• #guerra @user — Retar a alguien.\n\n¡Prepara a tu escuadrón!`);
-  break;
-}
-case 'ppt': {
-  const opcion = cuerpo.slice(cmd.length).trim().toLowerCase();
-  if (!['piedra', 'papel', 'tijera'].includes(opcion)) { await responder('Uso: #ppt <piedra/papel/tijera>'); break; }
-  const opciones = ['piedra', 'papel', 'tijera'];
-  const botOpcion = opciones[Math.floor(Math.random() * 3)];
-  let resultado = '';
-  if (opcion === botOpcion) resultado = '🤝 ¡Empate!';
-  else if ((opcion === 'piedra' && botOpcion === 'tijera') || (opcion === 'papel' && botOpcion === 'piedra') || (opcion === 'tijera' && botOpcion === 'papel')) resultado = '🎉 ¡Ganaste!';
-  else resultado = '😢 Perdiste.';
-  await responder(`Tú: *${opcion}*\nBot: *${botOpcion}*\n\n${resultado}`);
-  break;
-}
-case 'dados': {
-  const dado = Math.floor(Math.random() * 6) + 1;
-  await responder(`🎲 Has lanzado el dado y salió: *${dado}*`);
-  break;
-}
-case 'flipp': {
-  const res = Math.random() > 0.5 ? 'Cara 🪙' : 'Sello 🪙';
-  await responder(`Lanzando moneda... ¡Salió *${res}*!`);
-  break;
-}
-case 'casino': {
-  const sender = m.key.participant || m.key.remoteJid;
-  const cantidad = parseInt(cuerpo.slice(cmd.length).trim());
-  if (isNaN(cantidad) || cantidad <= 0) { await responder('Uso: #casino <cantidad>\nEj: #casino 50'); break; }
-  const db = getGachaDB();
-  const u = getGachaUser(db, sender);
-  if (u.coins < cantidad) { await responder('❌ No tienes suficientes monedas en tu Gacha.'); break; }
-  u.coins -= cantidad;
-  const gano = Math.random() > 0.6;
-  if (gano) { u.coins += (cantidad * 2); await responder(`🎰 ¡JACKPOT! Ganaste *${cantidad * 2} monedas*.\n💰 Saldo actual: ${u.coins}`); }
-  else { await responder(`🎰 La casa gana... Perdiste *${cantidad} monedas*.\n💰 Saldo actual: ${u.coins}`); }
-  saveGachaDB(db);
-  break;
-}
-case 'enigma': {
-  const enigmas = [
-    '¿Qué cosa es, que cuanto más grande, menos se ve? (La oscuridad)',
-    'Tiene dientes pero no muerde. (El peine)',
-    '¿Qué es lo que se rompe cuando se dice su nombre? (El silencio)',
-    'Blanco por dentro, verde por fuera, si quieres que te lo diga espera. (La pera)'
-  ];
-  await responder(`🧩 *Resuelve el enigma:*\n\n${enigmas[Math.floor(Math.random() * enigmas.length)]}`);
-  break;
-}
-case 'horca': {
-  const sender = m.key.participant || m.key.remoteJid;
-  if (!global.horcaGames) global.horcaGames = new Map();
-  const palabras = ['programacion', 'whatsapp', 'telefono', 'javascript', 'computadora', 'internet'];
-  const palabra = palabras[Math.floor(Math.random() * palabras.length)];
-  global.horcaGames.set(sender, { palabra, intentos: 6, adivinadas: [] });
-  const mostrar = palabra.split('').map(l => '_').join(' ');
-  await responder(`🎮 *AHORCADO*\nPalabra: ${mostrar} (${palabra.length} letras)\nIntentos restantes: 6\n\nUsa #resphorca <letra>`);
-  break;
-}
-case 'resphorca': {
-  const sender = m.key.participant || m.key.remoteJid;
-  const letra = cuerpo.slice(cmd.length).trim().toLowerCase();
-  if (!letra || letra.length !== 1) { await responder('❌ Escribe solo una letra.'); break; }
-  if (!global.horcaGames || !global.horcaGames.has(sender)) { await responder('❌ No tienes un juego activo. Usa #horca'); break; }
-  const juego = global.horcaGames.get(sender);
-  if (juego.palabra.includes(letra)) {
-    if (!juego.adivinadas.includes(letra)) juego.adivinadas.push(letra);
-    const mostrar = juego.palabra.split('').map(l => juego.adivinadas.includes(l) ? l : '_').join(' ');
-    if (!mostrar.includes('_')) { await responder(`🎉 ¡Ganaste! La palabra era *${juego.palabra}*.`); global.horcaGames.delete(sender); }
-    else { await responder(`✅ ¡Bien! Letra correcta.\n${mostrar}`); }
-  } else {
-    juego.intentos--;
-    if (juego.intentos === 0) { await responder(`💀 ¡Has perdido! La palabra era *${juego.palabra}*.`); global.horcaGames.delete(sender); }
-    else { await responder(`❌ Letra incorrecta. Te quedan ${juego.intentos} intentos.`); }
-  }
-  break;
-}
-case 'guerra': {
-  const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
-  if (!mencionado) { await responder('Uso: #guerra @usuario'); break; }
-  const miPoder = Math.floor(Math.random() * 100);
-  const suPoder = Math.floor(Math.random() * 100);
-  const ganador = miPoder > suPoder ? `@${m.key.participant.split('@')[0]}` : `@${mencionado.split('@')[0]}`;
-  await sock.sendMessage(jid, { text: `⚔️ *GUERRA*\n\nTú: ${miPoder} de poder.\nRival: ${suPoder} de poder.\n\n🏆 El ganador es: *${ganador}*`, mentions: [mencionado, m.key.participant] }, { quoted: m });
-  break;
-}
-case '4vs4': case '6vs6': case '12vs12': {
-  const menciones = m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
-  if (menciones.length < 2) { await responder('Uso: #4vs4 @user1 @user2 ...'); break; }
-  const mezclados = menciones.sort(() => Math.random() - 0.5);
-  const mitad = Math.ceil(mezclados.length / 2);
-  const equipo1 = mezclados.slice(0, mitad).map(u => '@' + u.split('@')[0]).join(', ');
-  const equipo2 = mezclados.slice(mitad).map(u => '@' + u.split('@')[0]).join(', ');
-  await sock.sendMessage(jid, { text: `⚔️ *EQUIPOS FORMADOS*\n\n🔴 Equipo 1:\n${equipo1}\n\n🔵 Equipo 2:\n${equipo2}`, mentions: mezclados }, { quoted: m });
-  break;
-}
-case 'sensibilidad': {
-  const gen = () => Math.floor(Math.random() * 200);
-  await responder(`🎯 *SENSIBILIDAD FREE FIRE*\n\nGeneral: ${gen()}\nPunto Rojo: ${gen()}\nMira 2x: ${gen()}\nMira 4x: ${gen()}\nFranco: ${gen()}\n\n¡Prueba esta config!`);
-  break;
-}
-case 'card': case 'stats': {
-  const nombre = cuerpo.slice(cmd.length).trim() || 'Jugador';
-  const kd = (Math.random() * 3 + 1).toFixed(2);
-  const victorias = Math.floor(Math.random() * 500);
-  await responder(`📊 *TARJETA DE JUGADOR*\n\n👤 Nombre: ${nombre}\n🏆 Victorias: ${victorias}\n💀 K/D Ratio: ${kd}\n🎖️ Rango: ${victorias > 250 ? 'Heroico' : 'Diamante'}\n\n(Estadísticas simuladas)`);
-  break;
-}
-
-
-
-case 'botones': {
-  try {
-    // 1. Intentar con Lista Interactiva (Menú desplegable)
-    const sections = [
-      {
-        title: 'Opciones del Bot',
-        rows: [
-          { title: '🤗 Dar Abrazo', rowId: '.hug', description: 'Envía un sticker de abrazo' },
-          { title: '😘 Dar Beso', rowId: '.kiss', description: 'Envía un sticker de beso' },
-          { title: '📋 Ver Menú', rowId: '.menu', description: 'Muestra el menú principal' }
-        ]
-      }
-    ];
-    
-    await sock.sendMessage(jid, {
-      text: '🤖 *Prueba de Lista Interactiva*\n\nToca el botón de abajo para ver las opciones.',
-      footer: 'Shisui Bot v1.5.0',
-      buttonText: '📌 Abrir Opciones',
-      sections: sections
-    }, { quoted: m });
-    
-    // 2. Intentar con Botón de Enlace (Template)
-    await sock.sendMessage(jid, {
-      text: '🌐 *Prueba de Botón de Enlace*\n\nEste es un botón que te lleva a un sitio web (suele funcionar mejor).',
-      footer: 'Shisui Bot',
-      templateButtons: [
-        {
-          index: 1,
-          urlButton: {
-            displayText: '📢 Ir al Canal',
-            url: 'https://whatsapp.com/channel/0029VbDBJk4BfxoCBx5ov41y'
+        try {
+          const fs2 = require('fs');
+          if (!fs2.existsSync(filePath)) throw new Error('Archivo no encontrado');
+          const buffer = fs2.readFileSync(filePath);
+          
+          if (esDoc) {
+            await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: title.substring(0,20) + '.mp4' }, { quoted: m });
+          } else if (esAudio) {
+            await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+          } else {
+            await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
           }
+          fs2.unlinkSync(filePath);
+        } catch (e) {
+          console.log('Error enviando:', e.message);
+          await responder('❌ Error enviando el archivo.');
         }
-      ]
-    }, { quoted: m });
-
+      });
+    });
   } catch (e) {
-    console.log('Error .botones:', e.message);
-    await responder('❌ Error enviando los botones.');
+    console.log('Error .' + cmd + ':', e.message);
+    await responder('❌ Error procesando la descarga.');
   }
-  break;
-}
-
-
-case 'robloxinventario': {
-      await sock.sendMessage(jid, { text: '❌ *Aviso:* Roblox tiene bloqueada la API pública de inventarios. Es imposible ver el inventario de una cuenta desde un bot de WhatsApp sin tener sus cookies de inicio de sesión.\n\nSi quieres ver tus objetos, entra directamente a tu perfil en la página web de Roblox.' }, { quoted: m });
-      break;
-    }
-    case 'bloxstock': case 'stockfrutas': {
-      await sock.sendMessage(jid, { text: '🍎 Consultando stock...' }, { quoted: m });
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000); // 8 segundos max
-        const res = await fetch('https://api.anything.notte.cc/bloxfruits/stock', { signal: controller.signal });
-        clearTimeout(timeout);
-        
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-
-        let txt = '🍎 *STOCK DE BLOX FRUITS*\n\n'
-        txt += `*Normal:*\n`
-        data.normal.forEach(f => { txt += `- ${f.name} (${f.price} Beli)\n` })
-        txt += `\n*Mirage:*\n`
-        data.mirage.forEach(f => { txt += `- ${f.name} (${f.price} Beli)\n` })
-
-        await sock.sendMessage(jid, { text: txt }, { quoted: m })
-      } catch (e) {
-        console.log('Error .bloxstock:', e.message)
-        await sock.sendMessage(jid, { text: '❌ El servidor del stock está caído o tardando demasiado. Intenta más tarde.' }, { quoted: m })
-      }
-      break;
-    }
-    case 'stockfrutas': {
-      await responder('🍎 Consultando stock de frutas...')
-      try {
-        const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 10000)
-        
-        const res = await fetch('https://api.anything.notte.cc/bloxfruits/stock', { signal: controller.signal })
-        clearTimeout(timeout)
-        
-        if (!res.ok) throw new Error('HTTP ' + res.status)
-        const data = await res.json()
-
-        let txt = '🍎 *STOCK DE BLOX FRUITS*\n\n'
-        txt += `*Normal:*\n`
-        data.normal.forEach(f => { txt += `- ${f.name} (${f.price} Beli / ${f.robux} R$)\n` })
-        txt += `\n*Mirage:*\n`
-        data.mirage.forEach(f => { txt += `- ${f.name} (${f.price} Beli / ${f.robux} R$)\n` })
-
-        await sock.sendMessage(jid, { text: txt }, { quoted: m })
-      } catch (e) {
-        console.log('Error .bloxstock:', e.message)
-        await responder('❌ No se pudo obtener el stock en este momento.')
-      }
-      break
-    }
-    case 'stockfrutas': {
-  await responder('🍎 Consultando stock de frutas...')
-  try {
-    const res = await fetch('https://api.anything.notte.cc/bloxfruits/stock')
-    const data = await res.json()
-
-    let txt = '🍎 *STOCK DE BLOX FRUITS*\n\n'
-    txt += `*Normal:*\n`
-    data.normal.forEach(f => { txt += `- ${f.name} (${f.price} Beli / ${f.robux} R$)\n` })
-    txt += `\n*Mirage:*\n`
-    data.mirage.forEach(f => { txt += `- ${f.name} (${f.price} Beli / ${f.robux} R$)\n` })
-
-    await sock.sendMessage(jid, { text: txt }, { quoted: m })
-  } catch (e) {
-    console.log('Error .bloxstock:', e.message)
-    await responder('❌ No se pudo obtener el stock en este momento.')
-  }
-  break
-}
-
-
-
-
-
-case 'villancico': {
-  const villancicos = [
-    '🎵 *Noche de paz, noche de amor...* 🎵\nTodos duermen en derredor...',
-    '🎵 *Rodolfo el reno, tenía una nariz muy roja...* 🎵\nY si tú la vieras, dirías que brilla más que el sol.',
-    '🎵 *Campana sobre campana, y sobre campana una...* 🎵\nAsómate a la ventana, verás al niño en la cuna.',
-    '🎵 *Los peces en el río, se peinan de alegría...* 🎵'
-  ];
-  await responder(villancicos[Math.floor(Math.random() * villancicos.length)]);
   break;
 }
 
