@@ -436,13 +436,14 @@ async function iniciar(opciones = {}) {
 
   
 // Sistema de invitaciones pendientes (en memoria)
+global.antiPorno = false
 const invitacionesPendientes = new Map()
 let contadorInvitaciones = 0
 
 sock.ev.on('messages.upsert', async ({ messages }) => {
   // --- DETECCIÓN ANTIPORNO AUTOMÁTICA ---
   try {
-    if (typeof antiPorno !== 'undefined' && antiPorno && !m.key.fromMe) {
+    if (global.antiPorno && !m.key.fromMe) {
       const { downloadMediaMessage } = require('@whiskeysockets/baileys')
       let innerMsg = m.message || {}
       if (innerMsg.ephemeralMessage) innerMsg = innerMsg.ephemeralMessage.message || {}

@@ -7,7 +7,7 @@ let modelo = null
 async function cargarModelo () {
   if (modelo) return modelo
   console.log('[antiporno] Cargando modelo NSFW...')
-  modelo = await nsfw.load('https://nsfwjs.com/model/', { size: 224 })
+  modelo = await nsfw.load('https://nsfwjs.com/quant_nsfw_mobilenet/model.json', { size: 224 })
   console.log('[antiporno] Modelo NSFW listo.')
   return modelo
 }
