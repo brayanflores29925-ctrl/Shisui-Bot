@@ -5586,7 +5586,20 @@ case 'musica':
             await responder('❌ Ocurrió un error en el sistema Gacha.')
           }
         } else {
-          await responder('❌ Lo siento, ese comando no está disponible.\n📋 Usa #menu para ver los comandos disponibles.')
+          
+          let sug2 = '';
+          let min2 = 3;
+          if (global.listaComandos && comando && comando.length > 1) {
+            for (const val of global.listaComandos) {
+              const d = calcularSimilitud(comando, val);
+              if (d < min2 && d > 0) { min2 = d; sug2 = val; }
+            }
+          }
+          if (sug2) {
+            await responder(`❌ El comando *${comando}* no existe.\n\n💡 ¿Quizás quisiste decir *${prefijo}${sug2}*?`);
+          } else {
+            await responder(`❌ Lo siento, el comando *${comando}* no está disponible.\n📋 Usa ${prefijo}menu.`);
+          }
         }
         break
       }
