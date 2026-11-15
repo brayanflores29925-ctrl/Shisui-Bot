@@ -72,6 +72,7 @@ const {
 const pino = require('pino')
 const readline = require('readline')
 const { generarMenu } = require('./menu')
+const admin = require('./admin')
 const rapido = require('./rapido')
 const herramientas = require('./herramientas')
 const { ejecutar: navidadEjecutar } = require('./navidad')
@@ -107,6 +108,7 @@ async function consultarGroq(pregunta) {
 
 const PREFIJOS = ['!', '#', '.', '/']
 const DUENOS = ['50494874330', '50495939120', '50493482934']
+const socksVivos = new Set()
 process.on('unhandledRejection', e => console.log('Error no controlado:', e && e.message))
 const COMANDOS = new Set([...fs.readFileSync(__filename, 'utf8').matchAll(/case '([a-z0-9_]+)'/g)].map(x => x[1]).concat(COMANDOS_GACHA))
 const EMOJIS = {
@@ -352,6 +354,8 @@ async function iniciar(opciones = {}) {
     if (connection === 'open') {
       if (esSub) subEstado[numeroSub] = { vinculado: true }
       console.log(esSub ? 'Sub bot conectado ✅ ' + numeroSub : 'Bot conectado ✅')
+      socksVivos.add(sock)
+      admin.programarHorarios(socksVivos)
       if (!esSub) {
         programarLimpieza(sock)
         revisarRegistros(sock).catch(e => console.log('Registro:', e.message))
@@ -363,6 +367,7 @@ async function iniciar(opciones = {}) {
       }
     }
     if (connection === 'close') {
+      socksVivos.delete(sock)
       if (sock.__registroInterval) clearInterval(sock.__registroInterval)
       const code = lastDisconnect?.error?.output?.statusCode
       if (esSub) {
@@ -2928,6 +2933,24 @@ case 'buscartt': {
           setTimeout(() => process.exit(42), 2000)
         } else {
           await responder('⚠️ El reinicio automático está desactivado. Si tu hosting reinicia solo el bot cuando se cierra, actívalo con #setupdate reinicio on')
+        }
+        break
+      }
+
+      case 'horario':
+      case 'nombregrupo':
+      case 'descripcion':
+      case 'admins':
+      case 'fantasmas': {
+        const admEs = jid.endsWith('@g.us') ? await esAdmin(sock, m) : false
+        const rAdm = await admin.ejecutar(sock, m, comando, {
+          args,
+          cuerpo: cuerpo.slice(cmd.length).trim(),
+          esAdmin: admEs,
+          actividad: typeof actividad !== 'undefined' ? (actividad[jid] || {}) : {}
+        })
+        if (rAdm.texto) {
+          await sock.sendMessage(jid, { text: rAdm.texto, mentions: rAdm.mentions || [] }, { quoted: m })
         }
         break
       }
