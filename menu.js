@@ -193,7 +193,9 @@ const secciones = [
     '#tbcookie <cookie> — Guarda una cookie en el sistema.',
     '#testvideo — Envía un video de prueba.',
     '#clear — Limpia la consola del servidor.',
-    '#consola / #cmd / #sh — Ejecuta comandos de terminal (Solo owner).'
+    '#consola / #cmd / #sh — Ejecuta comandos de terminal (Solo owner).',
+    '#logs / #errores — Muestra los últimos logs y errores del bot.',
+    '#clearlogs — Borra los logs guardados en la memoria.'
   ]],
 
   ['📱 SISTEMA DE SUBBOTS', [
