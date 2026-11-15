@@ -4247,6 +4247,33 @@ case 'musica':
       case 'pfp':
       case 'perfil': case 'pr': {
   const sender = m.key.participant || m.key.remoteJid;
+  const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0] || m.message?.extendedTextMessage?.contextInfo?.participant;
+  const target = mencionado || sender;
+  const user = target.split('@')[0];
+  
+  const db = getPerfilDB();
+  const p = db[target] || {};
+  
+  let txt = '👤 *PERFIL DE @' + user + '*\n\n';
+  txt += '📝 *Descripción:* ' + (p.desc || 'No establecida') + '\n';
+  txt += '🚻 *Género:* ' + (p.genero || 'No establecido') + '\n';
+  txt += '🎂 *Cumpleaños:* ' + (p.cumple || 'No establecido') + '\n';
+  txt += '💍 *Pareja:* ' + (p.pareja ? '@' + p.pareja.split('@')[0] : 'Solter@') + '\n';
+  
+  const menciones = [target]; 
+  if (p.pareja) menciones.push(p.pareja);
+  
+  try {
+    const pp = await sock.profilePictureUrl(target, 'image');
+    await sock.sendMessage(jid, { image: { url: pp }, caption: txt, mentions: menciones }, { quoted: m });
+  } catch (e) {
+    // Si no hay foto, enviamos solo el texto
+    await sock.sendMessage(jid, { text: txt, mentions: menciones }, { quoted: m });
+  }
+  break;
+}
+case 'pr': {
+  const sender = m.key.participant || m.key.remoteJid;
   const user = sender.split('@')[0];
   const db = getPerfilDB();
   const p = db[sender] || {};
