@@ -1178,6 +1178,82 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     
     switch (comando) {
+    // --- COMANDOS DE EMERGENCIA (CONFIG Y PIN) ---
+    case 'config': {
+      if (!global.filtrosConfig) {
+        global.filtrosConfig = { antiPorno: false, antiaudio: false, antivideos: false, antisticker: false, antispam: false, antibots: false, antiestafas: false };
+      }
+      const args = cuerpo.slice(cmd.length).trim();
+      const f = global.filtrosConfig;
+      
+      if (args) {
+        const num = parseInt(args);
+        if (num === 1) f.antiPorno = !f.antiPorno;
+        else if (num === 2) f.antiaudio = !f.antiaudio;
+        else if (num === 3) f.antivideos = !f.antivideos;
+        else if (num === 4) f.antisticker = !f.antisticker;
+        else if (num === 5) f.antispam = !f.antispam;
+        else if (num === 6) f.antibots = !f.antibots;
+        else if (num === 7) f.antiestafas = !f.antiestafas;
+        else { await responder('❌ Usa números del 1 al 7.'); break; }
+      }
+      
+      const on = '✅ ON'; const off = '❌ OFF';
+      let txt = '⚙️ *CONFIGURACIÓN DEL BOT*\n\n';
+      txt += '*1.* 🔞 Antiporno: ' + (f.antiPorno ? on : off) + '\n';
+      txt += '*2.* 🔇 Antiaudio: ' + (f.antiaudio ? on : off) + '\n';
+      txt += '*3.* 🎬 Antivideos: ' + (f.antivideos ? on : off) + '\n';
+      txt += '*4.* 🎨 Antisticker: ' + (f.antisticker ? on : off) + '\n';
+      txt += '*5.* 📵 Antispam: ' + (f.antispam ? on : off) + '\n';
+      txt += '*6.* 🤖 Antibots: ' + (f.antibots ? on : off) + '\n';
+      txt += '*7.* ⚠️ Antiestafas: ' + (f.antiestafas ? on : off) + '\n\n';
+      txt += '💡 Envía #config 1 para cambiar el estado.';
+      await responder(txt);
+      break;
+    }
+    
+    case 'pin': {
+      const query = cuerpo.slice(cmd.length).trim();
+      if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
+      await responder('🔍 Buscando: ' + query);
+      
+      // Intentar con Google Images rápido
+      try {
+        const gimages = require('@killovsky/gimages');
+        const data = await gimages.get({ query: query, safe: true });
+        if (data && data.data && data.data.length > 0) {
+          for (let i = 0; i < Math.min(2, data.data.length); i++) {
+            await sock.sendMessage(jid, { image: { url: data.data[i].url }, caption: '🖼️ Foto de: ' + query }, { quoted: m });
+          }
+          break;
+        }
+      } catch (e) {}
+      
+      // Si falla, generar con IA (máximo 10 segundos)
+      await responder('⚠️ Generando 2 fotos con IA...');
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        
+        for (let i = 1; i <= 2; i++) {
+          const imgUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(query) + '?width=512&height=512&nologo=true&seed=' + (Date.now() + i);
+          const imgRes = await fetch(imgUrl, { signal: controller.signal });
+          clearTimeout(timeout);
+          
+          if (imgRes.ok) {
+            const buffer = Buffer.from(await imgRes.arrayBuffer());
+            await sock.sendMessage(jid, { image: buffer, caption: '🖼️ IA Foto ' + i + ': ' + query }, { quoted: m });
+          } else {
+            throw new Error('Fallo la IA');
+          }
+        }
+      } catch (err) {
+        await responder('❌ No se pudo generar la imagen. Servidor de IA ocupado.');
+      }
+      break;
+    }
+    // ---------------------------------------------
+    
       case 'racha': case 'rc': {
   const sender = m.key.participant || m.key.remoteJid;
   const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0] || m.message?.extendedTextMessage?.contextInfo?.participant;
@@ -4138,103 +4214,6 @@ case 'play': case 'play2': {
 
 
 
-
-case 'pin': {
-  const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
-  await responder('🔍 Buscando sticker o foto de: ' + query);
-  
-  let stickerEnviado = false;
-
-  // A) Intentar sticker con GifSnap
-  try {
-    const { createGifSnapClient } = await import('@rowix/gifsnap-js');
-    const client = createGifSnapClient();
-    const res = await client.searchStickers({ query: query, limit: 1 });
-    if (res.data && res.data.length > 0) {
-      const stickerUrl = res.data[0].url;
-      const stickerRes = await fetch(stickerUrl);
-      const buffer = Buffer.from(await stickerRes.arrayBuffer());
-      const webp = await convertirGifAWebp(buffer);
-      await sock.sendMessage(jid, { sticker: webp }, { quoted: m });
-      stickerEnviado = true;
-    }
-  } catch (e) { console.log('Error GifSnap:', e.message); }
-
-  // B) Si no hay sticker, buscar fotos con @killovsky/gimages
-  if (!stickerEnviado) {
-    await responder('⚠️ No encontré sticker. Buscando fotos...');
-    try {
-      const gimages = require('@killovsky/gimages');
-      const data = await gimages.get({ query: query, safe: true });
-      const results = data.data || [];
-      if (results.length > 0) {
-        for (let i = 0; i < Math.min(results.length, 2); i++) {
-          await sock.sendMessage(jid, { image: { url: results[i].url }, caption: '🖼️ Foto ' + (i+1) + ' de: ' + query }, { quoted: m });
-        }
-        stickerEnviado = true;
-      }
-    } catch (e) { console.log('Error killovsky:', e.message); }
-  }
-
-  // C) Si aún no hay fotos, usar free-google-images como respaldo
-  if (!stickerEnviado) {
-    try {
-      const googleImages = require('free-google-images');
-      const results = await googleImages.search(query);
-      if (results && results.length > 0) {
-        for (let i = 0; i < Math.min(results.length, 2); i++) {
-          await sock.sendMessage(jid, { image: { url: results[i].image.url }, caption: '🖼️ Foto ' + (i+1) + ' de: ' + query }, { quoted: m });
-        }
-        stickerEnviado = true;
-      }
-    } catch (e) { console.log('Error free-google-images:', e.message); }
-  }
-
-  // D) Respaldo final: Pollinations
-  if (!stickerEnviado) {
-    await responder('⚠️ Generando fotos con IA...');
-    for (let i = 1; i <= 2; i++) {
-      const imgUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(query) + '?width=512&height=512&nologo=true&seed=' + (Date.now() + i);
-      await sock.sendMessage(jid, { image: { url: imgUrl }, caption: '🖼️ Foto IA ' + i + ': ' + query }, { quoted: m });
-    }
-  }
-  break;
-}
-
-case 'config': {
-  const args = cuerpo.slice(cmd.length).trim();
-  const f = global.filtrosConfig || {
-    antiPorno: false, antiaudio: false, antivideos: false,
-    antisticker: false, antispam: false, antibots: false, antiestafas: false
-  };
-
-  if (args) {
-    const num = parseInt(args);
-    if (num === 1) f.antiPorno = !f.antiPorno;
-    else if (num === 2) f.antiaudio = !f.antiaudio;
-    else if (num === 3) f.antivideos = !f.antivideos;
-    else if (num === 4) f.antisticker = !f.antisticker;
-    else if (num === 5) f.antispam = !f.antispam;
-    else if (num === 6) f.antibots = !f.antibots;
-    else if (num === 7) f.antiestafas = !f.antiestafas;
-    else { await responder('❌ Opción no válida. Usa números del 1 al 7.'); break; }
-  }
-
-  const on = '✅ ON';
-  const off = '❌ OFF';
-  let txt = '⚙️ *CONFIGURACIÓN DEL BOT*\n\n';
-  txt += '*1.* 🔞 Antiporno: ' + (f.antiPorno ? on : off) + '\n';
-  txt += '*2.* 🔇 Antiaudio: ' + (f.antiaudio ? on : off) + '\n';
-  txt += '*3.* 🎬 Antivideos: ' + (f.antivideos ? on : off) + '\n';
-  txt += '*4.* 🎨 Antisticker: ' + (f.antisticker ? on : off) + '\n';
-  txt += '*5.* 📵 Antispam: ' + (f.antispam ? on : off) + '\n';
-  txt += '*6.* 🤖 Antibots: ' + (f.antibots ? on : off) + '\n';
-  txt += '*7.* ⚠️ Antiestafas: ' + (f.antiestafas ? on : off) + '\n\n';
-  txt += '💡 *Para cambiar un estado, envía:*\nEjemplo: #config 1';
-  await responder(txt);
-  break;
-}
 
 case 'musica': case 'm': {
   const query = cuerpo.slice(cmd.length).trim();
