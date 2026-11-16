@@ -2631,7 +2631,7 @@ case 'wikipedia': {
   break;
 }
 
-case 'attp': case 'attp2': case 'attp3': {
+case 'attp2': case 'attp3': {
   const texto = cuerpo.slice(cmd.length).trim();
   if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
   await responder('✨ Generando sticker de texto...');
@@ -4004,6 +4004,41 @@ case 'maps': case 'mapa': {
   // 3. Si la API falla o tarda más de 5s, enviamos el enlace directo
   const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
   await sock.sendMessage(jid, { text: '🗺️ *Enlace de Google Maps:*\n' + link }, { quoted: m });
+  break;
+}
+
+
+case 'attp': case 'attp2': case 'attp3': case 'ttp': {
+  const texto = cuerpo.slice(cmd.length).trim();
+  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
+  
+  await responder('✨ Generando sticker de texto...');
+  
+  try {
+    const estilos = { attp: 'neon glowing letters', attp2: '3d glossy letters', attp3: 'handwritten graffiti', ttp: 'colorful cute letters' };
+    const prompt = 'The text "' + texto + '" written in ' + (estilos[cmd] || estilos.attp) + ', centered, solid black background, sticker style, high contrast';
+    
+    // Límite de 15 segundos para que no se quede colgado
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+    const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) + '?width=512&height=512&nologo=true&seed=' + Date.now();
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) throw new Error('API falló con estado ' + res.status);
+    
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (buffer.length < 1000) throw new Error('La imagen generada está vacía.');
+
+    // Convertir a sticker
+    const out = await imagenASticker(buffer, 'square');
+    await sock.sendMessage(jid, { sticker: out }, { quoted: m });
+
+  } catch (e) {
+    console.log('Error en .' + cmd + ':', e.message);
+    await responder('❌ Error generando el sticker. La IA está saturada o la conversión falló. Intenta de nuevo en unos segundos.');
+  }
   break;
 }
 
