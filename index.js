@@ -1715,84 +1715,7 @@ case 'menu': {
         break
       }
 
-      case 'pin': {
-  const consulta = cuerpo.slice(cmd.length).trim()
-  if (!consulta) {
-    await responder('Uso: .pin <búsqueda>\nEjemplo: .pin gato')
-    break
-  }
-  await responder('🔍 Buscando sticker o foto de: ' + consulta)
-  try {
-    let enviado = false
-    
-    // 1. Buscar sticker animado en Giphy (no necesita API Key)
-    try {
-      const giphyUrl = `https://api.giphy.com/v1/stickers/search?api_key=dc6zaTOxFJmzC&q=${encodeURIComponent(consulta)}&limit=1&rating=g`
-      const res = await fetch(giphyUrl)
-      const data = await res.json()
-      if (data.data && data.data.length > 0) {
-        const gifUrl = data.data[0].images.original.url
-        const gifRes = await fetch(gifUrl)
-        const gifBuffer = Buffer.from(await gifRes.arrayBuffer())
-        const webpBuffer = await convertirGifAWebp(gifBuffer)
-        await sock.sendMessage(jid, { sticker: webpBuffer }, { quoted: m })
-        enviado = true
-        console.log('[pin] Sticker de Giphy enviado para:', consulta)
-      }
-    } catch (e) {
-      console.log('Error buscando en Giphy:', e.message)
-    }
-
-    // 2. Si no hay sticker, buscar imagen en Google
-    if (!enviado) {
-      try {
-        const { search, ImageResult } = require('google-sr')
-        const results = await search({ query: consulta, parsers: [ImageResult] })
-        if (results && results.length > 0) {
-          const imgUrl = results[0].image
-          const imgRes = await fetch(imgUrl)
-          if (imgRes.ok) {
-            const imgBuffer = Buffer.from(await imgRes.arrayBuffer())
-            try {
-              // Intentar convertir a sticker
-              const webp = await imagenASticker(imgBuffer, 'square')
-              await sock.sendMessage(jid, { sticker: webp }, { quoted: m })
-            } catch (e) {
-              // Si falla, enviar como foto
-              await sock.sendMessage(jid, { image: imgBuffer, caption: '🖼️ Aquí tienes: ' + consulta }, { quoted: m })
-            }
-            enviado = true
-            console.log('[pin] Imagen de Google enviada para:', consulta)
-          }
-        }
-      } catch (e) {
-        console.log('Error buscando imagen en Google:', e.message)
-      }
-    }
-
-    // 3. Si todo falla, generar con IA (Pollinations)
-    if (!enviado) {
-      try {
-        console.log('[pin] Generando imagen con IA...')
-        const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(consulta) + '?width=512&height=512&nologo=true'
-        const res = await fetch(url)
-        const imgBuffer = Buffer.from(await res.arrayBuffer())
-        const webp = await imagenASticker(imgBuffer, 'square')
-        await sock.sendMessage(jid, { sticker: webp }, { quoted: m })
-        enviado = true
-      } catch (e) {
-        console.log('Error generando en Pollinations:', e.message)
-      }
-    }
-
-    if (!enviado) await responder('❌ No encontré nada para esa búsqueda.')
-  } catch (e) {
-    console.log('Error .pin:', e.message)
-    await responder('❌ Error buscando. Intenta de nuevo.')
-  }
-  break
-}
-case 'buscar':
+      case 'buscar':
 case 'buscartt': {
   const consulta = cuerpo.slice(cmd.length).trim()
   if (!consulta) {
@@ -3860,7 +3783,6 @@ case 'tt': {
 }
 
 
-case 'play': case 'play2': 
 case 'mapa': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #mapa <lugar>'); break; }
@@ -4125,6 +4047,130 @@ case 'config': {
   break;
 }
 
+case 'play': case 'play2': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
+  await responder('🔍 Buscando audio de: ' + query + '...');
+  try {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    const btch = require('btch-downloader');
+    const target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
+    
+    let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', url = target;
+    
+    try {
+      const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
+      const info = JSON.parse(stdout.trim().split('\n')[0]);
+      title = info.title || query; thumb = info.thumbnail; channel = info.channel || info.uploader; duration = info.duration_string || info.duration + 's'; url = info.webpage_url;
+    } catch (err) {
+      await responder('❌ No encontré resultados para: ' + query); break;
+    }
+    
+    const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⧖ Duración › *' + duration + '*\n⏳ Espera un momento...';
+    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+
+    let dlUrl = '';
+    try {
+      const dl = await btch.ytmp3(url);
+      dlUrl = dl.result?.download || dl.result?.url || dl.result?.mp3;
+    } catch(e) {}
+    
+    if (dlUrl) {
+      const fileRes = await fetch(dlUrl);
+      const buffer = Buffer.from(await fileRes.arrayBuffer());
+      await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+    } else {
+      const fileNameBase = 'audio_' + Date.now();
+      const filePath = '/tmp/' + fileNameBase + '.m4a';
+      await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePath + '" "' + url + '"', { timeout: 120000 });
+      const fs2 = require('fs');
+      const buffer = fs2.readFileSync(filePath);
+      await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+      fs2.unlinkSync(filePath);
+    }
+  } catch (e) { 
+    console.log('Error en play:', e.message);
+    await responder('❌ Error al descargar el audio.'); 
+  }
+  break;
+}
+
+case 'playvideo': case 'video': case 'v': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
+  await responder('🔍 Buscando video de: ' + query + '...');
+  try {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    const target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
+    
+    let title = query, thumb = null, channel = 'Desconocido', url = target;
+    
+    try {
+      const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
+      const info = JSON.parse(stdout.trim().split('\n')[0]);
+      title = info.title || query; thumb = info.thumbnail; channel = info.channel || info.uploader; url = info.webpage_url;
+    } catch (err) {
+      await responder('❌ No encontré resultados para: ' + query); break;
+    }
+    
+    const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Espera un momento...';
+    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+
+    await responder('⬇️ Procesando video (puede tardar)...');
+    const filePath = '/tmp/video_' + Date.now() + '.mp4';
+    let archivoDescargado = false;
+    try {
+      await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + url + '"', { timeout: 120000 });
+      archivoDescargado = true;
+    } catch (e) { 
+      console.log('Fallo yt-dlp:', e.message); 
+    }
+    if (archivoDescargado && require('fs').existsSync(filePath)) {
+      const fs2 = require('fs');
+      const buffer = fs2.readFileSync(filePath);
+      if (buffer.length > 64 * 1024 * 1024) await responder('❌ El video pesa más de 64MB.');
+      else await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
+      fs2.unlinkSync(filePath);
+    } else {
+      await responder('❌ No se pudo descargar el video.');
+    }
+  } catch (e) { 
+    console.log('Error en video:', e.message);
+    await responder('❌ Error al descargar el video.'); 
+  }
+  break;
+}
+
+case 'pin': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
+  await responder('🔍 Buscando sticker o foto de: ' + query);
+  try {
+    const giphyUrl = 'https://api.giphy.com/v1/stickers/search?api_key=dc6zaTOxFJmzC&q=' + encodeURIComponent(query) + '&limit=1&rating=g';
+    const res = await fetch(giphyUrl);
+    const data = await res.json();
+    if (data.data && data.data.length > 0) {
+      const gifUrl = data.data[0].images.original.url;
+      const gifRes = await fetch(gifUrl);
+      const gifBuffer = Buffer.from(await gifRes.arrayBuffer());
+      const webpBuffer = await convertirGifAWebp(gifBuffer);
+      await sock.sendMessage(jid, { sticker: webpBuffer }, { quoted: m });
+    } else {
+      await responder('❌ No encontré stickers de ' + query);
+    }
+  } catch(e) {
+    console.log('Error pin:', e.message);
+    await responder('❌ Error al buscar sticker.');
+  }
+  break;
+}
+
 case 'musica': case 'm': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
@@ -4157,7 +4203,7 @@ case 'musica': case 'm': {
   break;
 }
 
-case 'playvideo': case 'video': case 'v': case 'playdoc': {
+case 'video': case 'v': case 'playdoc': {
       const query = cuerpo.slice(cmd.length).trim();
       if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
       await responder('🔍 Buscando video de: ' + query + '...');
