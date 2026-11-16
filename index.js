@@ -4047,57 +4047,6 @@ case 'config': {
   break;
 }
 
-case 'play': case 'play2': {
-  const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
-  await responder('🔍 Buscando audio de: ' + query + '...');
-  try {
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
-    const btch = require('btch-downloader');
-    const target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
-    
-    let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', url = target;
-    
-    try {
-      const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
-      const info = JSON.parse(stdout.trim().split('\n')[0]);
-      title = info.title || query; thumb = info.thumbnail; channel = info.channel || info.uploader; duration = info.duration_string || info.duration + 's'; url = info.webpage_url;
-    } catch (err) {
-      await responder('❌ No encontré resultados para: ' + query); break;
-    }
-    
-    const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⧖ Duración › *' + duration + '*\n⏳ Espera un momento...';
-    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
-    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-
-    let dlUrl = '';
-    try {
-      const dl = await btch.ytmp3(url);
-      dlUrl = dl.result?.download || dl.result?.url || dl.result?.mp3;
-    } catch(e) {}
-    
-    if (dlUrl) {
-      const fileRes = await fetch(dlUrl);
-      const buffer = Buffer.from(await fileRes.arrayBuffer());
-      await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
-    } else {
-      const fileNameBase = 'audio_' + Date.now();
-      const filePath = '/tmp/' + fileNameBase + '.m4a';
-      await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePath + '" "' + url + '"', { timeout: 120000 });
-      const fs2 = require('fs');
-      const buffer = fs2.readFileSync(filePath);
-      await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
-      fs2.unlinkSync(filePath);
-    }
-  } catch (e) { 
-    console.log('Error en play:', e.message);
-    await responder('❌ Error al descargar el audio.'); 
-  }
-  break;
-}
-
 case 'playvideo': case 'video': case 'v': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
@@ -4167,6 +4116,78 @@ case 'pin': {
   } catch(e) {
     console.log('Error pin:', e.message);
     await responder('❌ Error al buscar sticker.');
+  }
+  break;
+}
+
+
+case 'play': case 'play2': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
+  
+  await responder('🔍 Buscando audio de: ' + query + '...');
+  
+  try {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    const fs2 = require('fs');
+    
+    const target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
+    
+    let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', url = target;
+    
+    // 1. Obtener info
+    try {
+      const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
+      const info = JSON.parse(stdout.trim().split('\n')[0]);
+      title = info.title || query; thumb = info.thumbnail; channel = info.channel || info.uploader; duration = info.duration_string || info.duration + 's'; url = info.webpage_url;
+    } catch (err) {
+      await responder('❌ No encontré resultados para: ' + query); break;
+    }
+    
+    const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⧖ Duración › *' + duration + '*\n⏳ Espera un momento...';
+    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+
+    await responder('⬇️ Procesando audio (puede tardar)...');
+    
+    // 2. Descargar el video (usando el mismo motor que playvideo que SÍ funciona)
+    const filePathMp4 = '/tmp/video_temp_' + Date.now() + '.mp4';
+    const filePathM4a = '/tmp/audio_temp_' + Date.now() + '.m4a';
+    
+    let archivoDescargado = false;
+    try {
+      await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePathMp4 + '" "' + url + '"', { timeout: 120000 });
+      archivoDescargado = true;
+    } catch (e) { 
+      console.log('Fallo yt-dlp al bajar video para audio:', e.message); 
+    }
+
+    if (archivoDescargado && fs2.existsSync(filePathMp4)) {
+      // 3. Extraer el audio usando ffmpeg
+      try {
+        await execAsync('ffmpeg -y -i "' + filePathMp4 + '" -vn -acodec copy "' + filePathM4a + '"', { timeout: 30000 });
+        
+        const buffer = fs2.readFileSync(filePathM4a);
+        await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+        
+        fs2.unlinkSync(filePathMp4);
+        fs2.unlinkSync(filePathM4a);
+      } catch (ffmpegErr) {
+        // Si falla ffmpeg, enviamos el video como respaldo
+        console.log('Fallo ffmpeg, enviando video como fallback:', ffmpegErr.message);
+        const buffer = fs2.readFileSync(filePathMp4);
+        await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
+        fs2.unlinkSync(filePathMp4);
+      }
+    } else {
+      await responder('❌ No se pudo descargar el audio. Intenta de nuevo.');
+    }
+
+  } catch (e) { 
+    console.log('Error en play:', e.message);
+    await responder('❌ Error al descargar el audio.'); 
   }
   break;
 }
