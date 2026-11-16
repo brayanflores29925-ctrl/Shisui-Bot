@@ -193,7 +193,7 @@ function nsfwActivo(jid) {
   return !!((leerConfig().nsfw || {})[jid])
 }
 
-function menuActual(nsfw) {
+function menuActual(nsfw, filtro) {
   const cfg = leerConfig()
   if (!cfg.menu) return generarMenu(nsfw)
   const zona = 'America/Tegucigalpa'
@@ -1288,9 +1288,9 @@ case 'menu': {
         const tag = '@' + quien.split('@')[0].split(':')[0]
         const saludo = `Hola ${tag}, soy ${leerConfig().nombre || 'Shisui Bot'} 🤖`
         if (fs.existsSync('./foto.jpg')) {
-          await sock.sendMessage(jid, { image: fs.readFileSync('./foto.jpg'), caption: saludo + '\n\n' + menuActual(nsfwActivo(jid), filtro), mentions: [quien] }, { quoted: m })
+          await sock.sendMessage(jid, { image: fs.readFileSync('./foto.jpg'), caption: saludo + '\n\n' + menuActual(nsfwActivo(jid, filtro), filtro), mentions: [quien] }, { quoted: m })
         } else {
-          await sock.sendMessage(jid, { text: saludo + '\n\n' + menuActual(nsfwActivo(jid), filtro), mentions: [quien] }, { quoted: m })
+          await sock.sendMessage(jid, { text: saludo + '\n\n' + menuActual(nsfwActivo(jid, filtro), filtro), mentions: [quien] }, { quoted: m })
         }
         break
       }
