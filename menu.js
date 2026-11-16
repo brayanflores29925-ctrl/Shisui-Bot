@@ -315,6 +315,7 @@ const secciones = [
     '#chatgpt — Preguntas a una IA.',
     '#llama — Preguntas a Llama IA.',
     '#google — Busca en Google.',
+    '#maps / #mapa — Busca una ubicación y envía el mapa.',
     '#wikipedia — Busca en Wikipedia.',
     '#clima — Clima de una ciudad.',
     '#sticker — Convierte imagen/video a sticker (ya existía).',
