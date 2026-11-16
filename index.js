@@ -4009,45 +4009,32 @@ case 'attp': case 'attp2': case 'attp3': case 'ttp': {
 }
 
 case 'config': {
-  const args = cuerpo.slice(cmd.length).trim();
-  
-  // Función para alternar los estados si se pasa un número
-  if (args) {
-    const num = parseInt(args);
-    if (num === 1) global.antiPorno = !global.antiPorno;
-    else if (num === 2) global.antiaudio = !global.antiaudio;
-    else if (num === 3) global.antivideos = !global.antivideos;
-    else if (num === 4) global.antisticker = !global.antisticker;
-    else if (num === 5) global.antispam = !global.antispam;
-    else if (num === 6) global.antibots = !global.antibots;
-    else if (num === 7) global.antiestafas = !global.antiestafas;
-    else {
-      await responder('❌ Opción no válida. Usa un número del 1 al 7.');
+      const args = cuerpo.slice(cmd.length).trim();
+      if (args) {
+        const num = parseInt(args);
+        if (num === 1) global.antiPorno = !global.antiPorno;
+        else if (num === 2) global.antiaudio = !global.antiaudio;
+        else if (num === 3) global.antivideos = !global.antivideos;
+        else if (num === 4) global.antisticker = !global.antisticker;
+        else if (num === 5) global.antispam = !global.antispam;
+        else if (num === 6) global.antibots = !global.antibots;
+        else if (num === 7) global.antiestafas = !global.antiestafas;
+        else { await responder('❌ Opción no válida. Usa 1 al 7.'); break; }
+      }
+      const on = '✅ ON'; const off = '❌ OFF';
+      let txt = '⚙️ *CONFIGURACIÓN DEL BOT*\n\n';
+      txt += '*1.* 🔞 Antiporno: ' + (global.antiPorno ? on : off) + '\n';
+      txt += '*2.* 🔇 Antiaudio: ' + (global.antiaudio ? on : off) + '\n';
+      txt += '*3.* 🎬 Antivideos: ' + (global.antivideos ? on : off) + '\n';
+      txt += '*4.* 🎨 Antisticker: ' + (global.antisticker ? on : off) + '\n';
+      txt += '*5.* 📵 Antispam: ' + (global.antispam ? on : off) + '\n';
+      txt += '*6.* 🤖 Antibots: ' + (global.antibots ? on : off) + '\n';
+      txt += '*7.* ⚠️ Antiestafas: ' + (global.antiestafas ? on : off) + '\n\n';
+      txt += '💡 *Para cambiar un estado, envía:*\nEjemplo: #config 1';
+      await responder(txt);
       break;
     }
-  }
-
-  // Mostrar el panel
-  const on = '✅ ON';
-  const off = '❌ OFF';
-  
-  let txt = '⚙️ *CONFIGURACIÓN DEL BOT*\\n\\n';
-  txt += `*1.* 🔞 Antiporno: ${global.antiPorno ? on : off}\\n`;
-  txt += `*2.* 🔇 Antiaudio: ${global.antiaudio ? on : off}\\n`;
-  txt += `*3.* 🎬 Antivideos: ${global.antivideos ? on : off}\\n`;
-  txt += `*4.* 🎨 Antisticker: ${global.antisticker ? on : off}\\n`;
-  txt += `*5.* 📵 Antispam: ${global.antispam ? on : off}\\n`;
-  txt += `*6.* 🤖 Antibots: ${global.antibots ? on : off}\\n`;
-  txt += `*7.* ⚠️ Antiestafas: ${global.antiestafas ? on : off}\\n\\n`;
-  
-  txt += '💡 *Para cambiar un estado, envía:*\\n';
-  txt += 'Ejemplo: #config 1 (para activar/desactivar antiporno)';
-  
-  await responder(txt);
-  break;
-}
-
-case 'playvideo': case 'video': case 'v': {
+    case 'playvideo': case 'video': case 'v': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
   await responder('🔍 Buscando video de: ' + query + '...');
@@ -4097,31 +4084,34 @@ case 'playvideo': case 'video': case 'v': {
 }
 
 case 'pin': {
-  const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
-  await responder('🔍 Buscando sticker o foto de: ' + query);
-  try {
-    const giphyUrl = 'https://api.giphy.com/v1/stickers/search?api_key=dc6zaTOxFJmzC&q=' + encodeURIComponent(query) + '&limit=1&rating=g';
-    const res = await fetch(giphyUrl);
-    const data = await res.json();
-    if (data.data && data.data.length > 0) {
-      const gifUrl = data.data[0].images.original.url;
-      const gifRes = await fetch(gifUrl);
-      const gifBuffer = Buffer.from(await gifRes.arrayBuffer());
-      const webpBuffer = await convertirGifAWebp(gifBuffer);
-      await sock.sendMessage(jid, { sticker: webpBuffer }, { quoted: m });
-    } else {
-      await responder('❌ No encontré stickers de ' + query);
+      const query = cuerpo.slice(cmd.length).trim();
+      if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
+      await responder('🔍 Buscando sticker o foto de: ' + query);
+      try {
+        const giphyUrl = 'https://api.giphy.com/v1/stickers/search?api_key=dc6zaTOxFJmzC&q=' + encodeURIComponent(query) + '&limit=1&rating=g';
+        const res = await fetch(giphyUrl);
+        const data = await res.json();
+        if (data.data && data.data.length > 0) {
+          const gifUrl = data.data[0].images.original.url;
+          const gifRes = await fetch(gifUrl);
+          const gifBuffer = Buffer.from(await gifRes.arrayBuffer());
+          const webpBuffer = await convertirGifAWebp(gifBuffer);
+          await sock.sendMessage(jid, { sticker: webpBuffer }, { quoted: m });
+        } else {
+          // Si no hay sticker, enviamos 2 fotos generadas por IA
+          await responder('⚠️ No encontré sticker. Generando 2 fotos con IA...');
+          for (let i = 1; i <= 2; i++) {
+            const imgUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(query) + '?width=512&height=512&nologo=true&seed=' + (Date.now() + i);
+            await sock.sendMessage(jid, { image: { url: imgUrl }, caption: '🖼️ Foto ' + i + ' de: ' + query }, { quoted: m });
+          }
+        }
+      } catch(e) {
+        console.log('Error pin:', e.message);
+        await responder('❌ Error al buscar.');
+      }
+      break;
     }
-  } catch(e) {
-    console.log('Error pin:', e.message);
-    await responder('❌ Error al buscar sticker.');
-  }
-  break;
-}
-
-
-case 'play': case 'play2': {
+    case 'play': case 'play2': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
   
