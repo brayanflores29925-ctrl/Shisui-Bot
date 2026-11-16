@@ -3839,6 +3839,41 @@ case 'playdoc': {
 }
 
 
+case 'tt': {
+  const url = cuerpo.slice(cmd.length).trim();
+  if (!url || !url.includes('tiktok.com')) {
+    await responder('Uso: #tiktok <enlace de TikTok>\nEjemplo: #tiktok https://vm.tiktok.com/...');
+    break;
+  }
+  
+  await responder('⬇️ Descargando video de TikTok...');
+  
+  try {
+    const res = await fetch('https://www.tikwm.com/api/?url=' + encodeURIComponent(url) + '&hd=1');
+    const json = await res.json();
+    
+    if (json.code !== 0 || !json.data) {
+      await responder('❌ No se pudo obtener el video. Asegúrate de que sea público.');
+      break;
+    }
+    
+    const videoUrl = json.data.play;
+    const titulo = json.data.title || 'Video de TikTok';
+    const autor = json.data.author ? json.data.author.nickname : 'Desconocido';
+    
+    const videoRes = await fetch(videoUrl);
+    const buffer = Buffer.from(await videoRes.arrayBuffer());
+    
+    await sock.sendMessage(jid, { video: buffer, caption: '🎬 *' + titulo + '*\n👤 ' + autor }, { quoted: m });
+    
+  } catch (e) {
+    console.log('Error .tiktok:', e.message);
+    await responder('❌ Error descargando de TikTok.');
+  }
+  break;
+}
+
+
 case 'play': case 'play2': case 'playvideo': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
@@ -3846,56 +3881,83 @@ case 'play': case 'play2': case 'playvideo': {
   await responder('🔍 Buscando y preparando: ' + query + '...');
   
   try {
-    const Youtube = require('youtube-sr').default;
-    const btch = require('btch-downloader');
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+
+    const esVideo = cmd === 'playvideo';
+    const target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
     
-    let videoUrl = query;
-    let videoInfo = null;
+    let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0, url = target;
     
-    // Buscar en YouTube si no es un enlace directo
-    if (!query.startsWith('http')) {
-      const res = await Youtube.searchOne(query);
-      if (!res) { await responder('❌ No encontré resultados para: ' + query); break; }
-      videoUrl = res.url;
-      videoInfo = res;
+    // 1. Obtener info del video usando yt-dlp (esto SÍ funciona)
+    try {
+      const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
+      const info = JSON.parse(stdout.trim().split('\n')[0]);
+      title = info.title || query;
+      thumb = info.thumbnail || null;
+      channel = info.channel || info.uploader || 'Desconocido';
+      duration = info.duration_string || (info.duration ? info.duration + 's' : 'Desconocido');
+      views = info.view_count || 0;
+      url = info.webpage_url || target;
+    } catch (err) {
+      console.log('Error obteniendo info:', err.message);
+      await responder('❌ No encontré resultados para: ' + query);
+      break;
     }
-    
-    const title = videoInfo ? videoInfo.title : 'Video de YouTube';
-    const thumb = videoInfo ? videoInfo.thumbnail.url : null;
-    const channel = videoInfo ? videoInfo.channel.name : 'Desconocido';
-    
-    // Enviar la tarjeta
+
+    // 2. Enviar la tarjeta bonita (igual que antes)
     const txt = '➩ Descargando › *' + title + '*\n\n' +
                 '❖ Canal › *' + channel + '*\n' +
+                '⧖ Duración › *' + duration + '*\n' +
+                (views ? '❀ Vistas › *' + views.toLocaleString() + '*\n' : '') +
                 '⏳ Espera un momento mientras preparo tu archivo...';
                 
     if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
     else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-    
-    // Descargar usando btch-downloader (Evita bloqueos de YouTube)
+
+    // 3. Descargar usando btch-downloader (para evitar el bloqueo SABR de YouTube)
+    const btch = require('btch-downloader');
     let dlUrl = '';
-    if (cmd === 'playvideo') {
-      const dl = await btch.ytmp4(videoUrl);
-      if (dl.status && dl.result) dlUrl = dl.result.download;
-    } else {
-      const dl = await btch.ytmp3(videoUrl);
-      if (dl.status && dl.result) dlUrl = dl.result.download;
-    }
     
+    try {
+      if (esVideo) {
+        const dl = await btch.ytmp4(url);
+        if (dl.status && dl.result) dlUrl = dl.result.download;
+      } else {
+        const dl = await btch.ytmp3(url);
+        if (dl.status && dl.result) dlUrl = dl.result.download;
+      }
+    } catch (apiErr) {
+      console.log('Falló btch-downloader, usando yt-dlp de respaldo...');
+    }
+
+    // Si btch falla, intentamos con yt-dlp normal
     if (!dlUrl) {
-      await responder('❌ El servidor de descarga está saturado. Intenta de nuevo en unos minutos.');
-      break;
-    }
-    
-    const fileRes = await fetch(dlUrl);
-    const buffer = Buffer.from(await fileRes.arrayBuffer());
-    
-    if (cmd === 'playvideo') {
-      await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
+      const fs2 = require('fs');
+      const fileNameBase = 'media_' + Date.now();
+      const filePath = '/tmp/' + fileNameBase + (esVideo ? '.mp4' : '.m4a');
+      const ytArgs = esVideo ? '-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"' : '-f 140/bestaudio[ext=m4a]/bestaudio';
+      
+      await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -R 3 --no-part ' + ytArgs + ' -o "' + filePath + '" "' + url + '"', { timeout: 120000 });
+      
+      const files = fs2.readdirSync('/tmp').filter(f => f.startsWith(fileNameBase));
+      if (files.length > 0) {
+        const buffer = fs2.readFileSync('/tmp/' + files[0]);
+        if (esVideo) await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
+        else await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+        fs2.unlinkSync('/tmp/' + files[0]);
+      } else {
+        await responder('❌ El servidor de descarga falló. Intenta de nuevo.');
+      }
     } else {
-      await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+      // Si btch funcionó, descargamos de su URL
+      const fileRes = await fetch(dlUrl);
+      const buffer = Buffer.from(await fileRes.arrayBuffer());
+      if (esVideo) await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
+      else await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
     }
-    
+
   } catch (e) {
     console.log('Error en descarga:', e.message);
     await responder('❌ Error al descargar: ' + e.message);
