@@ -3731,40 +3731,6 @@ case 'ytsearch': {
 
 
 
-case 'tt': {
-  const url = cuerpo.slice(cmd.length).trim();
-  if (!url || !url.includes('tiktok.com')) {
-    await responder('Uso: #tiktok <enlace de TikTok>\nEjemplo: #tiktok https://vm.tiktok.com/...');
-    break;
-  }
-  
-  await responder('⬇️ Descargando video de TikTok...');
-  
-  try {
-    const res = await fetch('https://www.tikwm.com/api/?url=' + encodeURIComponent(url) + '&hd=1');
-    const json = await res.json();
-    
-    if (json.code !== 0 || !json.data) {
-      await responder('❌ No se pudo obtener el video. Asegúrate de que sea público.');
-      break;
-    }
-    
-    const videoUrl = json.data.play;
-    const titulo = json.data.title || 'Video de TikTok';
-    const autor = json.data.author ? json.data.author.nickname : 'Desconocido';
-    
-    const videoRes = await fetch(videoUrl);
-    const buffer = Buffer.from(await videoRes.arrayBuffer());
-    
-    await sock.sendMessage(jid, { video: buffer, caption: '🎬 *' + titulo + '*\n👤 ' + autor }, { quoted: m });
-    
-  } catch (e) {
-    console.log('Error .tiktok:', e.message);
-    await responder('❌ Error descargando de TikTok.');
-  }
-  break;
-}
-
 case 'villancico':
       case 'tt': {
   const url = cuerpo.slice(cmd.length).trim();
@@ -3872,49 +3838,56 @@ case 'tt':
       }
 
       
+case 'tt': {
+  const url = cuerpo.slice(cmd.length).trim();
+  if (!url || !url.includes('tiktok.com')) {
+    await responder('Uso: #tiktok <enlace de TikTok>');
+    break;
+  }
+  await responder('⬇️ Descargando video de TikTok...');
+  try {
+    const res = await fetch('https://www.tikwm.com/api/?url=' + encodeURIComponent(url) + '&hd=1');
+    const json = await res.json();
+    if (json.code !== 0 || !json.data) { await responder('❌ Video no disponible o privado.'); break; }
+    const videoRes = await fetch(json.data.play);
+    const buffer = Buffer.from(await videoRes.arrayBuffer());
+    await sock.sendMessage(jid, { video: buffer, caption: '🎬 *' + (json.data.title || 'TikTok') + '*\n👤 ' + (json.data.author ? json.data.author.nickname : 'Desconocido') }, { quoted: m });
+  } catch (e) {
+    console.log('Error en tiktok:', e.message);
+    await responder('❌ Error descargando de TikTok.');
+  }
+  break;
+}
+
+
 case 'play': case 'play2': case 'musica': case 'm': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
   await responder('🔍 Buscando audio de: ' + query + '...');
   try {
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
-    const btch = require('btch-downloader');
-    const target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
+    const yt = require('@denzy-official/youtube_scraper');
+    const res = await yt.ytmp3(query);
     
-    let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', url = target;
-    
-    // Buscar info (esto funcionaba antes)
-    try {
-      const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
-      const info = JSON.parse(stdout.trim().split('\n')[0]);
-      title = info.title || query; thumb = info.thumbnail; channel = info.channel || info.uploader; duration = info.duration_string || info.duration + 's'; url = info.webpage_url;
-    } catch (err) {
-      await responder('❌ No encontré resultados para: ' + query); break;
+    if (!res.status || !res.download || !res.download.url) {
+      await responder('❌ No se pudo encontrar el audio o el servidor está saturado.');
+      break;
     }
+
+    const meta = res.metadata;
+    const txt = '➩ Descargando › *' + meta.title + '*\n\n❖ Canal › *' + meta.author.name + '*\n⧖ Duración › *' + meta.timestamp + '*\n⏳ Espera un momento...';
     
-    const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⧖ Duración › *' + duration + '*\n⏳ Espera un momento...';
-    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+    // Enviar tarjeta con foto
+    if (meta.thumbnail) await sock.sendMessage(jid, { image: { url: meta.thumbnail }, caption: txt }, { quoted: m });
     else await sock.sendMessage(jid, { text: txt }, { quoted: m });
 
-    // Descargar con API
-    let dlUrl = '';
-    try {
-      const dl = await btch.ytmp3(url);
-      dlUrl = dl.result?.download || dl.result?.url || dl.result?.mp3;
-    } catch(e) {}
-    
-    if (dlUrl) {
-      const fileRes = await fetch(dlUrl);
-      const buffer = Buffer.from(await fileRes.arrayBuffer());
-      await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
-    } else {
-      await responder('❌ Servidor de audio saturado. Intenta de nuevo.');
-    }
+    // Descargar y enviar el audio
+    const fileRes = await fetch(res.download.url);
+    const buffer = Buffer.from(await fileRes.arrayBuffer());
+    await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+
   } catch (e) { 
     console.log('Error en play:', e.message);
-    await responder('❌ Error procesando descarga.'); 
+    await responder('❌ Error al descargar el audio. Intenta de nuevo.'); 
   }
   break;
 }
@@ -3924,42 +3897,27 @@ case 'playvideo': case 'video': case 'v': case 'playdoc': {
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
   await responder('🔍 Buscando video de: ' + query + '...');
   try {
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
-    const btch = require('btch-downloader');
-    const target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
+    const yt = require('@denzy-official/youtube_scraper');
+    const res = await yt.ytmp4(query);
     
-    let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', url = target;
-    
-    try {
-      const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
-      const info = JSON.parse(stdout.trim().split('\n')[0]);
-      title = info.title || query; thumb = info.thumbnail; channel = info.channel || info.uploader; duration = info.duration_string || info.duration + 's'; url = info.webpage_url;
-    } catch (err) {
-      await responder('❌ No encontré resultados para: ' + query); break;
+    if (!res.status || !res.download || !res.download.url) {
+      await responder('❌ No se pudo encontrar el video o el servidor está saturado.');
+      break;
     }
+
+    const meta = res.metadata;
+    const txt = '➩ Descargando › *' + meta.title + '*\n\n❖ Canal › *' + meta.author.name + '*\n⏳ Espera un momento...';
     
-    const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⧖ Duración › *' + duration + '*\n⏳ Espera un momento...';
-    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+    if (meta.thumbnail) await sock.sendMessage(jid, { image: { url: meta.thumbnail }, caption: txt }, { quoted: m });
     else await sock.sendMessage(jid, { text: txt }, { quoted: m });
 
-    let dlUrl = '';
-    try {
-      const dl = await btch.ytmp4(url);
-      dlUrl = dl.result?.download || dl.result?.url || dl.result?.mp4;
-    } catch(e) {}
-    
-    if (dlUrl) {
-      const fileRes = await fetch(dlUrl);
-      const buffer = Buffer.from(await fileRes.arrayBuffer());
-      await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
-    } else {
-      await responder('❌ Servidor de video saturado. Intenta de nuevo.');
-    }
+    const fileRes = await fetch(res.download.url);
+    const buffer = Buffer.from(await fileRes.arrayBuffer());
+    await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + meta.title }, { quoted: m });
+
   } catch (e) { 
     console.log('Error en video:', e.message);
-    await responder('❌ Error procesando descarga.'); 
+    await responder('❌ Error al descargar el video. Intenta de nuevo.'); 
   }
   break;
 }
