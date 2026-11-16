@@ -698,6 +698,42 @@ sock.ev.on('group-participants.update', async (update) => {
 // --------------------------------------------------
 
 sock.ev.on('messages.upsert', async ({ messages }) => {
+  // --- CONTADOR DE MENSAJES ---
+  try {
+    const msg = messages[0];
+    if (msg.key.remoteJid.endsWith('@g.us') && msg.key.participant && !msg.key.fromMe) {
+      const textoMsg = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+      if (textoMsg && textoMsg.length > 1) {
+         const db = getActividadDB();
+         if (!db[msg.key.remoteJid]) db[msg.key.remoteJid] = {};
+         const sender = msg.key.participant;
+         db[msg.key.remoteJid][sender] = (db[msg.key.remoteJid][sender] || 0) + 1;
+         saveActividadDB(db);
+      }
+      
+      // Detectar si alguien responde "si" a un sorteo
+      if (textoMsg.toLowerCase() === 'si' && global.sorteos) {
+        for (const id in global.sorteos) {
+          if (global.sorteos[id].ganador === msg.key.participant && global.sorteos[id].jid === msg.key.remoteJid) {
+            const premio = global.sorteos[id].premio;
+            delete global.sorteos[id];
+            await sock.sendMessage(msg.key.remoteJid, { text: `🎉 ¡Felicidades @${msg.key.participant.split('@')[0]}! Has reclamado tu premio: *${premio}*`, mentions: [msg.key.participant] });
+          }
+        }
+      }
+      
+      // Respuestas automáticas
+      const dbResp = getRespuestasDB();
+      if (dbResp[msg.key.remoteJid] && textoMsg) {
+         const palabra = textoMsg.toLowerCase().trim();
+         if (dbResp[msg.key.remoteJid][palabra]) {
+            await sock.sendMessage(msg.key.remoteJid, { text: dbResp[msg.key.remoteJid][palabra] }, { quoted: msg });
+         }
+      }
+    }
+  } catch(e) { console.log('Error contador:', e.message); }
+  // ----------------------------
+
   // --- BAN POR REACCION ---
   try {
     const msgR = messages[0];
@@ -3910,6 +3946,152 @@ case 'attp': case 'attp2': case 'attp3': case 'ttp': {
   } catch (e) {
     console.log('Error en .' + cmd + ':', e.message);
     await responder('❌ Error al generar el sticker. Intenta de nuevo.');
+  }
+  break;
+}
+
+
+// --- BASE DE DATOS DE ACTIVIDAD ---
+function getActividadDB() {
+  const fs = require('fs');
+  try { return JSON.parse(fs.readFileSync('./actividad.json', 'utf8')); } catch { return {}; }
+}
+function saveActividadDB(db) {
+  const fs = require('fs');
+  fs.writeFileSync('./actividad.json', JSON.stringify(db, null, 2));
+}
+
+// --- BASE DE DATOS DE RESPUESTAS ---
+function getRespuestasDB() {
+  const fs = require('fs');
+  try { return JSON.parse(fs.readFileSync('./respuestas.json', 'utf8')); } catch { return {}; }
+}
+function saveRespuestasDB(db) {
+  const fs = require('fs');
+  fs.writeFileSync('./respuestas.json', JSON.stringify(db, null, 2));
+}
+
+case 'idgp': {
+  await sock.sendMessage(jid, { text: '🆔 *ID de este grupo:*\n\n`' + jid + '`' }, { quoted: m });
+  break;
+}
+case 'listaadmins': {
+  if (!jid.endsWith('@g.us')) { await responder('❌ Solo en grupos.'); break; }
+  const meta = await sock.groupMetadata(jid);
+  const admins = meta.participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin');
+  let txt = '👑 *ADMINISTRADORES DEL GRUPO*\n\n';
+  admins.forEach(a => { txt += '• @' + a.id.split('@')[0] + '\n'; });
+  await sock.sendMessage(jid, { text: txt, mentions: admins.map(a => a.id) }, { quoted: m });
+  break;
+}
+case 'contadormensajes': {
+  const db = getActividadDB();
+  const total = db[jid] ? Object.values(db[jid]).reduce((a, b) => a + b, 0) : 0;
+  await responder(`📊 *Total de mensajes en este grupo:*\n\n💬 ${total} mensajes`);
+  break;
+}
+case 'veractividad': {
+  const db = getActividadDB();
+  const grupo = db[jid] || {};
+  const lista = Object.keys(grupo).map(id => ({ id, count: grupo[id] })).sort((a, b) => b.count - a.count);
+  if (lista.length === 0) { await responder('❌ No hay actividad registrada.'); break; }
+  let txt = '📊 *ACTIVIDAD DEL GRUPO*\n\n';
+  lista.slice(0, 10).forEach((u, i) => { txt += `${i+1}. @${u.id.split('@')[0]} — *${u.count}* msgs\n`; });
+  await sock.sendMessage(jid, { text: txt, mentions: lista.slice(0, 10).map(u => u.id) }, { quoted: m });
+  break;
+}
+case 'rankactivos': {
+  const db = getActividadDB();
+  const grupo = db[jid] || {};
+  const lista = Object.keys(grupo).map(id => ({ id, count: grupo[id] })).sort((a, b) => b.count - a.count).slice(0, 10);
+  if (lista.length === 0) { await responder('❌ No hay actividad registrada.'); break; }
+  let txt = '🏆 *TOP 10 MÁS ACTIVOS*\n\n';
+  lista.forEach((u, i) => { txt += `${i+1}. @${u.id.split('@')[0]} — *${u.count}* msgs\n`; });
+  await sock.sendMessage(jid, { text: txt, mentions: lista.map(u => u.id) }, { quoted: m });
+  break;
+}
+case 'reiniciarcontador': {
+  const meta = await sock.groupMetadata(jid);
+  const sender = m.key.participant || m.key.remoteJid;
+  const p = meta.participants.find(x => x.id === sender);
+  if (!p || (p.admin !== 'admin' && p.admin !== 'superadmin')) { await responder('❌ Solo admins.'); break; }
+  const db = getActividadDB();
+  if (db[jid]) delete db[jid];
+  saveActividadDB(db);
+  await responder('🧹 Contador de actividad reiniciado a cero.');
+  break;
+}
+case 'ausente': {
+  const motivo = cuerpo.slice(cmd.length).trim() || 'Sin motivo';
+  const sender = m.key.participant || m.key.remoteJid;
+  if (!global.ausentes) global.ausentes = {};
+  global.ausentes[sender] = motivo;
+  await sock.sendMessage(jid, { text: `💤 @${sender.split('@')[0]} está ausente: _${motivo}_`, mentions: [sender] }, { quoted: m });
+  break;
+}
+case 'activo': {
+  const sender = m.key.participant || m.key.remoteJid;
+  if (!global.ausentes) global.ausentes = {};
+  delete global.ausentes[sender];
+  await sock.sendMessage(jid, { text: `✅ @${sender.split('@')[0]} ha vuelto y está activo.`, mentions: [sender] }, { quoted: m });
+  break;
+}
+case 'sorteo': {
+  const meta = await sock.groupMetadata(jid);
+  const sender = m.key.participant || m.key.remoteJid;
+  const p = meta.participants.find(x => x.id === sender);
+  if (!p || (p.admin !== 'admin' && p.admin !== 'superadmin')) { await responder('❌ Solo admins pueden iniciar sorteos.'); break; }
+  
+  const premio = cuerpo.slice(cmd.length).trim();
+  if (!premio) { await responder('Uso: #sorteo <premio>'); break; }
+  
+  const participantes = meta.participants.map(x => x.id);
+  const ganador = participantes[Math.floor(Math.random() * participantes.length)];
+  
+  if (!global.sorteos) global.sorteos = {};
+  const idSorteo = Date.now();
+  global.sorteos[idSorteo] = { ganador, premio, jid };
+  
+  await sock.sendMessage(jid, { text: `🎉 *¡SORTEO INICIADO!* 🎉\n\n🎁 Premio: *${premio}*\n\nEl elegido al azar es: @${ganador.split('@')[0]}\n\n⏳ Tienes *5 minutos* para reclamar. Responde a este mensaje escribiendo: *si*`, mentions: [ganador] }, { quoted: m });
+  
+  setTimeout(async () => {
+    if (global.sorteos && global.sorteos[idSorteo]) {
+      delete global.sorteos[idSorteo];
+      await sock.sendMessage(jid, { text: `⏰ El tiempo ha terminado. @${ganador.split('@')[0]} no reclamó el premio: *${premio}*.`, mentions: [ganador] });
+    }
+  }, 300000); // 5 minutos
+  break;
+}
+case 'crearrespuesta': {
+  const partes = cuerpo.slice(cmd.length).split('|');
+  if (partes.length < 2) { await responder('Uso: #crearrespuesta <palabra> | <respuesta>'); break; }
+  const palabra = partes[0].trim().toLowerCase();
+  const respuesta = partes[1].trim();
+  const db = getRespuestasDB();
+  if (!db[jid]) db[jid] = {};
+  db[jid][palabra] = respuesta;
+  saveRespuestasDB(db);
+  await responder(`✅ Respuesta creada: cuando alguien diga *"${palabra}"*, el bot responderá *"${respuesta}"*.`);
+  break;
+}
+case 'listarrespuestas': {
+  const db = getRespuestasDB();
+  const grupo = db[jid] || {};
+  if (Object.keys(grupo).length === 0) { await responder('❌ No hay respuestas automáticas configuradas.'); break; }
+  let txt = '🤖 *RESPUESTAS AUTOMÁTICAS*\n\n';
+  for (const [palabra, resp] of Object.entries(grupo)) { txt += `• *${palabra}* → ${resp}\n`; }
+  await responder(txt);
+  break;
+}
+case 'eliminarrespuesta': {
+  const palabra = cuerpo.slice(cmd.length).trim().toLowerCase();
+  const db = getRespuestasDB();
+  if (db[jid] && db[jid][palabra]) {
+    delete db[jid][palabra];
+    saveRespuestasDB(db);
+    await responder(`✅ Respuesta *"${palabra}"* eliminada.`);
+  } else {
+    await responder('❌ Esa respuesta no existe.');
   }
   break;
 }

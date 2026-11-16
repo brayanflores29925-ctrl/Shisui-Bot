@@ -289,6 +289,22 @@ const secciones = [
     '#card / #stats — Tarjeta de jugador.',
   ]],
 
+  ['🛡️ ADMIN 2', [
+    '#config — ⚙️ Panel de ajustes (Próximamente)',
+    '#idgp — Muestra el ID del grupo.',
+    '#listaadmins — Muestra a los administradores.',
+    '#contadormensajes — Total de mensajes del grupo.',
+    '#veractividad — Muestra los mensajes por persona.',
+    '#rankactivos — Top 10 usuarios más activos.',
+    '#reiniciarcontador — Reinicia el contador a cero.',
+    '#ausente <motivo> — Te marca como ausente.',
+    '#activo — Quita tu estado de ausente.',
+    '#sorteo <premio> — (Admin) Inicia un sorteo rápido.',
+    '#crearrespuesta <palabra> | <respuesta> — Respuesta automática.',
+    '#listarrespuestas — Muestra las respuestas automáticas.',
+    '#eliminarrespuesta <palabra> — Borra una respuesta.'
+  ]],
+
   ['🎧 EFECTOS Y STICKERS', [
     '#alteradores — Lista de efectos disponibles.',
     '#audiolento — Audio lento.',
