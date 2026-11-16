@@ -3861,71 +3861,12 @@ case 'tt': {
 case 'play': case 'play2': 
 case 'mapa': {
   const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #maps <lugar>'); break; }
-  
-  const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
-  await sock.sendMessage(jid, { text: '🗺️ *Ubicación en Google Maps:*\n' + link }, { quoted: m });
-  break;
-}
-
-
-case 'mapa': {
-  const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #mapa <lugar>'); break; }
   
   // Envía el enlace directo sin buscar en APIs (respuesta instantánea)
   const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
   await sock.sendMessage(jid, { text: '🗺️ *Ubicación en Google Maps:*\n' + link }, { quoted: m });
   break;
-}
-
-case 'attp2': case 'attp3': case 'ttp': {
-  const texto = cuerpo.slice(cmd.length).trim();
-  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
-  
-  await responder('✨ Generando sticker...');
-  
-  try {
-    // Usamos una API pública de creación de stickers
-    const url = 'https://api.xteam.xyz/attp?text=' + encodeURIComponent(texto);
-    const res = await fetch(url);
-    
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    
-    const buffer = Buffer.from(await res.arrayBuffer());
-    
-    if (buffer.length < 1000) throw new Error('Imagen vacía');
-    
-    // Convertir a sticker y enviar
-    const out = await imagenASticker(buffer, 'square');
-    await sock.sendMessage(jid, { sticker: out }, { quoted: m });
-
-  } catch (e) {
-    console.log('Error en .' + cmd + ':', e.message);
-    await responder('❌ Error al generar el sticker. Intenta de nuevo.');
-  }
-  break;
-}
-
-
-// --- BASE DE DATOS DE ACTIVIDAD ---
-function getActividadDB() {
-  const fs = require('fs');
-  try { return JSON.parse(fs.readFileSync('./actividad.json', 'utf8')); } catch { return {}; }
-}
-function saveActividadDB(db) {
-  const fs = require('fs');
-  fs.writeFileSync('./actividad.json', JSON.stringify(db, null, 2));
-}
-
-// --- BASE DE DATOS DE RESPUESTAS ---
-function getRespuestasDB() {
-  const fs = require('fs');
-  try { return JSON.parse(fs.readFileSync('./respuestas.json', 'utf8')); } catch { return {}; }
-}
-function saveRespuestasDB(db) {
-  const fs = require('fs');
-  fs.writeFileSync('./respuestas.json', JSON.stringify(db, null, 2));
 }
 
 case 'idgp': {
@@ -4054,7 +3995,7 @@ case 'eliminarrespuesta': {
 }
 
 
-case 'maps': case 'mapa': {
+case 'mapa': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #mapa <lugar>'); break; }
   
@@ -4064,7 +4005,7 @@ case 'maps': case 'mapa': {
   break;
 }
 
-case 'attp': case 'attp2': case 'attp3': case 'ttp': {
+case 'attp2': case 'attp3': case 'ttp': {
   const texto = cuerpo.slice(cmd.length).trim();
   if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
   
@@ -4102,6 +4043,83 @@ case 'attp': case 'attp2': case 'attp3': case 'ttp': {
     console.log('Error en attp:', e.message);
     await responder('❌ Error al crear el sticker. Intenta de nuevo.');
   }
+  break;
+}
+
+
+case 'mapa': case 'maps': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #mapa <lugar>'); break; }
+  const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
+  await sock.sendMessage(jid, { text: '🗺️ *Ubicación en Google Maps:*\n' + link }, { quoted: m });
+  break;
+}
+
+case 'attp': case 'attp2': case 'attp3': case 'ttp': {
+  const texto = cuerpo.slice(cmd.length).trim();
+  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
+  
+  await responder('✨ Creando sticker...');
+  
+  try {
+    const Jimp = require('jimp');
+    // Creamos una imagen transparente de 512x512
+    const image = new Jimp(512, 512, 0x00000000);
+    const font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
+    
+    image.print(font, 0, 0, {
+      text: texto,
+      alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
+      alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
+    }, 512, 512);
+    
+    const buffer = await image.getBufferAsync(Jimp.MIME_PNG);
+    const out = await imagenASticker(buffer, 'square');
+    await sock.sendMessage(jid, { sticker: out }, { quoted: m });
+    
+  } catch (e) {
+    console.log('Error en .' + cmd + ' (local):', e.message);
+    await responder('❌ Error al crear el sticker.');
+  }
+  break;
+}
+
+case 'config': {
+  const args = cuerpo.slice(cmd.length).trim();
+  
+  // Función para alternar los estados si se pasa un número
+  if (args) {
+    const num = parseInt(args);
+    if (num === 1) global.antiPorno = !global.antiPorno;
+    else if (num === 2) global.antiaudio = !global.antiaudio;
+    else if (num === 3) global.antivideos = !global.antivideos;
+    else if (num === 4) global.antisticker = !global.antisticker;
+    else if (num === 5) global.antispam = !global.antispam;
+    else if (num === 6) global.antibots = !global.antibots;
+    else if (num === 7) global.antiestafas = !global.antiestafas;
+    else {
+      await responder('❌ Opción no válida. Usa un número del 1 al 7.');
+      break;
+    }
+  }
+
+  // Mostrar el panel
+  const on = '✅ ON';
+  const off = '❌ OFF';
+  
+  let txt = '⚙️ *CONFIGURACIÓN DEL BOT*\\n\\n';
+  txt += `*1.* 🔞 Antiporno: ${global.antiPorno ? on : off}\\n`;
+  txt += `*2.* 🔇 Antiaudio: ${global.antiaudio ? on : off}\\n`;
+  txt += `*3.* 🎬 Antivideos: ${global.antivideos ? on : off}\\n`;
+  txt += `*4.* 🎨 Antisticker: ${global.antisticker ? on : off}\\n`;
+  txt += `*5.* 📵 Antispam: ${global.antispam ? on : off}\\n`;
+  txt += `*6.* 🤖 Antibots: ${global.antibots ? on : off}\\n`;
+  txt += `*7.* ⚠️ Antiestafas: ${global.antiestafas ? on : off}\\n\\n`;
+  
+  txt += '💡 *Para cambiar un estado, envía:*\\n';
+  txt += 'Ejemplo: #config 1 (para activar/desactivar antiporno)';
+  
+  await responder(txt);
   break;
 }
 
