@@ -355,6 +355,21 @@ async function iniciar(opciones = {}) {
 
   sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
     if (connection === 'open') {
+      // --- CANCELAR TIMEOUT SUBBOT ---
+      try {
+        const botNumberOpen = sock.user.id.split(':')[0];
+        if (global.pendingCodes) {
+          for (const senderJid in global.pendingCodes) {
+            if (global.pendingCodes[senderJid].target === botNumberOpen) {
+              clearTimeout(global.pendingCodes[senderJid].timer);
+              delete global.pendingCodes[senderJid];
+              console.log('✅ Subbot vinculado a tiempo. Cronómetro cancelado.');
+            }
+          }
+        }
+      } catch(e) {}
+      // -------------------------------
+        
       // --- BIENVENIDA SUBBOT ---
       try {
         const botNumber = sock.user.id.split(':')[0];
@@ -367,7 +382,7 @@ async function iniciar(opciones = {}) {
           // Esperar 3 segundos para que WhatsApp termine de sincronizar
           setTimeout(async () => {
             const jidSelf = botNumber + '@s.whatsapp.net';
-            const mensaje = `🎉 *¡FELICIDADES!* 🎉\n\n@${botNumber} *Te has convertido en un SubBot oficial de Shisui Bot.* 🤖\n\n*Nuevas actualizaciones:*\n✅ Nuevo menú interactivo\n✅ Descargas de TikTok y YouTube rápidas\n✅ Juegos, Economía y Gacha\n✅ Invitaciones y comandos de Admin\n\n💡 *¿Qué puedes hacer ahora?*\nYa puedes usar el menú escribiendo *.menu* aquí en tu chat privado o en cualquier grupo donde te agreguen.\n\n¡Disfruta tu nuevo bot! 🚀`;
+            const mensaje = `🎉 *¡FELICIDADES!* 🎉\n\n@${botNumber} *Te has convertido en un SubBot oficial de Shisui Bot.* 🤖\n\n*Recuerda que hay nuevas actualizaciones:*\n✅ Menú renovado\n✅ Nuevas descargas (TikTok, YouTube)\n✅ Juegos y Economía\n✅ Comandos de Admin\n\n💡 *¿Qué puedes hacer ahora?*\nYa puedes digitar el menú escribiendo *.menu* aquí en tu chat privado o en cualquier grupo donde te agreguen.\n\n¡Disfruta tu nuevo bot! 🚀`;
             
             await sock.sendMessage(jidSelf, { 
               text: mensaje, 
@@ -5760,6 +5775,23 @@ case 'kick': {
       }
 
       case 'code': {
+  // --- TIMEOUT DE VINCULACION ---
+  const senderCode = m.key.participant || m.key.remoteJid;
+  let numCode = cuerpo.slice(cmd.length).trim().replace(/[^0-9]/g, '');
+  if (!numCode) numCode = senderCode.split('@')[0];
+  
+  if (!global.pendingCodes) global.pendingCodes = {};
+  if (global.pendingCodes[senderCode]) clearTimeout(global.pendingCodes[senderCode].timer);
+  
+  const timerCode = setTimeout(async () => {
+    if (global.pendingCodes[senderCode]) {
+      delete global.pendingCodes[senderCode];
+      await sock.sendMessage(jid, { text: '❌ Lo siento, no te has podido vincular a tiempo. Vuelve a intentarlo.' });
+    }
+  }, 300000); // 5 minutos
+  global.pendingCodes[senderCode] = { target: numCode, timer: timerCode };
+  // ------------------------------
+        
         const solicitante = m.key.participant || m.key.remoteJid
         const ahoraCode = Date.now()
         if (codeReciente[solicitante] && ahoraCode - codeReciente[solicitante] < 120000) {
