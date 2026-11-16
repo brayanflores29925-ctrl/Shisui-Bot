@@ -6,6 +6,19 @@ const BOT = {
   prefijos: '! # . / y otros'
 }
 
+
+function getNavidadCountdown() {
+  const ahora = new Date();
+  let navidad = new Date(ahora.getFullYear(), 11, 25, 0, 0, 0);
+  if (ahora > navidad) navidad.setFullYear(navidad.getFullYear() + 1);
+  const diff = navidad - ahora;
+  const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+  const m = Math.floor((diff / (1000 * 60)) % 60);
+  const s = Math.floor((diff / 1000) % 60);
+  return `🎅 ${d} días\n┃ 🕒 ${h} horas, ${m} minutos\n┃ ⏱️ ${s} segundos`;
+}
+
 function fechaHora() {
   const ahora = new Date()
   return {
@@ -355,6 +368,7 @@ function generarMenu(nsfw) {
 ┃ 👑 Creador: ${BOT.creador}
 ┃ 📅 Fecha: ${fecha}
 ┃ 🕒 Hora: ${hora} (Honduras 🇭🇳)
+┃ ⏳ ${getNavidadCountdown()}
 ┃ ⚡ Prefijos: ${BOT.prefijos}
 ┃ 📢 Canal: ${red}
 ╰━━━━━━━━━━━━━━━━━━━━\n`
