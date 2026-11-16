@@ -1179,82 +1179,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     switch (comando) {
     // --- COMANDOS DE EMERGENCIA (CONFIG Y PIN) ---
-    case 'config': {
-      if (!global.filtrosConfig) {
-        global.filtrosConfig = { antiPorno: false, antiaudio: false, antivideos: false, antisticker: false, antispam: false, antibots: false, antiestafas: false };
-      }
-      const args = cuerpo.slice(cmd.length).trim();
-      const f = global.filtrosConfig;
-      
-      if (args) {
-        const num = parseInt(args);
-        if (num === 1) f.antiPorno = !f.antiPorno;
-        else if (num === 2) f.antiaudio = !f.antiaudio;
-        else if (num === 3) f.antivideos = !f.antivideos;
-        else if (num === 4) f.antisticker = !f.antisticker;
-        else if (num === 5) f.antispam = !f.antispam;
-        else if (num === 6) f.antibots = !f.antibots;
-        else if (num === 7) f.antiestafas = !f.antiestafas;
-        else { await responder('❌ Usa números del 1 al 7.'); break; }
-      }
-      
-      const on = '✅ ON'; const off = '❌ OFF';
-      let txt = '⚙️ *CONFIGURACIÓN DEL BOT*\n\n';
-      txt += '*1.* 🔞 Antiporno: ' + (f.antiPorno ? on : off) + '\n';
-      txt += '*2.* 🔇 Antiaudio: ' + (f.antiaudio ? on : off) + '\n';
-      txt += '*3.* 🎬 Antivideos: ' + (f.antivideos ? on : off) + '\n';
-      txt += '*4.* 🎨 Antisticker: ' + (f.antisticker ? on : off) + '\n';
-      txt += '*5.* 📵 Antispam: ' + (f.antispam ? on : off) + '\n';
-      txt += '*6.* 🤖 Antibots: ' + (f.antibots ? on : off) + '\n';
-      txt += '*7.* ⚠️ Antiestafas: ' + (f.antiestafas ? on : off) + '\n\n';
-      txt += '💡 Envía #config 1 para cambiar el estado.';
-      await responder(txt);
-      break;
-    }
-    
-    case 'pin': {
-      const query = cuerpo.slice(cmd.length).trim();
-      if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
-      await responder('🔍 Buscando: ' + query);
-      
-      // Intentar con Google Images rápido
-      try {
-        const gimages = require('@killovsky/gimages');
-        const data = await gimages.get({ query: query, safe: true });
-        if (data && data.data && data.data.length > 0) {
-          for (let i = 0; i < Math.min(2, data.data.length); i++) {
-            await sock.sendMessage(jid, { image: { url: data.data[i].url }, caption: '🖼️ Foto de: ' + query }, { quoted: m });
-          }
-          break;
-        }
-      } catch (e) {}
-      
-      // Si falla, generar con IA (máximo 10 segundos)
-      await responder('⚠️ Generando 2 fotos con IA...');
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
-        
-        for (let i = 1; i <= 2; i++) {
-          const imgUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(query) + '?width=512&height=512&nologo=true&seed=' + (Date.now() + i);
-          const imgRes = await fetch(imgUrl, { signal: controller.signal });
-          clearTimeout(timeout);
-          
-          if (imgRes.ok) {
-            const buffer = Buffer.from(await imgRes.arrayBuffer());
-            await sock.sendMessage(jid, { image: buffer, caption: '🖼️ IA Foto ' + i + ': ' + query }, { quoted: m });
-          } else {
-            throw new Error('Fallo la IA');
-          }
-        }
-      } catch (err) {
-        await responder('❌ No se pudo generar la imagen. Servidor de IA ocupado.');
-      }
-      break;
-    }
-    // ---------------------------------------------
-    
-      case 'racha': case 'rc': {
+    case 'racha': case 'rc': {
   const sender = m.key.participant || m.key.remoteJid;
   const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0] || m.message?.extendedTextMessage?.contextInfo?.participant;
   if (!mencionado) { await responder('❌ Menciona o responde a alguien para invitar a una racha.'); break; }
@@ -4214,6 +4139,77 @@ case 'play': case 'play2': {
 
 
 
+
+
+case 'pin': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
+  await responder('🔍 Buscando: ' + query);
+  
+  let enviado = false;
+
+  // A) free-google-images
+  try {
+    const googleImages = require('free-google-images');
+    const results = await googleImages.search(query);
+    if (results && results.length > 0) {
+      for (let i = 0; i < Math.min(2, results.length); i++) {
+        await sock.sendMessage(jid, { image: { url: results[i].image.url }, caption: '🖼️ Foto de: ' + query }, { quoted: m });
+      }
+      enviado = true;
+    }
+  } catch (e) { console.log('Error free-google-images:', e.message); }
+
+  // B) g4f-image (IA)
+  if (!enviado) {
+    await responder('⚠️ Generando con IA...');
+    try {
+      const { generate, provider } = await import('g4f-image');
+      for (let i = 1; i <= 2; i++) {
+        const base64 = await generate(query, provider.PollinationsAI);
+        if (base64) {
+          const buffer = Buffer.from(base64, 'base64');
+          await sock.sendMessage(jid, { image: buffer, caption: '🖼️ IA Foto ' + i + ': ' + query }, { quoted: m });
+        }
+      }
+      enviado = true;
+    } catch (e) {
+      console.log('Error g4f-image:', e.message);
+      await responder('❌ No se pudo generar la imagen.');
+    }
+  }
+  break;
+}
+
+case 'config': {
+  const args = cuerpo.slice(cmd.length).trim();
+  const f = global.filtrosConfig;
+
+  if (args) {
+    const num = parseInt(args);
+    if (num === 1) f.antiPorno = !f.antiPorno;
+    else if (num === 2) f.antiaudio = !f.antiaudio;
+    else if (num === 3) f.antivideos = !f.antivideos;
+    else if (num === 4) f.antisticker = !f.antisticker;
+    else if (num === 5) f.antispam = !f.antispam;
+    else if (num === 6) f.antibots = !f.antibots;
+    else if (num === 7) f.antiestafas = !f.antiestafas;
+    else { await responder('❌ Usa números del 1 al 7.'); break; }
+  }
+
+  const on = '✅ ON'; const off = '❌ OFF';
+  let txt = '⚙️ *CONFIGURACIÓN DEL BOT*\n\n';
+  txt += '*1.* 🔞 Antiporno: ' + (f.antiPorno ? on : off) + '\n';
+  txt += '*2.* 🔇 Antiaudio: ' + (f.antiaudio ? on : off) + '\n';
+  txt += '*3.* 🎬 Antivideos: ' + (f.antivideos ? on : off) + '\n';
+  txt += '*4.* 🎨 Antisticker: ' + (f.antisticker ? on : off) + '\n';
+  txt += '*5.* 📵 Antispam: ' + (f.antispam ? on : off) + '\n';
+  txt += '*6.* 🤖 Antibots: ' + (f.antibots ? on : off) + '\n';
+  txt += '*7.* ⚠️ Antiestafas: ' + (f.antiestafas ? on : off) + '\n\n';
+  txt += '💡 Envía #config 1 para cambiar el estado.';
+  await responder(txt);
+  break;
+}
 
 case 'musica': case 'm': {
   const query = cuerpo.slice(cmd.length).trim();
