@@ -3861,7 +3861,7 @@ case 'tt': {
 
 
 case 'play': case 'play2': 
-case 'maps': case 'mapa': {
+case 'mapa': {
   const busqueda = cuerpo.slice(cmd.length).trim();
   if (!busqueda) { 
     await responder('Uso: #maps <lugar>\\nEjemplo: #maps Tegucigalpa'); 
@@ -3906,6 +3906,58 @@ case 'maps': case 'mapa': {
   } catch (e) {
     console.log('Error en .maps:', e.message);
     await responder('❌ Error al buscar la ubicación. Intenta de nuevo.');
+  }
+  break;
+}
+
+
+case 'maps': case 'mapa': {
+  const busqueda = cuerpo.slice(cmd.length).trim();
+  if (!busqueda) { await responder('Uso: #maps <lugar>'); break; }
+  
+  await responder('📍 Buscando ubicación de: ' + busqueda + '...');
+  
+  try {
+    // Límite de 10 segundos para que no se quede colgado
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    const url = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(busqueda) + '&format=json&limit=1';
+    const res = await fetch(url, { headers: { 'User-Agent': 'Shisui-Bot/1.0' }, signal: controller.signal });
+    clearTimeout(timeoutId);
+    
+    const data = await res.json();
+
+    if (!data || data.length === 0) {
+      await responder('❌ No encontré esa ubicación. Intenta ser más específico.');
+      break;
+    }
+
+    const lugar = data[0];
+    const lat = parseFloat(lugar.lat);
+    const lon = parseFloat(lugar.lon);
+    const nombre = lugar.display_name.split(',')[0]; 
+    const direccion = lugar.display_name;
+
+    // Enviar el pin de ubicación
+    await sock.sendMessage(jid, { 
+      location: { 
+        degreesLatitude: lat, 
+        degreesLongitude: lon, 
+        name: nombre, 
+        address: direccion 
+      } 
+    }, { quoted: m });
+
+    // Enviar el enlace de Google Maps
+    const linkMaps = 'https://www.google.com/maps?q=' + lat + ',' + lon;
+    await sock.sendMessage(jid, { text: '🗺️ *Enlace de Google Maps:*\n' + linkMaps }, { quoted: m });
+
+  } catch (e) {
+    console.log('Error en .maps:', e.message);
+    // Respaldo: Si la API falla o tarda mucho, enviamos el enlace directo de búsqueda
+    const linkFallback = 'https://www.google.com/maps/search/' + encodeURIComponent(busqueda);
+    await sock.sendMessage(jid, { text: '⚠️ No pude obtener el pin, pero aquí tienes el enlace directo de Google Maps:\n🗺️ ' + linkFallback }, { quoted: m });
   }
   break;
 }
