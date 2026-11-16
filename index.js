@@ -4137,6 +4137,7 @@ case 'play': case 'play2': {
 
 
 
+
 case 'pin': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
@@ -4162,17 +4163,23 @@ case 'pin': {
     console.log('Error en GifSnap:', gifErr.message);
   }
 
-  // B) Si no se envió sticker, buscar 2 fotos con Google Images
+  // B) Si no se envió sticker, buscar 2 fotos con @killovsky/gimages
   if (!stickerEnviado) {
     await responder('⚠️ No encontré sticker. Buscando fotos reales...');
     try {
-      const gis = require('async-g-i-s');
-      const results = await gis(query);
+      const gimages = require('@killovsky/gimages');
+      const data = await gimages.get({ query: query, safe: true, formats: ['jpg', 'png'] });
+      
+      // La respuesta puede ser un array de objetos con 'url'
+      const results = data.data || data.results || data;
       
       if (results && results.length > 0) {
         const fotos = results.slice(0, 2);
         for (let i = 0; i < fotos.length; i++) {
-          await sock.sendMessage(jid, { image: { url: fotos[i].url }, caption: '🖼️ Foto ' + (i+1) + ' de: ' + query }, { quoted: m });
+          const imgUrl = fotos[i].url || fotos[i].image || fotos[i];
+          if (imgUrl) {
+            await sock.sendMessage(jid, { image: { url: imgUrl }, caption: '🖼️ Foto ' + (i+1) + ' de: ' + query }, { quoted: m });
+          }
         }
       } else {
         await responder('❌ No encontré fotos para esa búsqueda.');
