@@ -2561,26 +2561,7 @@ case 'sticker2': case 'sticker3': {
   }
   break;
 }
-case 'attp4': case 'attp5': case 'attp6': case 'ttp': {
-  const texto = cuerpo.slice(cmd.length).trim();
-  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
-  await responder('✨ Generando sticker de texto...');
-  try {
-    const estilos = { attp4: 'neon glowing letters', attp5: '3d glossy letters', attp6: 'handwritten graffiti', ttp: 'colorful cute letters' };
-    const prompt = 'The text "' + texto + '" written in ' + estilos[cmd] + ', centered, solid black background, sticker style, high contrast, bold typography';
-    const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) + '?width=512&height=512&nologo=true&seed=' + Date.now();
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const buffer = Buffer.from(await res.arrayBuffer());
-    const out = await imagenASticker(buffer, 'square');
-    await sock.sendMessage(jid, { sticker: out }, { quoted: m });
-  } catch (e) {
-    console.log('Error .' + cmd + ':', e.message);
-    await responder('❌ Error generando sticker de texto.');
-  }
-  break;
-}
-case 'imagine': case 'imagina': {
+case 'attp4': case 'attp5': case 'attp6': case 'imagine': case 'imagina': {
   const prompt = cuerpo.slice(cmd.length).trim();
   if (!prompt) { await responder('Uso: #imagine <descripción>\nEjemplo: #imagine un gato astronauta'); break; }
   await responder('🎨 Generando imagen con IA...');
@@ -2631,25 +2612,6 @@ case 'wikipedia': {
   break;
 }
 
-case 'attp2': case 'attp3': {
-  const texto = cuerpo.slice(cmd.length).trim();
-  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
-  await responder('✨ Generando sticker de texto...');
-  try {
-    const estilos = { attp: 'neon glowing letters', attp2: '3d glossy letters', attp3: 'handwritten graffiti' };
-    const prompt = 'The text "' + texto + '" written in ' + estilos[cmd] + ', centered, solid black background, sticker style, high contrast, bold typography';
-    const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) + '?width=512&height=512&nologo=true&seed=' + Date.now();
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const buffer = Buffer.from(await res.arrayBuffer());
-    const out = await imagenASticker(buffer, 'square');
-    await sock.sendMessage(jid, { sticker: out }, { quoted: m });
-  } catch (e) {
-    console.log('Error .' + cmd + ':', e.message);
-    await responder('❌ Error generando sticker.');
-  }
-  break;
-}
 case 'horoscopo': {
   const signo = cuerpo.slice(cmd.length).trim().toLowerCase();
   if (!signo) { await responder('Uso: #horoscopo <signo>\nEj: #horoscopo aries'); break; }
@@ -3863,56 +3825,6 @@ case 'tt': {
 case 'play': case 'play2': 
 case 'mapa': {
   const busqueda = cuerpo.slice(cmd.length).trim();
-  if (!busqueda) { 
-    await responder('Uso: #maps <lugar>\\nEjemplo: #maps Tegucigalpa'); 
-    break; 
-  }
-  
-  await responder('📍 Buscando ubicación de: ' + busqueda + '...');
-  
-  try {
-    // Buscamos en OpenStreetMap (Nominatim) que es gratis y no requiere API Key
-    const url = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(busqueda) + '&format=json&limit=1';
-    const res = await fetch(url, { headers: { 'User-Agent': 'Shisui-Bot/1.0' } });
-    const data = await res.json();
-
-    if (!data || data.length === 0) {
-      await responder('❌ No encontré esa ubicación. Intenta ser más específico.');
-      break;
-    }
-
-    const lugar = data[0];
-    const lat = parseFloat(lugar.lat);
-    const lon = parseFloat(lugar.lon);
-    const nombre = lugar.display_name.split(',')[0]; // Solo el nombre principal
-    const direccion = lugar.display_name; // Dirección completa
-
-    // 1. Enviar la ubicación nativa (el pin en el mapa)
-    await sock.sendMessage(jid, { 
-      location: { 
-        degreesLatitude: lat, 
-        degreesLongitude: lon, 
-        name: nombre, 
-        address: direccion 
-      } 
-    }, { quoted: m });
-
-    // 2. Enviar el enlace de Google Maps para abrirlo en el navegador
-    const linkMaps = 'https://www.google.com/maps?q=' + lat + ',' + lon;
-    await sock.sendMessage(jid, { 
-      text: '🗺️ *Enlace de Google Maps:*\\n' + linkMaps 
-    }, { quoted: m });
-
-  } catch (e) {
-    console.log('Error en .maps:', e.message);
-    await responder('❌ Error al buscar la ubicación. Intenta de nuevo.');
-  }
-  break;
-}
-
-
-case 'mapa': {
-  const busqueda = cuerpo.slice(cmd.length).trim();
   if (!busqueda) { await responder('Uso: #maps <lugar>'); break; }
   
   await responder('📍 Buscando ubicación de: ' + busqueda + '...');
@@ -3963,7 +3875,7 @@ case 'mapa': {
 }
 
 
-case 'maps': case 'mapa': {
+case 'mapa': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #maps <lugar>'); break; }
   
@@ -4008,7 +3920,7 @@ case 'maps': case 'mapa': {
 }
 
 
-case 'attp': case 'attp2': case 'attp3': case 'ttp': {
+case 'attp2': case 'attp3': case 'ttp': {
   const texto = cuerpo.slice(cmd.length).trim();
   if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
   
@@ -4039,6 +3951,52 @@ case 'attp': case 'attp2': case 'attp3': case 'ttp': {
     console.log('Error en .' + cmd + ':', e.message);
     await responder('❌ Error generando el sticker. La IA está saturada o la conversión falló. Intenta de nuevo en unos segundos.');
   }
+  break;
+}
+
+
+case 'attp': case 'attp2': case 'attp3': case 'ttp': {
+  const texto = cuerpo.slice(cmd.length).trim();
+  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
+  
+  await responder('✨ Generando sticker localmente...');
+  
+  try {
+    const Jimp = require('jimp');
+    // Creamos una imagen transparente de 512x512
+    const image = new Jimp(512, 512, 0x00000000);
+    
+    // Cargamos la fuente (puedes cambiar el tamaño si quieres)
+    const font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
+    
+    // Escribimos el texto centrado
+    image.print(font, 0, 0, {
+      text: texto,
+      alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
+      alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
+    }, 512, 512);
+    
+    // Convertimos a buffer
+    const buffer = await image.getBufferAsync(Jimp.MIME_PNG);
+    
+    // Convertimos a sticker WebP
+    const out = await imagenASticker(buffer, 'square');
+    await sock.sendMessage(jid, { sticker: out }, { quoted: m });
+
+  } catch (e) {
+    console.log('Error en .' + cmd + ' (local):', e.message);
+    await responder('❌ Error al crear el sticker localmente.');
+  }
+  break;
+}
+
+case 'maps': case 'mapa': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #maps <lugar>'); break; }
+  
+  // Enviamos el enlace directo sin consultar APIs
+  const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
+  await sock.sendMessage(jid, { text: '🗺️ *Ubicación en Google Maps:*\n' + link }, { quoted: m });
   break;
 }
 
