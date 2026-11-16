@@ -3937,7 +3937,7 @@ case 'historia': case 'story': case 'his': {
 }
 
 
-case 'invi': case 'inv': {
+case 'inv': {
   if (!jid.endsWith('@g.us')) { await responder('❌ Solo funciona en grupos.'); break; }
   
   // Validar admin
@@ -4012,6 +4012,39 @@ case 'invitardm': case 'invi': case 'inv': {
   } catch (e) {
     console.log('Error en .invitardm:', e.message);
     await responder('❌ Error: ' + e.message + '\\n\\nAsegúrate de que el bot sea administrador del grupo.');
+  }
+  break;
+}
+
+
+case 'invi': case 'invitardm': {
+  if (!jid.endsWith('@g.us')) { await responder('❌ Solo funciona en grupos.'); break; }
+  
+  const num = cuerpo.slice(cmd.length).trim().replace(/[^0-9]/g, '');
+  if (!num) { await responder('Uso: #invi <numero>'); break; }
+
+  await responder('🔄 Generando y enviando invitación a +' + num + '...');
+
+  try {
+    // 1. Obtener enlace (si el bot no es admin, esto fallará y saltará al catch)
+    const code = await sock.groupInviteCode(jid);
+    const link = 'https://chat.whatsapp.com/' + code;
+    
+    // 2. Enviar por privado (usamos @s.whatsapp.net directo para evitar colgar)
+    const jidTarget = num + '@s.whatsapp.net';
+    await sock.sendMessage(jidTarget, { 
+      text: '👋 ¡Hola! Invitación al grupo:\n\n🔗 ' + link + '\n\n⚠️ *ATENCIÓN:* Este enlace es de *un solo uso*. Se destruirá en cuanto alguien entre.' 
+    });
+    
+    // 3. Activar autodestrucción
+    if (!global.invitesUsoUnico) global.invitesUsoUnico = {};
+    global.invitesUsoUnico[jid] = true;
+    
+    await sock.sendMessage(jid, { text: '✅ Invitación enviada al +' + num + '. (Se autodestruirá al usarse).' }, { quoted: m });
+    
+  } catch (e) {
+    console.log('Error en .invi:', e.message);
+    await responder('❌ Error al generar el enlace. Asegúrate de que el BOT sea Administrador del grupo.');
   }
   break;
 }
