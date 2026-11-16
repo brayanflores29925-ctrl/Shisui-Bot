@@ -3893,34 +3893,52 @@ case 'play': case 'play2': case 'musica': case 'm': {
 }
 
 case 'playvideo': case 'video': case 'v': case 'playdoc': {
-  const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
-  await responder('🔍 Buscando video de: ' + query + '...');
-  try {
-    const yt = require('@denzy-official/youtube_scraper');
-    const res = await yt.ytmp4(query);
-    
-    if (!res.status || !res.download || !res.download.url) {
-      await responder('❌ No se pudo encontrar el video o el servidor está saturado.');
+      const query = cuerpo.slice(cmd.length).trim();
+      if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
+      await responder('🔍 Buscando video de: ' + query + '...');
+      
+      try {
+        const btch = require('btch-downloader');
+        
+        // Buscar y obtener el enlace de video
+        const res = await btch.ytmp4(query);
+
+        if (!res.status || !res.result) {
+          await responder('❌ No se pudo encontrar el video.');
+          break;
+        }
+
+        const dlUrl = res.result.download || res.result.url || res.result.mp4;
+        if (!dlUrl) throw new Error('No se encontró un enlace de descarga válido.');
+
+        // Mostrar la tarjeta con la info
+        const txt = '➩ Descargando › *' + (res.result.title || query) + '*\n\n⏳ Espera un momento...';
+        if (res.result.thumb) await sock.sendMessage(jid, { image: { url: res.result.thumb }, caption: txt }, { quoted: m });
+        else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+
+        await responder('⬇️ Descargando archivo (puede tardar)...');
+        
+        // Descargar el video como buffer
+        const fileRes = await fetch(dlUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        if (!fileRes.ok) throw new Error('Error HTTP ' + fileRes.status + ' al descargar el archivo.');
+
+        const buffer = Buffer.from(await fileRes.arrayBuffer());
+
+        // Verificar que no exceda el límite de WhatsApp (64MB)
+        if (buffer.length > 64 * 1024 * 1024) {
+           await responder('❌ El video pesa más de 64MB y WhatsApp no lo dejará enviar.');
+           break;
+        }
+
+        // Enviar el video
+        await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + (res.result.title || query) }, { quoted: m });
+
+      } catch (e) { 
+        console.log('Error en playvideo:', e.message);
+        await responder('❌ Error al descargar el video: ' + e.message); 
+      }
       break;
     }
-
-    const meta = res.metadata;
-    const txt = '➩ Descargando › *' + meta.title + '*\n\n❖ Canal › *' + meta.author.name + '*\n⏳ Espera un momento...';
-    
-    if (meta.thumbnail) await sock.sendMessage(jid, { image: { url: meta.thumbnail }, caption: txt }, { quoted: m });
-    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-
-    const fileRes = await fetch(res.download.url);
-    const buffer = Buffer.from(await fileRes.arrayBuffer());
-    await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + meta.title }, { quoted: m });
-
-  } catch (e) { 
-    console.log('Error en video:', e.message);
-    await responder('❌ Error al descargar el video. Intenta de nuevo.'); 
-  }
-  break;
-}
 
 case 'tiktok': case 'tt': {
   const url = cuerpo.slice(cmd.length).trim();
