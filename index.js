@@ -1282,6 +1282,8 @@ case 'desactivarracha': case 'dr': {
   break;
 }
 case 'menu': {
+    const filtro = cuerpo.slice(cmd.length).trim();
+
         const quien = m.key.participant || m.key.remoteJid
         const tag = '@' + quien.split('@')[0].split(':')[0]
         const saludo = `Hola ${tag}, soy ${leerConfig().nombre || 'Shisui Bot'} 🤖`
