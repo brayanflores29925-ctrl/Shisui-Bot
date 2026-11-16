@@ -3937,7 +3937,7 @@ case 'historia': case 'story': case 'his': {
 }
 
 
-case 'invitardm': case 'invi': case 'inv': {
+case 'invi': case 'inv': {
   if (!jid.endsWith('@g.us')) { await responder('❌ Solo funciona en grupos.'); break; }
   
   // Validar admin
@@ -3974,6 +3974,44 @@ case 'invitardm': case 'invi': case 'inv': {
   } catch (e) {
     console.log('Error en .invitardm:', e.message);
     await responder('❌ Error al generar el enlace. Asegúrate de que el bot sea administrador.');
+  }
+  break;
+}
+
+
+case 'invitardm': case 'invi': case 'inv': {
+  if (!jid.endsWith('@g.us')) { await responder('❌ Solo funciona en grupos.'); break; }
+  
+  const num = cuerpo.slice(cmd.length).trim().replace(/[^0-9]/g, '');
+  if (!num) { await responder('Uso: #invi <numero>\\nEjemplo: #invi 50499998888'); break; }
+
+  try {
+    await responder('🔄 Verificando número...');
+    const [result] = await sock.onWhatsApp(num);
+    if (!result || !result.exists) {
+      await responder('❌ El número +' + num + ' no tiene WhatsApp o es inválido.');
+      break;
+    }
+    
+    const jidTarget = result.jid;
+
+    await responder('🔄 Generando enlace de invitación...');
+    const code = await sock.groupInviteCode(jid);
+    const link = 'https://chat.whatsapp.com/' + code;
+    
+    await responder('🔄 Enviando invitación por privado...');
+    await sock.sendMessage(jidTarget, { 
+      text: '👋 ¡Hola! Has recibido una invitación para unirte al grupo.\\n\\n🔗 ' + link + '\\n\\n⚠️ *ATENCIÓN:* Este enlace es de *un solo uso*. En el momento en que alguien entre al grupo, el enlace se destruirá automáticamente.' 
+    });
+    
+    if (!global.invitesUsoUnico) global.invitesUsoUnico = {};
+    global.invitesUsoUnico[jid] = true;
+    
+    await sock.sendMessage(jid, { text: '✅ Invitación enviada al +' + num + ' con éxito.\\n\\n*(El enlace se autodestruirá cuando la persona ingrese).*' }, { quoted: m });
+    
+  } catch (e) {
+    console.log('Error en .invitardm:', e.message);
+    await responder('❌ Error: ' + e.message + '\\n\\nAsegúrate de que el bot sea administrador del grupo.');
   }
   break;
 }
