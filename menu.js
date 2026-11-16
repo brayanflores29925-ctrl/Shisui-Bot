@@ -364,7 +364,7 @@ const secciones = [
   ]]
 ]
 
-function generarMenu(nsfw) {
+function generarMenu(nsfw, filtro = "") {
   const { fecha, hora } = fechaHora()
   let config = {}
 
@@ -391,6 +391,10 @@ function generarMenu(nsfw) {
 ╰━━━━━━━━━━━━━━━━━━━━\n`
 
   for (const [titulo, comandos] of secciones) {
+    let fLimpio = filtro.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    let tLimpio = titulo.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (fLimpio !== "" && !tLimpio.includes(fLimpio)) continue;
+
     if (!nsfw && titulo.includes('+18')) continue
     texto += `\n┏━━「 ${titulo} 」\n`
     texto += comandos.map(c => `┃ ➳ ${c}`).join('\n')
