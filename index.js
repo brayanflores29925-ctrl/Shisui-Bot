@@ -3827,86 +3827,6 @@ case 'mapa': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #maps <lugar>'); break; }
   
-  await responder('📍 Buscando: ' + query + '...');
-  
-  try {
-    // Creamos una promesa para la API y otra para el tiempo límite de 5 segundos
-    const fetchPromise = fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(query) + '&format=json&limit=1', { 
-        headers: { 'User-Agent': 'Mozilla/5.0' } 
-    }).then(res => res.json());
-    
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 5000));
-    
-    // El bot espera a que termine la primera
-    const data = await Promise.race([fetchPromise, timeoutPromise]);
-    
-    if (data && data.length > 0) {
-      const lugar = data[0];
-      const lat = parseFloat(lugar.lat);
-      const lon = parseFloat(lugar.lon);
-      const nombre = lugar.display_name.split(',')[0]; 
-      
-      // Si respondió rápido, enviamos el pin nativo
-      await sock.sendMessage(jid, { 
-        location: { 
-          degreesLatitude: lat, 
-          degreesLongitude: lon, 
-          name: nombre, 
-          address: lugar.display_name 
-        } 
-      }, { quoted: m });
-      break;
-    }
-  } catch (e) {
-    console.log('Error o Timeout en .maps:', e.message);
-  }
-  
-  // 3. Si la API falla o tarda más de 5s, enviamos el enlace directo
-  const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
-  await sock.sendMessage(jid, { text: '🗺️ *Enlace de Google Maps:*\n' + link }, { quoted: m });
-  break;
-}
-
-
-case 'attp2': case 'attp3': case 'ttp': {
-  const texto = cuerpo.slice(cmd.length).trim();
-  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
-  
-  await responder('✨ Generando sticker localmente...');
-  
-  try {
-    const Jimp = require('jimp');
-    // Creamos una imagen transparente de 512x512
-    const image = new Jimp(512, 512, 0x00000000);
-    
-    // Cargamos la fuente (puedes cambiar el tamaño si quieres)
-    const font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
-    
-    // Escribimos el texto centrado
-    image.print(font, 0, 0, {
-      text: texto,
-      alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
-      alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
-    }, 512, 512);
-    
-    // Convertimos a buffer
-    const buffer = await image.getBufferAsync(Jimp.MIME_PNG);
-    
-    // Convertimos a sticker WebP
-    const out = await imagenASticker(buffer, 'square');
-    await sock.sendMessage(jid, { sticker: out }, { quoted: m });
-
-  } catch (e) {
-    console.log('Error en .' + cmd + ' (local):', e.message);
-    await responder('❌ Error al crear el sticker localmente.');
-  }
-  break;
-}
-
-case 'mapa': {
-  const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #maps <lugar>'); break; }
-  
   // Enviamos el enlace directo sin consultar APIs
   const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
   await sock.sendMessage(jid, { text: '🗺️ *Ubicación en Google Maps:*\n' + link }, { quoted: m });
@@ -3914,7 +3834,7 @@ case 'mapa': {
 }
 
 
-case 'attp': case 'attp2': case 'attp3': case 'ttp': {
+case 'attp2': case 'attp3': case 'ttp': {
   const texto = cuerpo.slice(cmd.length).trim();
   if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
   
@@ -3946,12 +3866,51 @@ case 'attp': case 'attp2': case 'attp3': case 'ttp': {
   break;
 }
 
-case 'maps': case 'mapa': {
+case 'mapa': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #maps <lugar>'); break; }
   
   const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
   await sock.sendMessage(jid, { text: '🗺️ *Ubicación en Google Maps:*\n' + link }, { quoted: m });
+  break;
+}
+
+
+case 'maps': case 'mapa': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #mapa <lugar>'); break; }
+  
+  // Envía el enlace directo sin buscar en APIs (respuesta instantánea)
+  const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
+  await sock.sendMessage(jid, { text: '🗺️ *Ubicación en Google Maps:*\n' + link }, { quoted: m });
+  break;
+}
+
+case 'attp': case 'attp2': case 'attp3': case 'ttp': {
+  const texto = cuerpo.slice(cmd.length).trim();
+  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
+  
+  await responder('✨ Generando sticker...');
+  
+  try {
+    // Usamos una API pública de creación de stickers
+    const url = 'https://api.xteam.xyz/attp?text=' + encodeURIComponent(texto);
+    const res = await fetch(url);
+    
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    
+    const buffer = Buffer.from(await res.arrayBuffer());
+    
+    if (buffer.length < 1000) throw new Error('Imagen vacía');
+    
+    // Convertir a sticker y enviar
+    const out = await imagenASticker(buffer, 'square');
+    await sock.sendMessage(jid, { sticker: out }, { quoted: m });
+
+  } catch (e) {
+    console.log('Error en .' + cmd + ':', e.message);
+    await responder('❌ Error al generar el sticker. Intenta de nuevo.');
+  }
   break;
 }
 
