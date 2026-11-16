@@ -3860,7 +3860,57 @@ case 'tt': {
 }
 
 
-case 'play': case 'play2': case 'musica': case 'm': {
+case 'play': case 'play2': 
+case 'maps': case 'mapa': {
+  const busqueda = cuerpo.slice(cmd.length).trim();
+  if (!busqueda) { 
+    await responder('Uso: #maps <lugar>\\nEjemplo: #maps Tegucigalpa'); 
+    break; 
+  }
+  
+  await responder('📍 Buscando ubicación de: ' + busqueda + '...');
+  
+  try {
+    // Buscamos en OpenStreetMap (Nominatim) que es gratis y no requiere API Key
+    const url = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(busqueda) + '&format=json&limit=1';
+    const res = await fetch(url, { headers: { 'User-Agent': 'Shisui-Bot/1.0' } });
+    const data = await res.json();
+
+    if (!data || data.length === 0) {
+      await responder('❌ No encontré esa ubicación. Intenta ser más específico.');
+      break;
+    }
+
+    const lugar = data[0];
+    const lat = parseFloat(lugar.lat);
+    const lon = parseFloat(lugar.lon);
+    const nombre = lugar.display_name.split(',')[0]; // Solo el nombre principal
+    const direccion = lugar.display_name; // Dirección completa
+
+    // 1. Enviar la ubicación nativa (el pin en el mapa)
+    await sock.sendMessage(jid, { 
+      location: { 
+        degreesLatitude: lat, 
+        degreesLongitude: lon, 
+        name: nombre, 
+        address: direccion 
+      } 
+    }, { quoted: m });
+
+    // 2. Enviar el enlace de Google Maps para abrirlo en el navegador
+    const linkMaps = 'https://www.google.com/maps?q=' + lat + ',' + lon;
+    await sock.sendMessage(jid, { 
+      text: '🗺️ *Enlace de Google Maps:*\\n' + linkMaps 
+    }, { quoted: m });
+
+  } catch (e) {
+    console.log('Error en .maps:', e.message);
+    await responder('❌ Error al buscar la ubicación. Intenta de nuevo.');
+  }
+  break;
+}
+
+case 'musica': case 'm': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
   await responder('🔍 Buscando audio de: ' + query + '...');
