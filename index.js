@@ -3730,6 +3730,7 @@ case 'ytsearch': {
 
 
 
+
 case 'playvideo': case 'play2': case 'playdoc': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
@@ -3748,7 +3749,7 @@ case 'playvideo': case 'play2': case 'playdoc': {
     
     let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0, url = target;
     
-    // 1. Obtener info para la tarjeta
+    // 1. Obtener info del video
     try {
       const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
       const info = JSON.parse(stdout.trim().split('\n')[0]);
@@ -3772,320 +3773,67 @@ case 'playvideo': case 'play2': case 'playdoc': {
     if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
     else await sock.sendMessage(jid, { text: txt }, { quoted: m });
 
-    // 3. Descargar archivo
+    // 3. Intentar descargar el archivo con múltiples estrategias
     const fileNameBase = 'media_' + Date.now();
     const filePathBase = '/tmp/' + fileNameBase;
-    
-    // Para audio (play2), forzamos el formato 140 (m4a) que es más rápido y no lo bloquea YouTube
-    // Para video, pedimos mp4
-    let ytArgs = '';
-    if (esAudio) {
-      ytArgs = '-f 140/bestaudio[ext=m4a]/bestaudio';
-    } else {
-      ytArgs = '-f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"';
+    let archivoDescargado = false;
+    let errorFinal = '';
+
+    // Estrategia A: Forzar cliente Android y mantener audio original (sin ffmpeg)
+    if (!archivoDescargado) {
+      try {
+        await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -R 3 --no-part -f ba -o "' + filePathBase + '.%(ext)s" "' + url + '"', { timeout: 120000 });
+        archivoDescargado = true;
+      } catch (e) { errorFinal = e.message; console.log('Estrategia A falló:', e.message); }
     }
-    
-    // -R 3: Reintentar 3 veces si falla. --no-part: no dejar archivos temporales
-    const dlCmd = 'yt-dlp --extractor-args "youtube:player_client=android" -R 3 --no-part ' + ytArgs + ' -o "' + filePathBase + '.%(ext)s" "' + url + '"';
-    
-    try {
-      await execAsync(dlCmd, { timeout: 120000, maxBuffer: 1024 * 1024 * 50 });
-      
+
+    // Estrategia B: Forzar cliente iOS
+    if (!archivoDescargado) {
+      try {
+        await responder('⚠️ Reintentando (Modo iOS)...');
+        await execAsync('yt-dlp --extractor-args "youtube:player_client=ios" -R 3 --no-part -f ba -o "' + filePathBase + '.%(ext)s" "' + url + '"', { timeout: 120000 });
+        archivoDescargado = true;
+      } catch (e) { errorFinal = e.message; console.log('Estrategia B falló:', e.message); }
+    }
+
+    // Estrategia C: Usar btch-downloader como respaldo
+    if (!archivoDescargado && esAudio) {
+      try {
+        await responder('⚠️ Reintentando (Servidor Alternativo)...');
+        const btch = require('btch-downloader');
+        const res = await btch.ytmp3(url);
+        if (res.status && res.result && res.result.download) {
+          const audioRes = await fetch(res.result.download);
+          const audioBuf = Buffer.from(await audioRes.arrayBuffer());
+          await sock.sendMessage(jid, { audio: audioBuf, mimetype: 'audio/mpeg' }, { quoted: m });
+          return;
+        }
+      } catch (e) { console.log('Estrategia C falló:', e.message); }
+    }
+
+    // 4. Verificar y enviar el archivo si se descargó
+    if (archivoDescargado) {
       const files = fs2.readdirSync('/tmp').filter(f => f.startsWith(fileNameBase));
-      if (files.length === 0) throw new Error('Archivo no encontrado');
-      
-      const finalFile = '/tmp/' + files[0];
-      const buffer = fs2.readFileSync(finalFile);
-      
-      if (esDoc) {
-        await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: title.substring(0,20) + '.mp4' }, { quoted: m });
-      } else if (esAudio) {
-        await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
-      } else {
-        await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
+      if (files.length > 0) {
+        const finalFile = '/tmp/' + files[0];
+        const buffer = fs2.readFileSync(finalFile);
+        
+        if (esDoc) {
+          await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: title.substring(0,20) + '.mp4' }, { quoted: m });
+        } else if (esAudio) {
+          await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+        } else {
+          await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
+        }
+        fs2.unlinkSync(finalFile);
       }
-      fs2.unlinkSync(finalFile);
-    } catch (dlErr) {
-      console.log('Error descargando (yt-dlp):', dlErr.message);
-      // SI FALLA YT-DLP, INTENTAMOS CON BTCH-DOWNLOADER (que ya tienes instalado)
-      if (esAudio) {
-        try {
-          await responder('⚠️ Reintentando con servidor alternativo...');
-          const btch = require('btch-downloader');
-          const res = await btch.ytmp3(url);
-          if (res.status && res.result && res.result.download) {
-            const audioRes = await fetch(res.result.download);
-            const audioBuf = Buffer.from(await audioRes.arrayBuffer());
-            await sock.sendMessage(jid, { audio: audioBuf, mimetype: 'audio/mpeg' }, { quoted: m });
-            return;
-          }
-        } catch(e) { console.log('Error btch también:', e.message); }
-      }
-      await responder('❌ Error descargando el archivo final. Intenta de nuevo.');
+    } else {
+      await responder('❌ Error descargando el archivo final. Detalles: ' + (errorFinal || 'Desconocido'));
     }
 
   } catch (e) {
     console.log('Error .' + cmd + ':', e.message);
     await responder('❌ Error procesando la descarga.');
-  }
-  break;
-}
-
-case 'logs': case 'errores': {
-  if (!esDueno(m)) { await responder('❌ Solo el dueño puede ver los logs.'); break; }
-  
-  if (!global.botLogs || global.botLogs.length === 0) {
-    await responder('📭 No hay logs guardados aún desde que se reinició el bot.');
-    break;
-  }
-  
-  let texto = '📋 *ÚLTIMOS LOGS DEL BOT:*\n\n';
-  // Mostrar solo los últimos 20 para no hacer el mensaje gigante
-  const ultimos = global.botLogs.slice(-20);
-  texto += ultimos.join('\n');
-  
-  // Si hay muchos, recortar por si excede el límite de WhatsApp
-  if (texto.length > 3500) {
-    texto = texto.substring(texto.length - 3500);
-    texto = '... ' + texto;
-  }
-  
-  await responder(texto);
-  break;
-}
-
-case 'clearlogs': {
-  if (!esDueno(m)) { await responder('❌ Solo el dueño.'); break; }
-  global.botLogs = [];
-  await responder('🧹 Logs borrados de la memoria.');
-  break;
-}
-
-
-case 'fixapi': case 'testapi': case 'repararapi': {
-  if (!esDueno(m)) { await responder('❌ Solo el dueño puede usar este comando.'); break; }
-  
-  await responder('🛠️ *Iniciando diagnóstico de APIs...*\nEsto puede tardar unos segundos.');
-  
-  let reporte = '📊 *REPORTE DE APIS*\n\n';
-  
-  // 1. Actualizar yt-dlp
-  try {
-    const { execSync } = require('child_process');
-    execSync('yt-dlp -U', { stdio: 'ignore' });
-    reporte += '✅ *yt-dlp (YouTube):* Actualizado correctamente.\n';
-  } catch (e) {
-    try {
-      execSync('pip install -U yt-dlp', { stdio: 'ignore' });
-      reporte += '✅ *yt-dlp (YouTube):* Actualizado vía pip.\n';
-    } catch (e2) {
-      reporte += '⚠️ *yt-dlp (YouTube):* No se pudo actualizar (pero podría funcionar).\n';
-    }
-  }
-
-  // 2. Probar IA (Pollinations)
-  try {
-    const res = await fetch('https://text.pollinations.ai/Hola');
-    if (res.ok) reporte += '✅ *IA (Pollinations):* Funcionando.\n';
-    else throw new Error();
-  } catch (e) {
-    reporte += '❌ *IA (Pollinations):* Caída o bloqueada.\n';
-  }
-
-  // 3. Probar TikTok (TikWM)
-  try {
-    const res = await fetch('https://www.tikwm.com/api/feed/search?keywords=test');
-    if (res.ok) reporte += '✅ *TikTok (TikWM):* Funcionando.\n';
-    else throw new Error();
-  } catch (e) {
-    reporte += '❌ *TikTok (TikWM):* Caída o bloqueada.\n';
-  }
-
-  // 4. Probar Roblox API
-  try {
-    const res = await fetch('https://users.roblox.com/v1/users/1');
-    if (res.ok) reporte += '✅ *Roblox API:* Funcionando.\n';
-    else throw new Error();
-  } catch (e) {
-    reporte += '❌ *Roblox API:* Caída o bloqueada.\n';
-  }
-
-  reporte += '\n💡 *Consejo:* Si una API está en ❌, los comandos relacionados fallarán. Intenta reiniciar el bot o usa comandos alternativos.';
-  
-  await responder(reporte);
-  break;
-}
-
-
-case 'historia': case 'story': case 'his': {
-  if (!jid.endsWith('@g.us')) { await responder('❌ Este comando solo funciona en grupos.'); break; }
-  
-  // 1. Verificar que quien lo usa sea Admin
-  try {
-    const groupMetadata = await sock.groupMetadata(jid);
-    const sender = m.key.participant || m.key.remoteJid;
-    const senderParticipant = groupMetadata.participants.find(p => p.id.split('@')[0].split(':')[0] === sender.split('@')[0].split(':')[0]);
-    
-    if (!senderParticipant || (senderParticipant.admin !== 'admin' && senderParticipant.admin !== 'superadmin')) {
-      await responder('❌ Solo los administradores pueden publicar historias en el grupo.');
-      break;
-    }
-  } catch (e) {
-    await responder('❌ Error al verificar permisos.');
-    break;
-  }
-
-  // 2. Verificar que esté respondiendo a una foto o video
-  const quoted = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-  
-  if (!quoted || (!quoted.imageMessage && !quoted.videoMessage)) {
-    await responder('❌ Responde a una foto o video con #historia para publicarlo en el grupo.');
-    break;
-  }
-
-  const texto = cuerpo.slice(cmd.length).trim() || '📸 Historia del grupo';
-  
-  // 3. Descargar y reenviar el archivo
-  try {
-    const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-    
-    // Creamos un objeto falso para descargar el mensaje citado
-    const msgFalso = {
-      message: quoted,
-      key: { 
-        remoteJid: jid, 
-        id: m.message.extendedTextMessage.contextInfo.stanzaId, 
-        participant: m.message.extendedTextMessage.contextInfo.participant 
-      }
-    };
-
-    const buffer = await downloadMediaMessage(msgFalso, 'buffer', {}, { logger: console, reuploadRequest: sock.updateMediaMessage });
-    
-    if (quoted.imageMessage) {
-      await sock.sendMessage(jid, { image: buffer, caption: texto }, { quoted: m });
-    } else {
-      await sock.sendMessage(jid, { video: buffer, caption: texto }, { quoted: m });
-    }
-    
-    // Reaccionar con un check
-    try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch(e) {}
-    
-  } catch (e) {
-    console.log('Error en .historia:', e.message);
-    await responder('❌ Error al descargar la foto/video. Intenta de nuevo.');
-  }
-  break;
-}
-
-
-case 'inv': {
-  if (!jid.endsWith('@g.us')) { await responder('❌ Solo funciona en grupos.'); break; }
-  
-  // Validar admin
-  const groupMetadata = await sock.groupMetadata(jid);
-  const sender = m.key.participant || m.key.remoteJid;
-  const senderParticipant = groupMetadata.participants.find(p => p.id === sender);
-  const esAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
-  
-  if (!esAdmin && !esDueno(m)) {
-    await responder('❌ Solo los administradores pueden enviar invitaciones directas.');
-    break;
-  }
-
-  const num = cuerpo.slice(cmd.length).trim().replace(/[^0-9]/g, '');
-  if (!num) { await responder('Uso: #invitardm <numero>\nEjemplo: #invitardm 50499998888'); break; }
-
-  await responder('⏳ Generando invitación de un solo uso...');
-  
-  try {
-    const code = await sock.groupInviteCode(jid);
-    const link = 'https://chat.whatsapp.com/' + code;
-    const jidTarget = num + '@s.whatsapp.net';
-    
-    // Enviar por privado
-    await sock.sendMessage(jidTarget, { 
-      text: '👋 ¡Hola! Has recibido una invitación para unirte al grupo.\n\n🔗 ' + link + '\n\n⚠️ *ATENCIÓN:* Este enlace es de *un solo uso*. En el momento en que alguien entre al grupo, el enlace se destruirá automáticamente.' 
-    });
-    
-    // Guardar en memoria para destruirlo cuando entren
-    if (!global.invitesUsoUnico) global.invitesUsoUnico = {};
-    global.invitesUsoUnico[jid] = true;
-    
-    await sock.sendMessage(jid, { text: '✅ Invitación enviada al +' + num + '.\n\n*(El enlace se autodestruirá cuando la persona ingrese al grupo).*' }, { quoted: m });
-  } catch (e) {
-    console.log('Error en .invitardm:', e.message);
-    await responder('❌ Error al generar el enlace. Asegúrate de que el bot sea administrador.');
-  }
-  break;
-}
-
-
-case 'invitardm': case 'invi': case 'inv': {
-  if (!jid.endsWith('@g.us')) { await responder('❌ Solo funciona en grupos.'); break; }
-  
-  const num = cuerpo.slice(cmd.length).trim().replace(/[^0-9]/g, '');
-  if (!num) { await responder('Uso: #invi <numero>\\nEjemplo: #invi 50499998888'); break; }
-
-  try {
-    await responder('🔄 Verificando número...');
-    const [result] = await sock.onWhatsApp(num);
-    if (!result || !result.exists) {
-      await responder('❌ El número +' + num + ' no tiene WhatsApp o es inválido.');
-      break;
-    }
-    
-    const jidTarget = result.jid;
-
-    await responder('🔄 Generando enlace de invitación...');
-    const code = await sock.groupInviteCode(jid);
-    const link = 'https://chat.whatsapp.com/' + code;
-    
-    await responder('🔄 Enviando invitación por privado...');
-    await sock.sendMessage(jidTarget, { 
-      text: '👋 ¡Hola! Has recibido una invitación para unirte al grupo.\\n\\n🔗 ' + link + '\\n\\n⚠️ *ATENCIÓN:* Este enlace es de *un solo uso*. En el momento en que alguien entre al grupo, el enlace se destruirá automáticamente.' 
-    });
-    
-    if (!global.invitesUsoUnico) global.invitesUsoUnico = {};
-    global.invitesUsoUnico[jid] = true;
-    
-    await sock.sendMessage(jid, { text: '✅ Invitación enviada al +' + num + ' con éxito.\\n\\n*(El enlace se autodestruirá cuando la persona ingrese).*' }, { quoted: m });
-    
-  } catch (e) {
-    console.log('Error en .invitardm:', e.message);
-    await responder('❌ Error: ' + e.message + '\\n\\nAsegúrate de que el bot sea administrador del grupo.');
-  }
-  break;
-}
-
-
-case 'invi': case 'invitardm': {
-  if (!jid.endsWith('@g.us')) { await responder('❌ Solo funciona en grupos.'); break; }
-  
-  const num = cuerpo.slice(cmd.length).trim().replace(/[^0-9]/g, '');
-  if (!num) { await responder('Uso: #invi <numero>'); break; }
-
-  await responder('🔄 Generando y enviando invitación a +' + num + '...');
-
-  try {
-    // 1. Obtener enlace (si el bot no es admin, esto fallará y saltará al catch)
-    const code = await sock.groupInviteCode(jid);
-    const link = 'https://chat.whatsapp.com/' + code;
-    
-    // 2. Enviar por privado (usamos @s.whatsapp.net directo para evitar colgar)
-    const jidTarget = num + '@s.whatsapp.net';
-    await sock.sendMessage(jidTarget, { 
-      text: '👋 ¡Hola! Invitación al grupo:\n\n🔗 ' + link + '\n\n⚠️ *ATENCIÓN:* Este enlace es de *un solo uso*. Se destruirá en cuanto alguien entre.' 
-    });
-    
-    // 3. Activar autodestrucción
-    if (!global.invitesUsoUnico) global.invitesUsoUnico = {};
-    global.invitesUsoUnico[jid] = true;
-    
-    await sock.sendMessage(jid, { text: '✅ Invitación enviada al +' + num + '. (Se autodestruirá al usarse).' }, { quoted: m });
-    
-  } catch (e) {
-    console.log('Error en .invi:', e.message);
-    await responder('❌ Error al generar el enlace. Asegúrate de que el BOT sea Administrador del grupo.');
   }
   break;
 }
