@@ -13,9 +13,11 @@
   "dependencies": {
     "@denzy-official/youtube_scraper": "^1.0.1",
     "@heavstaltech/api": "^2.0.3",
+    "@rowix/gifsnap-js": "^0.1.0",
     "@tensorflow/tfjs": "^4.22.0",
     "@tteg/tteg": "^0.1.0",
     "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "async-g-i-s": "^1.5.5",
     "dotenv": "^18.0.10",
     "duck-duck-scrape": "^2.2.7",
     "ducksearch": "^1.0.3",

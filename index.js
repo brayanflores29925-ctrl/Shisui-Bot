@@ -4136,52 +4136,51 @@ case 'play': case 'play2': {
 }
 
 
+
 case 'pin': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
   await responder('🔍 Buscando sticker o foto de: ' + query);
   
-  try {
-    // A) Intentar buscar un sticker animado en Giphy
-    const giphyUrl = 'https://api.giphy.com/v1/stickers/search?api_key=dc6zaTOxFJmzC&q=' + encodeURIComponent(query) + '&limit=1&rating=g';
-    const res = await fetch(giphyUrl);
-    const data = await res.json();
-    
-    if (data.data && data.data.length > 0) {
-      const gifUrl = data.data[0].images.original.url;
-      const gifRes = await fetch(gifUrl);
-      const gifBuffer = Buffer.from(await gifRes.arrayBuffer());
-      const webpBuffer = await convertirGifAWebp(gifBuffer);
-      await sock.sendMessage(jid, { sticker: webpBuffer }, { quoted: m });
-      break;
-    }
+  let stickerEnviado = false;
 
-    // B) Si no hay sticker, buscar 2 fotos reales sin API Key
-    await responder('⚠️ No encontré sticker. Buscando fotos...');
+  // A) Intentar buscar un sticker con GifSnap
+  try {
+    const { createGifSnapClient } = await import('@rowix/gifsnap-js');
+    const client = createGifSnapClient();
+    const res = await client.searchStickers({ query: query, limit: 1 });
+    
+    if (res.data && res.data.length > 0) {
+      const stickerUrl = res.data[0].url;
+      const stickerRes = await fetch(stickerUrl);
+      const buffer = Buffer.from(await stickerRes.arrayBuffer());
+      const webp = await convertirGifAWebp(buffer);
+      await sock.sendMessage(jid, { sticker: webp }, { quoted: m });
+      stickerEnviado = true;
+    }
+  } catch (gifErr) {
+    console.log('Error en GifSnap:', gifErr.message);
+  }
+
+  // B) Si no se envió sticker, buscar 2 fotos con Google Images
+  if (!stickerEnviado) {
+    await responder('⚠️ No encontré sticker. Buscando fotos reales...');
     try {
-      const { getImages } = await import('@tteg/tteg');
-      const fotos = await getImages(query, { count: 2 });
+      const gis = require('async-g-i-s');
+      const results = await gis(query);
       
-      if (fotos && fotos.length > 0) {
+      if (results && results.length > 0) {
+        const fotos = results.slice(0, 2);
         for (let i = 0; i < fotos.length; i++) {
           await sock.sendMessage(jid, { image: { url: fotos[i].url }, caption: '🖼️ Foto ' + (i+1) + ' de: ' + query }, { quoted: m });
         }
-        break;
+      } else {
+        await responder('❌ No encontré fotos para esa búsqueda.');
       }
-    } catch (ttegErr) {
-      console.log('Error en @tteg:', ttegErr.message);
+    } catch (gisErr) {
+      console.log('Error en Google Images:', gisErr.message);
+      await responder('❌ Error al buscar fotos.');
     }
-
-    // C) Respaldo final: Generar fotos con Pollinations si todo falla
-    await responder('⚠️ No encontré fotos reales. Generando con IA...');
-    for (let i = 1; i <= 2; i++) {
-      const imgUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(query) + '?width=512&height=512&nologo=true&seed=' + (Date.now() + i);
-      await sock.sendMessage(jid, { image: { url: imgUrl }, caption: '🖼️ Foto IA ' + i + ': ' + query }, { quoted: m });
-    }
-
-  } catch (e) {
-    console.log('Error en .pin:', e.message);
-    await responder('❌ Error al buscar.');
   }
   break;
 }
@@ -4189,16 +4188,17 @@ case 'pin': {
 case 'config': {
   const args = cuerpo.slice(cmd.length).trim();
   
-  // Si el usuario envía un número (1 al 7), cambiamos el estado
+  // Si el usuario envía un número, cambiamos el estado
   if (args) {
     const num = parseInt(args);
-    if (num === 1) global.filtrosConfig.antiPorno = !global.filtrosConfig.antiPorno;
-    else if (num === 2) global.filtrosConfig.antiaudio = !global.filtrosConfig.antiaudio;
-    else if (num === 3) global.filtrosConfig.antivideos = !global.filtrosConfig.antivideos;
-    else if (num === 4) global.filtrosConfig.antisticker = !global.filtrosConfig.antisticker;
-    else if (num === 5) global.filtrosConfig.antispam = !global.filtrosConfig.antispam;
-    else if (num === 6) global.filtrosConfig.antibots = !global.filtrosConfig.antibots;
-    else if (num === 7) global.filtrosConfig.antiestafas = !global.filtrosConfig.antiestafas;
+    const f = global.filtrosConfig;
+    if (num === 1) f.antiPorno = !f.antiPorno;
+    else if (num === 2) f.antiaudio = !f.antiaudio;
+    else if (num === 3) f.antivideos = !f.antivideos;
+    else if (num === 4) f.antisticker = !f.antisticker;
+    else if (num === 5) f.antispam = !f.antispam;
+    else if (num === 6) f.antibots = !f.antibots;
+    else if (num === 7) f.antiestafas = !f.antiestafas;
     else { await responder('❌ Opción no válida. Usa números del 1 al 7.'); break; }
   }
 
