@@ -3824,58 +3824,6 @@ case 'tt': {
 
 case 'play': case 'play2': 
 case 'mapa': {
-  const busqueda = cuerpo.slice(cmd.length).trim();
-  if (!busqueda) { await responder('Uso: #maps <lugar>'); break; }
-  
-  await responder('📍 Buscando ubicación de: ' + busqueda + '...');
-  
-  try {
-    // Límite de 10 segundos para que no se quede colgado
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-    
-    const url = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(busqueda) + '&format=json&limit=1';
-    const res = await fetch(url, { headers: { 'User-Agent': 'Shisui-Bot/1.0' }, signal: controller.signal });
-    clearTimeout(timeoutId);
-    
-    const data = await res.json();
-
-    if (!data || data.length === 0) {
-      await responder('❌ No encontré esa ubicación. Intenta ser más específico.');
-      break;
-    }
-
-    const lugar = data[0];
-    const lat = parseFloat(lugar.lat);
-    const lon = parseFloat(lugar.lon);
-    const nombre = lugar.display_name.split(',')[0]; 
-    const direccion = lugar.display_name;
-
-    // Enviar el pin de ubicación
-    await sock.sendMessage(jid, { 
-      location: { 
-        degreesLatitude: lat, 
-        degreesLongitude: lon, 
-        name: nombre, 
-        address: direccion 
-      } 
-    }, { quoted: m });
-
-    // Enviar el enlace de Google Maps
-    const linkMaps = 'https://www.google.com/maps?q=' + lat + ',' + lon;
-    await sock.sendMessage(jid, { text: '🗺️ *Enlace de Google Maps:*\n' + linkMaps }, { quoted: m });
-
-  } catch (e) {
-    console.log('Error en .maps:', e.message);
-    // Respaldo: Si la API falla o tarda mucho, enviamos el enlace directo de búsqueda
-    const linkFallback = 'https://www.google.com/maps/search/' + encodeURIComponent(busqueda);
-    await sock.sendMessage(jid, { text: '⚠️ No pude obtener el pin, pero aquí tienes el enlace directo de Google Maps:\n🗺️ ' + linkFallback }, { quoted: m });
-  }
-  break;
-}
-
-
-case 'mapa': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #maps <lugar>'); break; }
   
@@ -3924,41 +3872,6 @@ case 'attp2': case 'attp3': case 'ttp': {
   const texto = cuerpo.slice(cmd.length).trim();
   if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
   
-  await responder('✨ Generando sticker de texto...');
-  
-  try {
-    const estilos = { attp: 'neon glowing letters', attp2: '3d glossy letters', attp3: 'handwritten graffiti', ttp: 'colorful cute letters' };
-    const prompt = 'The text "' + texto + '" written in ' + (estilos[cmd] || estilos.attp) + ', centered, solid black background, sticker style, high contrast';
-    
-    // Límite de 15 segundos para que no se quede colgado
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    
-    const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) + '?width=512&height=512&nologo=true&seed=' + Date.now();
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) throw new Error('API falló con estado ' + res.status);
-    
-    const buffer = Buffer.from(await res.arrayBuffer());
-    if (buffer.length < 1000) throw new Error('La imagen generada está vacía.');
-
-    // Convertir a sticker
-    const out = await imagenASticker(buffer, 'square');
-    await sock.sendMessage(jid, { sticker: out }, { quoted: m });
-
-  } catch (e) {
-    console.log('Error en .' + cmd + ':', e.message);
-    await responder('❌ Error generando el sticker. La IA está saturada o la conversión falló. Intenta de nuevo en unos segundos.');
-  }
-  break;
-}
-
-
-case 'attp': case 'attp2': case 'attp3': case 'ttp': {
-  const texto = cuerpo.slice(cmd.length).trim();
-  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
-  
   await responder('✨ Generando sticker localmente...');
   
   try {
@@ -3990,11 +3903,53 @@ case 'attp': case 'attp2': case 'attp3': case 'ttp': {
   break;
 }
 
-case 'maps': case 'mapa': {
+case 'mapa': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #maps <lugar>'); break; }
   
   // Enviamos el enlace directo sin consultar APIs
+  const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
+  await sock.sendMessage(jid, { text: '🗺️ *Ubicación en Google Maps:*\n' + link }, { quoted: m });
+  break;
+}
+
+
+case 'attp': case 'attp2': case 'attp3': case 'ttp': {
+  const texto = cuerpo.slice(cmd.length).trim();
+  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
+  
+  await responder('✨ Creando sticker...');
+  
+  try {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    const fs2 = require('fs');
+    
+    const textoLimpio = texto.replace(/['"\\]/g, '');
+    const filePath = '/tmp/sticker_' + Date.now() + '.webp';
+    
+    const comandoFfmpeg = 'ffmpeg -f lavfi -i color=c=black:s=512x512:d=1 -vf "drawtext=text=\'' + textoLimpio + '\':fontcolor=white:fontsize=64:x=(w-text_w)/2:y=(h-text_h)/2" -vcodec libwebp -lossless 1 -q:v 60 -loop 0 -preset default -an -vsync 0 "' + filePath + '"';
+    
+    await execAsync(comandoFfmpeg, { timeout: 15000 });
+    
+    if (!fs2.existsSync(filePath)) throw new Error('No se creó el archivo');
+    
+    const buffer = fs2.readFileSync(filePath);
+    await sock.sendMessage(jid, { sticker: buffer }, { quoted: m });
+    fs2.unlinkSync(filePath);
+    
+  } catch (e) {
+    console.log('Error en attp local:', e.message);
+    await responder('❌ Error al crear el sticker (Falta ffmpeg o una fuente en el servidor).');
+  }
+  break;
+}
+
+case 'maps': case 'mapa': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #maps <lugar>'); break; }
+  
   const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
   await sock.sendMessage(jid, { text: '🗺️ *Ubicación en Google Maps:*\n' + link }, { quoted: m });
   break;
