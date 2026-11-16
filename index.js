@@ -3911,7 +3911,7 @@ case 'mapa': {
 }
 
 
-case 'maps': case 'mapa': {
+case 'mapa': {
   const busqueda = cuerpo.slice(cmd.length).trim();
   if (!busqueda) { await responder('Uso: #maps <lugar>'); break; }
   
@@ -3959,6 +3959,51 @@ case 'maps': case 'mapa': {
     const linkFallback = 'https://www.google.com/maps/search/' + encodeURIComponent(busqueda);
     await sock.sendMessage(jid, { text: '⚠️ No pude obtener el pin, pero aquí tienes el enlace directo de Google Maps:\n🗺️ ' + linkFallback }, { quoted: m });
   }
+  break;
+}
+
+
+case 'maps': case 'mapa': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #maps <lugar>'); break; }
+  
+  await responder('📍 Buscando: ' + query + '...');
+  
+  try {
+    // Creamos una promesa para la API y otra para el tiempo límite de 5 segundos
+    const fetchPromise = fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(query) + '&format=json&limit=1', { 
+        headers: { 'User-Agent': 'Mozilla/5.0' } 
+    }).then(res => res.json());
+    
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 5000));
+    
+    // El bot espera a que termine la primera
+    const data = await Promise.race([fetchPromise, timeoutPromise]);
+    
+    if (data && data.length > 0) {
+      const lugar = data[0];
+      const lat = parseFloat(lugar.lat);
+      const lon = parseFloat(lugar.lon);
+      const nombre = lugar.display_name.split(',')[0]; 
+      
+      // Si respondió rápido, enviamos el pin nativo
+      await sock.sendMessage(jid, { 
+        location: { 
+          degreesLatitude: lat, 
+          degreesLongitude: lon, 
+          name: nombre, 
+          address: lugar.display_name 
+        } 
+      }, { quoted: m });
+      break;
+    }
+  } catch (e) {
+    console.log('Error o Timeout en .maps:', e.message);
+  }
+  
+  // 3. Si la API falla o tarda más de 5s, enviamos el enlace directo
+  const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
+  await sock.sendMessage(jid, { text: '🗺️ *Enlace de Google Maps:*\n' + link }, { quoted: m });
   break;
 }
 
