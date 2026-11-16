@@ -4141,14 +4141,13 @@ case 'play': case 'play2': {
 
 
 
+
 case 'pin': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
   await responder('🔍 Buscando: ' + query);
   
   let enviado = false;
-
-  // A) free-google-images
   try {
     const googleImages = require('free-google-images');
     const results = await googleImages.search(query);
@@ -4160,7 +4159,6 @@ case 'pin': {
     }
   } catch (e) { console.log('Error free-google-images:', e.message); }
 
-  // B) g4f-image (IA)
   if (!enviado) {
     await responder('⚠️ Generando con IA...');
     try {
@@ -4172,7 +4170,6 @@ case 'pin': {
           await sock.sendMessage(jid, { image: buffer, caption: '🖼️ IA Foto ' + i + ': ' + query }, { quoted: m });
         }
       }
-      enviado = true;
     } catch (e) {
       console.log('Error g4f-image:', e.message);
       await responder('❌ No se pudo generar la imagen.');
@@ -4183,7 +4180,7 @@ case 'pin': {
 
 case 'config': {
   const args = cuerpo.slice(cmd.length).trim();
-  const f = global.filtrosConfig;
+  const f = global.filtrosConfig || {};
 
   if (args) {
     const num = parseInt(args);
