@@ -480,6 +480,8 @@ async function iniciar(opciones = {}) {
 
 async function convertirGifAWebp(gifBuffer) {
   const fs = require('fs');
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
   const path = require('path');
   const os = require('os');
   const { execFile } = require('child_process');
@@ -669,7 +671,12 @@ console.log = function(...args) { guardarLog('LOG', args); oldLog.apply(console,
 console.error = function(...args) { guardarLog('ERR', args); oldError.apply(console, args); };
 // -----------------------------------
 
-global.antiPorno = false
+
+global.filtrosConfig = {
+  antiPorno: false, antiaudio: false, antivideos: false,
+  antisticker: false, antispam: false, antibots: false, antiestafas: false
+};
+
 global.antiaudio = false
 global.antivideos = false
 global.antisticker = false
@@ -4008,33 +4015,7 @@ case 'attp': case 'attp2': case 'attp3': case 'ttp': {
   break;
 }
 
-case 'config': {
-      const args = cuerpo.slice(cmd.length).trim();
-      if (args) {
-        const num = parseInt(args);
-        if (num === 1) global.antiPorno = !global.antiPorno;
-        else if (num === 2) global.antiaudio = !global.antiaudio;
-        else if (num === 3) global.antivideos = !global.antivideos;
-        else if (num === 4) global.antisticker = !global.antisticker;
-        else if (num === 5) global.antispam = !global.antispam;
-        else if (num === 6) global.antibots = !global.antibots;
-        else if (num === 7) global.antiestafas = !global.antiestafas;
-        else { await responder('❌ Opción no válida. Usa 1 al 7.'); break; }
-      }
-      const on = '✅ ON'; const off = '❌ OFF';
-      let txt = '⚙️ *CONFIGURACIÓN DEL BOT*\n\n';
-      txt += '*1.* 🔞 Antiporno: ' + (global.antiPorno ? on : off) + '\n';
-      txt += '*2.* 🔇 Antiaudio: ' + (global.antiaudio ? on : off) + '\n';
-      txt += '*3.* 🎬 Antivideos: ' + (global.antivideos ? on : off) + '\n';
-      txt += '*4.* 🎨 Antisticker: ' + (global.antisticker ? on : off) + '\n';
-      txt += '*5.* 📵 Antispam: ' + (global.antispam ? on : off) + '\n';
-      txt += '*6.* 🤖 Antibots: ' + (global.antibots ? on : off) + '\n';
-      txt += '*7.* ⚠️ Antiestafas: ' + (global.antiestafas ? on : off) + '\n\n';
-      txt += '💡 *Para cambiar un estado, envía:*\nEjemplo: #config 1';
-      await responder(txt);
-      break;
-    }
-    case 'playvideo': case 'video': case 'v': {
+case 'playvideo': case 'video': case 'v': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
   await responder('🔍 Buscando video de: ' + query + '...');
@@ -4083,35 +4064,7 @@ case 'config': {
   break;
 }
 
-case 'pin': {
-      const query = cuerpo.slice(cmd.length).trim();
-      if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
-      await responder('🔍 Buscando sticker o foto de: ' + query);
-      try {
-        const giphyUrl = 'https://api.giphy.com/v1/stickers/search?api_key=dc6zaTOxFJmzC&q=' + encodeURIComponent(query) + '&limit=1&rating=g';
-        const res = await fetch(giphyUrl);
-        const data = await res.json();
-        if (data.data && data.data.length > 0) {
-          const gifUrl = data.data[0].images.original.url;
-          const gifRes = await fetch(gifUrl);
-          const gifBuffer = Buffer.from(await gifRes.arrayBuffer());
-          const webpBuffer = await convertirGifAWebp(gifBuffer);
-          await sock.sendMessage(jid, { sticker: webpBuffer }, { quoted: m });
-        } else {
-          // Si no hay sticker, enviamos 2 fotos generadas por IA
-          await responder('⚠️ No encontré sticker. Generando 2 fotos con IA...');
-          for (let i = 1; i <= 2; i++) {
-            const imgUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(query) + '?width=512&height=512&nologo=true&seed=' + (Date.now() + i);
-            await sock.sendMessage(jid, { image: { url: imgUrl }, caption: '🖼️ Foto ' + i + ' de: ' + query }, { quoted: m });
-          }
-        }
-      } catch(e) {
-        console.log('Error pin:', e.message);
-        await responder('❌ Error al buscar.');
-      }
-      break;
-    }
-    case 'play': case 'play2': {
+case 'play': case 'play2': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
   
@@ -4179,6 +4132,91 @@ case 'pin': {
     console.log('Error en play:', e.message);
     await responder('❌ Error al descargar el audio.'); 
   }
+  break;
+}
+
+
+case 'pin': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
+  await responder('🔍 Buscando sticker o foto de: ' + query);
+  
+  try {
+    // A) Intentar buscar un sticker animado en Giphy
+    const giphyUrl = 'https://api.giphy.com/v1/stickers/search?api_key=dc6zaTOxFJmzC&q=' + encodeURIComponent(query) + '&limit=1&rating=g';
+    const res = await fetch(giphyUrl);
+    const data = await res.json();
+    
+    if (data.data && data.data.length > 0) {
+      const gifUrl = data.data[0].images.original.url;
+      const gifRes = await fetch(gifUrl);
+      const gifBuffer = Buffer.from(await gifRes.arrayBuffer());
+      const webpBuffer = await convertirGifAWebp(gifBuffer);
+      await sock.sendMessage(jid, { sticker: webpBuffer }, { quoted: m });
+      break;
+    }
+
+    // B) Si no hay sticker, buscar 2 fotos reales sin API Key
+    await responder('⚠️ No encontré sticker. Buscando fotos...');
+    try {
+      const { getImages } = await import('@tteg/tteg');
+      const fotos = await getImages(query, { count: 2 });
+      
+      if (fotos && fotos.length > 0) {
+        for (let i = 0; i < fotos.length; i++) {
+          await sock.sendMessage(jid, { image: { url: fotos[i].url }, caption: '🖼️ Foto ' + (i+1) + ' de: ' + query }, { quoted: m });
+        }
+        break;
+      }
+    } catch (ttegErr) {
+      console.log('Error en @tteg:', ttegErr.message);
+    }
+
+    // C) Respaldo final: Generar fotos con Pollinations si todo falla
+    await responder('⚠️ No encontré fotos reales. Generando con IA...');
+    for (let i = 1; i <= 2; i++) {
+      const imgUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(query) + '?width=512&height=512&nologo=true&seed=' + (Date.now() + i);
+      await sock.sendMessage(jid, { image: { url: imgUrl }, caption: '🖼️ Foto IA ' + i + ': ' + query }, { quoted: m });
+    }
+
+  } catch (e) {
+    console.log('Error en .pin:', e.message);
+    await responder('❌ Error al buscar.');
+  }
+  break;
+}
+
+case 'config': {
+  const args = cuerpo.slice(cmd.length).trim();
+  
+  // Si el usuario envía un número (1 al 7), cambiamos el estado
+  if (args) {
+    const num = parseInt(args);
+    if (num === 1) global.filtrosConfig.antiPorno = !global.filtrosConfig.antiPorno;
+    else if (num === 2) global.filtrosConfig.antiaudio = !global.filtrosConfig.antiaudio;
+    else if (num === 3) global.filtrosConfig.antivideos = !global.filtrosConfig.antivideos;
+    else if (num === 4) global.filtrosConfig.antisticker = !global.filtrosConfig.antisticker;
+    else if (num === 5) global.filtrosConfig.antispam = !global.filtrosConfig.antispam;
+    else if (num === 6) global.filtrosConfig.antibots = !global.filtrosConfig.antibots;
+    else if (num === 7) global.filtrosConfig.antiestafas = !global.filtrosConfig.antiestafas;
+    else { await responder('❌ Opción no válida. Usa números del 1 al 7.'); break; }
+  }
+
+  const on = '✅ ON';
+  const off = '❌ OFF';
+  const f = global.filtrosConfig;
+
+  let txt = '⚙️ *CONFIGURACIÓN DEL BOT*\n\n';
+  txt += '*1.* 🔞 Antiporno: ' + (f.antiPorno ? on : off) + '\n';
+  txt += '*2.* 🔇 Antiaudio: ' + (f.antiaudio ? on : off) + '\n';
+  txt += '*3.* 🎬 Antivideos: ' + (f.antivideos ? on : off) + '\n';
+  txt += '*4.* 🎨 Antisticker: ' + (f.antisticker ? on : off) + '\n';
+  txt += '*5.* 📵 Antispam: ' + (f.antispam ? on : off) + '\n';
+  txt += '*6.* 🤖 Antibots: ' + (f.antibots ? on : off) + '\n';
+  txt += '*7.* ⚠️ Antiestafas: ' + (f.antiestafas ? on : off) + '\n\n';
+  txt += '💡 *Para cambiar un estado, envía:*\nEjemplo: #config 1';
+  
+  await responder(txt);
   break;
 }
 
