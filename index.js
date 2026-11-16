@@ -3898,60 +3898,77 @@ case 'playvideo': case 'video': case 'v': case 'playdoc': {
       await responder('🔍 Buscando video de: ' + query + '...');
       
       try {
-        const yt = require('@denzy-official/youtube_scraper');
-        const res = await yt.ytmp4(query);
+        const { exec } = require('child_process');
+        const { promisify } = require('util');
+        const execAsync = promisify(exec);
+        const fs2 = require('fs');
         
-        const videoUrl = res?.download?.url || res?.result?.download || res?.url;
-        if (!videoUrl) {
-          await responder('❌ No se pudo obtener el enlace del video.');
-          break;
+        const target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
+        let title = query, thumb = null, channel = 'Desconocido', url = target;
+        
+        // 1. Obtener información con Android (que sí funciona)
+        try {
+          const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
+          const info = JSON.parse(stdout.trim().split('\n')[0]);
+          title = info.title; thumb = info.thumbnail; channel = info.channel || info.uploader; url = info.webpage_url;
+        } catch (e) {
+          await responder('❌ No encontré resultados para: ' + query); break;
         }
-
-        const title = res?.metadata?.title || res?.title || query;
-        const channel = res?.metadata?.author?.name || res?.author?.name || 'Desconocido';
-        const thumb = res?.metadata?.thumbnail || res?.thumbnail;
-
-        const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Espera un momento...';
         
+        const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Espera un momento...';
         if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
         else await sock.sendMessage(jid, { text: txt }, { quoted: m });
 
-        await responder('⬇️ Procesando video (máximo 60s)...');
+        await responder('⬇️ Procesando video (puede tardar)...');
         
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); 
+        let archivoDescargado = false;
+        let filePath = '/tmp/video_' + Date.now() + '.mp4';
 
+        // Estrategia 1: Descargar con yt-dlp usando el cliente "web_embedded"
         try {
-            const fileRes = await fetch(videoUrl, { 
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-                signal: controller.signal 
-            });
-            clearTimeout(timeoutId);
+          await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + url + '"', { timeout: 120000 });
+          archivoDescargado = true;
+        } catch (e) { 
+          console.log('Fallo yt-dlp web_embedded:', e.message); 
+        }
 
-            if (!fileRes.ok) throw new Error('HTTP ' + fileRes.status);
-            
-            const buffer = Buffer.from(await fileRes.arrayBuffer());
-
-            if (buffer.length > 64 * 1024 * 1024) {
-               await responder('❌ El video pesa más de 64MB (límite de WhatsApp).');
-               break;
+        // Estrategia 2: Usar btch-downloader
+        if (!archivoDescargado) {
+          try {
+            const btch = require('btch-downloader');
+            let dlUrl = '';
+            if (typeof btch.ytmp4 === 'function') {
+              const res = await btch.ytmp4(url);
+              dlUrl = res?.result?.download || res?.result?.url;
             }
+            if (dlUrl) {
+              const fileRes = await fetch(dlUrl);
+              const buffer = Buffer.from(await fileRes.arrayBuffer());
+              fs2.writeFileSync(filePath, buffer);
+              archivoDescargado = true;
+            }
+          } catch (e) { 
+            console.log('Fallo btch:', e.message); 
+          }
+        }
 
+        // Enviar el video si se descargó
+        if (archivoDescargado && fs2.existsSync(filePath)) {
+          const stats = fs2.statSync(filePath);
+          if (stats.size > 64 * 1024 * 1024) {
+            await responder('❌ El video pesa más de 64MB (límite de WhatsApp).');
+          } else {
+            const buffer = fs2.readFileSync(filePath);
             await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
-
-        } catch (dlErr) {
-            clearTimeout(timeoutId);
-            if (dlErr.name === 'AbortError') {
-                await responder('❌ La descarga del video tardó demasiado (Timeout).');
-            } else {
-                console.log('Error directo, usando URL de respaldo:', dlErr.message);
-                await sock.sendMessage(jid, { video: { url: videoUrl }, caption: '✅ ' + title }, { quoted: m });
-            }
+          }
+          fs2.unlinkSync(filePath); // Limpiar
+        } else {
+          await responder('❌ No se pudo descargar el video. YouTube está bloqueando la descarga en este servidor.');
         }
 
       } catch (e) { 
         console.log('Error en video:', e.message);
-        await responder('❌ Error al buscar el video. Intenta de nuevo.'); 
+        await responder('❌ Error interno al procesar el video.'); 
       }
       break;
     }
