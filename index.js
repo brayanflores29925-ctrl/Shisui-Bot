@@ -4065,7 +4065,7 @@ case 'playvideo': case 'video': case 'v': {
   break;
 }
 
-case 'play': case 'play2': {
+case 'play2': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
   
@@ -4281,6 +4281,79 @@ case 'cancelarruleta': {
   clearTimeout(global.salasRuleta[jid].timer);
   delete global.salasRuleta[jid];
   await responder('🛑 Ruleta cancelada.');
+  break;
+}
+
+
+case 'play': case 'play2': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
+  
+  await responder('🔍 Buscando audio de: ' + query + '...');
+  
+  try {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    const fs2 = require('fs');
+    
+    let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', url = '';
+    
+    // 1. Buscar con yt-dlp (QUITANDO LAS COMILLAS INTERNAS QUE ROMPÍAN LA BÚSQUEDA)
+    try {
+      const searchCmd = 'yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query.replace(/"/g, '') + '"';
+      const { stdout } = await execAsync(searchCmd, { timeout: 30000 });
+      const info = JSON.parse(stdout.trim().split('\n')[0]);
+      title = info.title || query; thumb = info.thumbnail; channel = info.channel || info.uploader; duration = info.duration_string || info.duration + 's'; url = info.webpage_url;
+    } catch (err) {
+      console.log('Fallo yt-dlp search, intentando youtube-sr:', err.message);
+      // 2. Si yt-dlp falla, usar youtube-sr como respaldo
+      try {
+        const Youtube = require('youtube-sr').default;
+        const res = await Youtube.searchOne(query);
+        if (res) {
+          title = res.title; thumb = res.thumbnail.url; channel = res.channel.name; duration = res.durationFormatted; url = res.url;
+        } else {
+          await responder('❌ No encontré resultados para: ' + query); break;
+        }
+      } catch (err2) {
+        await responder('❌ No encontré resultados para: ' + query); break;
+      }
+    }
+
+    if (!url) { await responder('❌ No se pudo obtener el enlace del video.'); break; }
+    
+    const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⧖ Duración › *' + duration + '*\n⏳ Espera un momento...';
+    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+
+    // 3. Descargar el audio
+    let dlUrl = '';
+    try {
+      const btch = require('btch-downloader');
+      const dl = await btch.ytmp3(url);
+      dlUrl = dl.result?.download || dl.result?.url || dl.result?.mp3;
+    } catch(e) {}
+    
+    if (dlUrl) {
+      const fileRes = await fetch(dlUrl);
+      const buffer = Buffer.from(await fileRes.arrayBuffer());
+      await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+    } else {
+      // Respaldo: Descargar video y extraer audio con ffmpeg
+      const filePathMp4 = '/tmp/video_temp_' + Date.now() + '.mp4';
+      const filePathM4a = '/tmp/audio_temp_' + Date.now() + '.m4a';
+      await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePathMp4 + '" "' + url + '"', { timeout: 120000 });
+      await execAsync('ffmpeg -y -i "' + filePathMp4 + '" -vn -acodec copy "' + filePathM4a + '"', { timeout: 30000 });
+      const buffer = fs2.readFileSync(filePathM4a);
+      await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+      fs2.unlinkSync(filePathMp4); fs2.unlinkSync(filePathM4a);
+    }
+
+  } catch (e) { 
+    console.log('Error en play:', e.message);
+    await responder('❌ Error al descargar el audio.'); 
+  }
   break;
 }
 
