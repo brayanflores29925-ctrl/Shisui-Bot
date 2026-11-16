@@ -3731,7 +3731,7 @@ case 'ytsearch': {
 
 
 
-case 'playvideo': case 'play2': case 'playdoc': {
+case 'playdoc': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
   
@@ -3838,13 +3838,111 @@ case 'playvideo': case 'play2': case 'playdoc': {
   break;
 }
 
+
+case 'play': case 'play2': case 'playvideo': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
+  
+  await responder('🔍 Buscando y preparando: ' + query + '...');
+  
+  try {
+    const Youtube = require('youtube-sr').default;
+    const btch = require('btch-downloader');
+    
+    let videoUrl = query;
+    let videoInfo = null;
+    
+    // Buscar en YouTube si no es un enlace directo
+    if (!query.startsWith('http')) {
+      const res = await Youtube.searchOne(query);
+      if (!res) { await responder('❌ No encontré resultados para: ' + query); break; }
+      videoUrl = res.url;
+      videoInfo = res;
+    }
+    
+    const title = videoInfo ? videoInfo.title : 'Video de YouTube';
+    const thumb = videoInfo ? videoInfo.thumbnail.url : null;
+    const channel = videoInfo ? videoInfo.channel.name : 'Desconocido';
+    
+    // Enviar la tarjeta
+    const txt = '➩ Descargando › *' + title + '*\n\n' +
+                '❖ Canal › *' + channel + '*\n' +
+                '⏳ Espera un momento mientras preparo tu archivo...';
+                
+    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+    
+    // Descargar usando btch-downloader (Evita bloqueos de YouTube)
+    let dlUrl = '';
+    if (cmd === 'playvideo') {
+      const dl = await btch.ytmp4(videoUrl);
+      if (dl.status && dl.result) dlUrl = dl.result.download;
+    } else {
+      const dl = await btch.ytmp3(videoUrl);
+      if (dl.status && dl.result) dlUrl = dl.result.download;
+    }
+    
+    if (!dlUrl) {
+      await responder('❌ El servidor de descarga está saturado. Intenta de nuevo en unos minutos.');
+      break;
+    }
+    
+    const fileRes = await fetch(dlUrl);
+    const buffer = Buffer.from(await fileRes.arrayBuffer());
+    
+    if (cmd === 'playvideo') {
+      await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
+    } else {
+      await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+    }
+    
+  } catch (e) {
+    console.log('Error en descarga:', e.message);
+    await responder('❌ Error al descargar: ' + e.message);
+  }
+  break;
+}
+
+case 'tiktok': case 'tt': {
+  const url = cuerpo.slice(cmd.length).trim();
+  if (!url || !url.includes('tiktok.com')) {
+    await responder('Uso: #tiktok <enlace de TikTok>\nEjemplo: #tiktok https://vm.tiktok.com/...');
+    break;
+  }
+  
+  await responder('⬇️ Descargando video de TikTok...');
+  
+  try {
+    const res = await fetch('https://www.tikwm.com/api/?url=' + encodeURIComponent(url) + '&hd=1');
+    const json = await res.json();
+    
+    if (json.code !== 0 || !json.data) {
+      await responder('❌ No se pudo obtener el video. Asegúrate de que sea público.');
+      break;
+    }
+    
+    const videoUrl = json.data.play;
+    const titulo = json.data.title || 'Video de TikTok';
+    const autor = json.data.author ? json.data.author.nickname : 'Desconocido';
+    
+    const videoRes = await fetch(videoUrl);
+    const buffer = Buffer.from(await videoRes.arrayBuffer());
+    
+    await sock.sendMessage(jid, { video: buffer, caption: '🎬 *' + titulo + '*\n👤 ' + autor }, { quoted: m });
+    
+  } catch (e) {
+    console.log('Error .tiktok:', e.message);
+    await responder('❌ Error descargando de TikTok.');
+  }
+  break;
+}
+
 case 'musica':
       case 'm':
-      case 'play':
-case 'villancico':
+      case 'villancico':
       case 'video':
       case 'v':
-      case 'tiktok': case 'tt': {
+      case 'tt': {
   const url = cuerpo.slice(cmd.length).trim();
   if (!url || !url.includes('tiktok.com')) {
     await responder('Uso: #tiktok <enlace de TikTok>\\nEjemplo: #tiktok https://vm.tiktok.com/...');
