@@ -3863,56 +3863,13 @@ case 'mapa': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #maps <lugar>'); break; }
   
-  // Enviamos el enlace directo sin consultar APIs
   const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
   await sock.sendMessage(jid, { text: '🗺️ *Ubicación en Google Maps:*\n' + link }, { quoted: m });
   break;
 }
 
-
-case 'attp2': case 'attp3': case 'ttp': {
-  const texto = cuerpo.slice(cmd.length).trim();
-  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
-  
-  await responder('✨ Creando sticker...');
-  
-  try {
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
-    const fs2 = require('fs');
-    
-    const textoLimpio = texto.replace(/['"\\]/g, '');
-    const filePath = '/tmp/sticker_' + Date.now() + '.webp';
-    
-    const comandoFfmpeg = 'ffmpeg -f lavfi -i color=c=black:s=512x512:d=1 -vf "drawtext=text=\'' + textoLimpio + '\':fontcolor=white:fontsize=64:x=(w-text_w)/2:y=(h-text_h)/2" -vcodec libwebp -lossless 1 -q:v 60 -loop 0 -preset default -an -vsync 0 "' + filePath + '"';
-    
-    await execAsync(comandoFfmpeg, { timeout: 15000 });
-    
-    if (!fs2.existsSync(filePath)) throw new Error('No se creó el archivo');
-    
-    const buffer = fs2.readFileSync(filePath);
-    await sock.sendMessage(jid, { sticker: buffer }, { quoted: m });
-    fs2.unlinkSync(filePath);
-    
-  } catch (e) {
-    console.log('Error en attp local:', e.message);
-    await responder('❌ Error al crear el sticker (Falta ffmpeg o una fuente en el servidor).');
-  }
-  break;
-}
 
 case 'mapa': {
-  const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #maps <lugar>'); break; }
-  
-  const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
-  await sock.sendMessage(jid, { text: '🗺️ *Ubicación en Google Maps:*\n' + link }, { quoted: m });
-  break;
-}
-
-
-case 'maps': case 'mapa': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #mapa <lugar>'); break; }
   
@@ -3922,7 +3879,7 @@ case 'maps': case 'mapa': {
   break;
 }
 
-case 'attp': case 'attp2': case 'attp3': case 'ttp': {
+case 'attp2': case 'attp3': case 'ttp': {
   const texto = cuerpo.slice(cmd.length).trim();
   if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
   
@@ -4092,6 +4049,58 @@ case 'eliminarrespuesta': {
     await responder(`✅ Respuesta *"${palabra}"* eliminada.`);
   } else {
     await responder('❌ Esa respuesta no existe.');
+  }
+  break;
+}
+
+
+case 'maps': case 'mapa': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #mapa <lugar>'); break; }
+  
+  // Envía el enlace directo (cero APIs, cero bloqueos)
+  const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
+  await sock.sendMessage(jid, { text: '🗺️ *Ubicación en Google Maps:*\n' + link }, { quoted: m });
+  break;
+}
+
+case 'attp': case 'attp2': case 'attp3': case 'ttp': {
+  const texto = cuerpo.slice(cmd.length).trim();
+  if (!texto) { await responder('Uso: #' + cmd + ' <texto>'); break; }
+  
+  await responder('✨ Creando sticker...');
+  
+  try {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    const fs2 = require('fs');
+    
+    // 1. Descargar la fuente si no existe
+    const fontPath = '/tmp/font.ttf';
+    if (!fs2.existsSync(fontPath)) {
+      const fontRes = await fetch('https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf');
+      const fontBuffer = Buffer.from(await fontRes.arrayBuffer());
+      fs2.writeFileSync(fontPath, fontBuffer);
+    }
+
+    const textoLimpio = texto.replace(/['"\\]/g, '');
+    const filePath = '/tmp/sticker_' + Date.now() + '.webp';
+    
+    // 2. Generar con ffmpeg usando la fuente descargada
+    const comandoFfmpeg = 'ffmpeg -y -f lavfi -i color=c=black:s=512x512:d=1 -vf "drawtext=fontfile=' + fontPath + ':text=\'' + textoLimpio + '\':fontcolor=white:fontsize=64:x=(w-text_w)/2:y=(h-text_h)/2" -vcodec libwebp -lossless 1 -q:v 60 -loop 0 -preset default -an -vsync 0 "' + filePath + '"';
+    
+    await execAsync(comandoFfmpeg, { timeout: 15000 });
+    
+    if (!fs2.existsSync(filePath)) throw new Error('No se creó el archivo');
+    
+    const buffer = fs2.readFileSync(filePath);
+    await sock.sendMessage(jid, { sticker: buffer }, { quoted: m });
+    fs2.unlinkSync(filePath);
+    
+  } catch (e) {
+    console.log('Error en attp:', e.message);
+    await responder('❌ Error al crear el sticker. Intenta de nuevo.');
   }
   break;
 }
