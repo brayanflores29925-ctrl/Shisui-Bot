@@ -4138,6 +4138,7 @@ case 'play': case 'play2': {
 
 
 
+
 case 'pin': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
@@ -4145,12 +4146,11 @@ case 'pin': {
   
   let stickerEnviado = false;
 
-  // A) Intentar buscar un sticker con GifSnap
+  // A) Intentar sticker con GifSnap
   try {
     const { createGifSnapClient } = await import('@rowix/gifsnap-js');
     const client = createGifSnapClient();
     const res = await client.searchStickers({ query: query, limit: 1 });
-    
     if (res.data && res.data.length > 0) {
       const stickerUrl = res.data[0].url;
       const stickerRes = await fetch(stickerUrl);
@@ -4159,34 +4159,44 @@ case 'pin': {
       await sock.sendMessage(jid, { sticker: webp }, { quoted: m });
       stickerEnviado = true;
     }
-  } catch (gifErr) {
-    console.log('Error en GifSnap:', gifErr.message);
-  }
+  } catch (e) { console.log('Error GifSnap:', e.message); }
 
-  // B) Si no se envió sticker, buscar 2 fotos con @killovsky/gimages
+  // B) Si no hay sticker, buscar fotos con @killovsky/gimages
   if (!stickerEnviado) {
-    await responder('⚠️ No encontré sticker. Buscando fotos reales...');
+    await responder('⚠️ No encontré sticker. Buscando fotos...');
     try {
       const gimages = require('@killovsky/gimages');
-      const data = await gimages.get({ query: query, safe: true, formats: ['jpg', 'png'] });
-      
-      // La respuesta puede ser un array de objetos con 'url'
-      const results = data.data || data.results || data;
-      
-      if (results && results.length > 0) {
-        const fotos = results.slice(0, 2);
-        for (let i = 0; i < fotos.length; i++) {
-          const imgUrl = fotos[i].url || fotos[i].image || fotos[i];
-          if (imgUrl) {
-            await sock.sendMessage(jid, { image: { url: imgUrl }, caption: '🖼️ Foto ' + (i+1) + ' de: ' + query }, { quoted: m });
-          }
+      const data = await gimages.get({ query: query, safe: true });
+      const results = data.data || [];
+      if (results.length > 0) {
+        for (let i = 0; i < Math.min(results.length, 2); i++) {
+          await sock.sendMessage(jid, { image: { url: results[i].url }, caption: '🖼️ Foto ' + (i+1) + ' de: ' + query }, { quoted: m });
         }
-      } else {
-        await responder('❌ No encontré fotos para esa búsqueda.');
+        stickerEnviado = true;
       }
-    } catch (gisErr) {
-      console.log('Error en Google Images:', gisErr.message);
-      await responder('❌ Error al buscar fotos.');
+    } catch (e) { console.log('Error killovsky:', e.message); }
+  }
+
+  // C) Si aún no hay fotos, usar free-google-images como respaldo
+  if (!stickerEnviado) {
+    try {
+      const googleImages = require('free-google-images');
+      const results = await googleImages.search(query);
+      if (results && results.length > 0) {
+        for (let i = 0; i < Math.min(results.length, 2); i++) {
+          await sock.sendMessage(jid, { image: { url: results[i].image.url }, caption: '🖼️ Foto ' + (i+1) + ' de: ' + query }, { quoted: m });
+        }
+        stickerEnviado = true;
+      }
+    } catch (e) { console.log('Error free-google-images:', e.message); }
+  }
+
+  // D) Respaldo final: Pollinations
+  if (!stickerEnviado) {
+    await responder('⚠️ Generando fotos con IA...');
+    for (let i = 1; i <= 2; i++) {
+      const imgUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(query) + '?width=512&height=512&nologo=true&seed=' + (Date.now() + i);
+      await sock.sendMessage(jid, { image: { url: imgUrl }, caption: '🖼️ Foto IA ' + i + ': ' + query }, { quoted: m });
     }
   }
   break;
@@ -4194,11 +4204,13 @@ case 'pin': {
 
 case 'config': {
   const args = cuerpo.slice(cmd.length).trim();
-  
-  // Si el usuario envía un número, cambiamos el estado
+  const f = global.filtrosConfig || {
+    antiPorno: false, antiaudio: false, antivideos: false,
+    antisticker: false, antispam: false, antibots: false, antiestafas: false
+  };
+
   if (args) {
     const num = parseInt(args);
-    const f = global.filtrosConfig;
     if (num === 1) f.antiPorno = !f.antiPorno;
     else if (num === 2) f.antiaudio = !f.antiaudio;
     else if (num === 3) f.antivideos = !f.antivideos;
@@ -4211,8 +4223,6 @@ case 'config': {
 
   const on = '✅ ON';
   const off = '❌ OFF';
-  const f = global.filtrosConfig;
-
   let txt = '⚙️ *CONFIGURACIÓN DEL BOT*\n\n';
   txt += '*1.* 🔞 Antiporno: ' + (f.antiPorno ? on : off) + '\n';
   txt += '*2.* 🔇 Antiaudio: ' + (f.antiaudio ? on : off) + '\n';
@@ -4222,7 +4232,6 @@ case 'config': {
   txt += '*6.* 🤖 Antibots: ' + (f.antibots ? on : off) + '\n';
   txt += '*7.* ⚠️ Antiestafas: ' + (f.antiestafas ? on : off) + '\n\n';
   txt += '💡 *Para cambiar un estado, envía:*\nEjemplo: #config 1';
-  
   await responder(txt);
   break;
 }

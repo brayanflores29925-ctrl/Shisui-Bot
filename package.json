@@ -22,6 +22,7 @@
     "dotenv": "^18.0.10",
     "duck-duck-scrape": "^2.2.7",
     "ducksearch": "^1.0.3",
+    "free-google-images": "^1.2.1",
     "gocreative-tiktok-search": "^0.1.0",
     "groq-sdk": "^1.6.0",
     "jimp": "^1.6.1",
