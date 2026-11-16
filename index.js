@@ -651,7 +651,7 @@ const GACHA_RARITIES = [
 
 
 
-global.listaComandos = ['sticker', 'robloxgame', 'trabajar', 'robloxgroups', 'ranknazis', 'mediafire', 'antisticker', 'bored', 'antiaudio', 'stickername', 'despedida', 'yawn', '12vs12', 'advertencia', 'limpiar', 'card', 'bn', 'diario', 'descargarapk', 'horca', 'np', 'topricos', 'chatpgt', 'felicitar', 'setred', 'pin', 'video', 'robloxuser', 'fp', 'autoread', 'imagina', 'stare', 'grave', 'attp3', 'disco', 'random', 'piropo', 'yeet', 'adv', 'reverse', 'subs', 'pt', 'promote', 'patear', 'fake', 'instagram', 'videorapido', 'clima', 'delcode', 'imagine', 'horario', 'robloxrandom', 'arbol', 'smug', 'aspam', 'ram', 'yt', 'admins', 'cambiarlink', 'stats', 'aceptarracha', 'perfil', 'v', 'kiss', 'fd', 'piti', 'cd', 'nd', 'highfive', 'resphorca', 'musica', 'activarbot', 'dr', 'pfp', 'robloxavatar', 'as', 'roll', 'sticker2', 'gpt', 'tbcookie', 'w', 'tovideo', 'balance', 'voz', 'shoot', 'code', 'invitacion', 'dados', 'setmenu', 'invitar', 'shrug', 'audiorapido', 'bite', 'wink', 'baka', 'nod', 'antiestafas', 'ar', 'work', 'desactivarracha', 'ayudagacha', 'reglas', '6vs6', 'antilink', 'setowner', 'bt', 'feo', 'gacha', 'attp', 'setupdate', 'bass', 'p', 'toimg', 'setprotect', 'dn', 'setperfil', 'gay', 'rankotaku', 'cambiarenlace', 'k', 'facebook', 'casino', 'fix', 'coleccion', 'poke', 'sg', 'kick', 'bl', 'chatgpt', 'setoficial', 'handshake', 'hs', 'po', 'descripcion', 'sensibilidad', 'cuddle', 'setnsfw', 'aceptarinv', 'hp', 'an', 'lf', 'ardilla', 'e', 'robloxbadges', 'status', 'gpfp', 'verdad', 'thumbsup', 'tf', 'desmutear', 'rn', 'antibots', 'bonk', 'play', 'setprimary', 'videocontrario', 'yn', 'setnombre', 'downloadlink', 'fotogrupo', 'hf', 'ranklesbianas', 'dance', 'simi', 'vender', 'yonunca', 'toqr', 'think', 'link', 'aviso', 'cry', 'fb', 'aprobartodo', 'mr', 'testvideo', 'facepalm', 'slap', 'sleep', 'tag', 'modoadmin', 'guerra', 'reto', 'buscartt', 'x', 'menu', 'clear', 'sl', 'nope', 'audiolento', 'bd', 'aa', 'rankinfieles', 'navidad', 'cmd', 'r', 'horoscopo', 'borrar', 'eco', 'gachaprof', 'a2v', 'hd', 'fantasmas', 'handhold', 'setdespedida', 'owners', 'juegospro', 'rc', 'reporte', 'fq', 'stik', 'espacio', 'herramientas', 'monedas', 'setbienvenida', 'tirar', 'ae', 'robot', 'ttp', 'antistatus', 'attp2', 'lk', 'angry', 'alteradores', 'play2', 'tableflip', 'gachamenu', 'error', 'run', 'videolento', 'anonuevo', 'nom', 'togif', 'consola', 'ping', 'daily', 'delowner', 'mispj', 'wikipedia', 'ap', 'ab', 'blush', 'pk', 'removemoney', 'ranktherian', 'tt', 'tiktok', 'mute', 'actualizar', 'apostar', 'hh', 'setbotprincipal', 'setpfp', '4vs4', 'attp4', 'cerrar', 'buscar', 'setapi', 'menuclan', 'pat', 'st', 'rankbromistas', 'attp6', 'rr', 'tk', 'nombregrupo', 'wv', 'rechazarracha', 'bal', 'ban', 'robloxfriends', 'robloxfollowers', 'miracha', 'miid', 'peck', 'mutear', 'google', 'playdoc', 'sticker3', 'sh', 'ig', 'h', 'rankcornudos', 'bot', 'desactivarbot', 'tickle', 'sr', 'reiniciar', 'flipp', 'key', 'cartera', 'abrir', 'th', 'party', 'nochebuena', 'happy', 'ytsearch', 'antivideos', 'laugh', 'pc', 'smile', 'rankfieles', 'tu', 'pu', 'demote', 'sell', 'del', 'setban', 's', 'botlist', 'wave', 'restart', 'patada', 'punch', 'pout', 'zz', 'robloxstatus', 'nm', 'bk', 'unmute', 'g', 'addmoney', 'tomp3', 'rechazarinv', 'm', 'cr', 'attp5', 'av', 'robloxplayers', 'd', 'col', 'bienvenida', 'ranklindo', 'topactive', 'feed', 'llama', 'consejo', 'sm', 'wn', 'estado', 'racha', 'enigma', 'rankgay', 'gprof', 'topmoney', 'antispam', 'playvideo', 'botones', 'lurk', 'ppt', 'c', 'packname', 'hug', 'topactivos'];
+global.listaComandos = ['sticker', 'robloxgame', 'trabajar', 'robloxgroups', 'ranknazis', 'mediafire', 'antisticker', 'bored', 'antiaudio', 'stickername', 'despedida', 'yawn', '12vs12', 'advertencia', 'limpiar', 'card', 'bn', 'diario', 'descargarapk', 'horca', 'np', 'topricos', 'chatpgt', 'felicitar', 'setred', 'pin', 'video', 'robloxuser', 'fp', 'autoread', 'imagina', 'stare', 'grave', 'attp3', 'disco', 'random', 'piropo', 'yeet', 'adv', 'reverse', 'subs', 'pt', 'promote', 'patear', 'fake', 'instagram', 'videorapido', 'clima', 'delcode', 'imagine', 'horario', 'robloxrandom', 'arbol', 'smug', 'aspam', 'ram', 'yt', 'admins', 'cambiarlink', 'stats', 'aceptarracha', 'perfil', 'v', 'kiss', 'fd', 'piti', 'cd', 'nd', 'highfive', 'resphorca', 'musica', 'activarbot', 'dr', 'pfp', 'robloxavatar', 'as', 'roll', 'sticker2', 'gpt', 'tbcookie', 'w', 'tovideo', 'balance', 'voz', 'shoot', 'code', 'invitacion', 'dados', 'setmenu', 'invitar', 'shrug', 'audiorapido', 'bite', 'wink', 'baka', 'nod', 'antiestafas', 'ar', 'work', 'desactivarracha', 'ayudagacha', 'reglas', '6vs6', 'antilink', 'setowner', 'bt', 'feo', 'gacha', 'attp', 'setupdate', 'bass', 'p', 'toimg', 'setprotect', 'dn', 'setperfil', 'gay', 'rankotaku', 'cambiarenlace', 'k', 'facebook', 'casino', 'fix', 'coleccion', 'poke', 'sg', 'kick', 'bl', 'chatgpt', 'setoficial', 'handshake', 'hs', 'po', 'descripcion', 'sensibilidad', 'cuddle', 'setnsfw', 'aceptarinv', 'hp', 'an', 'lf', 'ardilla', 'e', 'robloxbadges', 'status', 'gpfp', 'verdad', 'thumbsup', 'tf', 'desmutear', 'rn', 'antibots', 'bonk', 'play', 'setprimary', 'videocontrario', 'yn', 'setnombre', 'downloadlink', 'fotogrupo', 'hf', 'ranklesbianas', 'dance', 'simi', 'vender', 'yonunca', 'toqr', 'think', 'link', 'aviso', 'cry', 'fb', 'aprobartodo', 'mr', 'testvideo', 'facepalm', 'slap', 'sleep', 'tag', 'modoadmin', 'guerra', 'reto', 'buscartt', 'x', 'menu', 'clear', 'sl', 'nope', 'audiolento', 'bd', 'aa', 'rankinfieles', 'navidad', 'cmd', 'r', 'horoscopo', 'borrar', 'eco', 'gachaprof', 'a2v', 'hd', 'fantasmas', 'handhold', 'setdespedida', 'owners', 'juegospro', 'rc', 'reporte', 'fq', 'stik', 'espacio', 'herramientas', 'monedas', 'setbienvenida', 'tirar', 'ae', 'robot', 'ttp', 'antistatus', 'attp2', 'lk', 'angry', 'alteradores', 'play2', 'tableflip', 'gachamenu', 'error', 'run', 'videolento', 'anonuevo', 'nom', 'togif', 'consola', 'ping', 'daily', 'delowner', 'mispj', 'wikipedia', 'ap', 'ab', 'blush', 'pk', 'removemoney', 'ranktherian', 'tt', 'tiktok', 'mute', 'actualizar', 'apostar', 'hh', 'setbotprincipal', 'setpfp', '4vs4', 'attp4', 'cerrar', 'buscar', 'setapi', 'menuclan', 'pat', 'st', 'rankbromistas', 'attp6', 'rr', 'tk', 'nombregrupo', 'wv', 'rechazarracha', 'bal', 'ban', 'robloxfriends', 'robloxfollowers', 'miracha', 'miid', 'peck', 'mutear', 'google', 'playdoc', 'sticker3', 'sh', 'ig', 'h', 'rankcornudos', 'bot', 'desactivarbot', 'tickle', 'sr', 'reiniciar', 'flipp', 'key', 'cartera', 'abrir', 'th', 'party', 'nochebuena', 'happy', 'ytsearch', 'antivideos', 'laugh', 'pc', 'smile', 'rankfieles', 'tu', 'pu', 'demote', 'sell', 'del', 'setban', 's', 'botlist', 'wave', 'restart', 'patada', 'punch', 'pout', 'zz', 'robloxstatus', 'nm', 'bk', 'unmute', 'g', 'addmoney', 'tomp3', 'rechazarinv', 'm', 'cr', 'attp5', 'av', 'robloxplayers', 'd', 'col', 'bienvenida', 'ranklindo', 'topactive', 'feed', 'llama', 'consejo', 'sm', 'wn', 'estado', 'racha', 'enigma', 'rankgay', 'gprof', 'topmoney', 'antispam', 'playvideo', 'botones', 'lurk', 'ppt', 'c', 'packname', 'hug', 'topactivos', 'ruleta', 'ruletarusa', 'unirme', 'iniciar', 'cancelarruleta'];
 
 // --- SISTEMA DE REGISTRO DE LOGS ---
 global.botLogs = [];
@@ -4284,32 +4284,53 @@ case 'play': case 'play2': {
 
 case 'ruleta': case 'ruletarusa': {
   try {
-    const creador = m.key.participant || m.key.remoteJid;
-    if (!global.salasRuleta) global.salasRuleta = {};
-    
-    if (global.salasRuleta[jid] && global.salasRuleta[jid].activa) {
-      await responder('❌ Ya hay una ruleta activa en este grupo.');
+    if (!jid.endsWith('@g.us')) {
+      await responder('❌ Este juego solo funciona en grupos.');
       break;
     }
-    
-    global.salasRuleta[jid] = {
+    if (!global.salasRuleta) global.salasRuleta = {};
+    if (global.salasRuleta[jid]?.activa) {
+      await responder('❌ Ya hay una partida activa.');
+      break;
+    }
+
+    const creador = m.key.participant || m.key.remoteJid;
+    const sala = {
       creador,
       participantes: [creador],
       activa: true,
       timer: null
     };
-    
-    let txt = '🔫 *RULETA RUSA* 🔫\n\n🔴 *Se ha cargado 1 bala en el tambor.*\n\n👥 *Participantes:*\n- @' + creador.split('@')[0] + '\n\n📝 Escribe *.unirme* para participar.\n⏳ Tienes 30 segundos.\n(Escribe *.iniciar* para empezar ya)';
-    await sock.sendMessage(jid, { text: txt, mentions: [creador] }, { quoted: m });
-    
-    global.salasRuleta[jid].timer = setTimeout(async () => {
-      if (global.salasRuleta[jid] && global.salasRuleta[jid].activa) {
-        await jugarRuleta(jid, sock);
+    global.salasRuleta[jid] = sala;
+
+    await sock.sendMessage(jid, {
+      text: '🎲 *SORTEO ALEATORIO*\n\n👥 @' + creador.split('@')[0] +
+        ' ha creado una partida.\n\nEscribe *.unirme* para participar.\n' +
+        '⏳ Tienes 30 segundos o el creador puede escribir *.iniciar*. ',
+      mentions: [creador]
+    }, { quoted: m });
+
+    sala.timer = setTimeout(async () => {
+      try {
+        const actual = global.salasRuleta?.[jid];
+        if (!actual || !actual.activa) return;
+        actual.activa = false;
+        delete global.salasRuleta[jid];
+        const elegido = actual.participantes[
+          Math.floor(Math.random() * actual.participantes.length)
+        ];
+        await sock.sendMessage(jid, {
+          text: '🎉 *SORTEO TERMINADO*\n\nPersona seleccionada al azar: @' +
+            elegido.split('@')[0],
+          mentions: [elegido]
+        });
+      } catch (e) {
+        console.log('Error en sorteo automático:', e.message);
       }
     }, 30000);
   } catch (e) {
-    console.log('Error en comando ruleta:', e.message);
-    await responder('❌ Error al iniciar la ruleta.');
+    console.log('Error en ruleta:', e.message);
+    await responder('❌ No se pudo crear la partida.');
   }
   break;
 }
@@ -4317,19 +4338,24 @@ case 'ruleta': case 'ruletarusa': {
 case 'unirme': {
   try {
     const sender = m.key.participant || m.key.remoteJid;
-    if (!global.salasRuleta || !global.salasRuleta[jid] || !global.salasRuleta[jid].activa) {
-      await responder('❌ No hay ninguna ruleta activa. Usa *.ruleta* para crear una.');
+    const sala = global.salasRuleta?.[jid];
+    if (!sala || !sala.activa) {
+      await responder('❌ No hay ninguna partida activa.');
       break;
     }
-    const sala = global.salasRuleta[jid];
     if (sala.participantes.includes(sender)) {
       await responder('❌ Ya estás participando.');
       break;
     }
     sala.participantes.push(sender);
-    await sock.sendMessage(jid, { text: '✅ @' + sender.split('@')[0] + ' se ha unido.\nParticipantes: *' + sala.participantes.length + '*', mentions: [sender] }, { quoted: m });
+    await sock.sendMessage(jid, {
+      text: '✅ @' + sender.split('@')[0] +
+        ' se ha unido.\nParticipantes: *' + sala.participantes.length + '*',
+      mentions: [sender]
+    }, { quoted: m });
   } catch (e) {
     console.log('Error en unirme:', e.message);
+    await responder('❌ No se pudo registrar tu participación.');
   }
   break;
 }
@@ -4337,18 +4363,51 @@ case 'unirme': {
 case 'iniciar': {
   try {
     const sender = m.key.participant || m.key.remoteJid;
-    if (!global.salasRuleta || !global.salasRuleta[jid] || !global.salasRuleta[jid].activa) {
-      await responder('❌ No hay ruleta activa.');
+    const sala = global.salasRuleta?.[jid];
+    if (!sala || !sala.activa) {
+      await responder('❌ No hay ninguna partida activa.');
       break;
     }
-    if (global.salasRuleta[jid].creador !== sender) {
-      await responder('❌ Solo el creador puede iniciar.');
+    if (sala.creador !== sender) {
+      await responder('❌ Solo quien creó la partida puede iniciarla.');
       break;
     }
-    clearTimeout(global.salasRuleta[jid].timer);
-    await jugarRuleta(jid, sock);
+    clearTimeout(sala.timer);
+    sala.activa = false;
+    delete global.salasRuleta[jid];
+    const elegido = sala.participantes[
+      Math.floor(Math.random() * sala.participantes.length)
+    ];
+    await sock.sendMessage(jid, {
+      text: '🎉 *SORTEO TERMINADO*\n\nPersona seleccionada al azar: @' +
+        elegido.split('@')[0],
+      mentions: [elegido]
+    }, { quoted: m });
   } catch (e) {
-    console.log('Error en iniciar:', e.message);
+    console.log('Error al iniciar sorteo:', e.message);
+    await responder('❌ No se pudo completar el sorteo.');
+  }
+  break;
+}
+
+case 'cancelarruleta': {
+  try {
+    const sender = m.key.participant || m.key.remoteJid;
+    const sala = global.salasRuleta?.[jid];
+    if (!sala || !sala.activa) {
+      await responder('❌ No hay ninguna partida activa.');
+      break;
+    }
+    if (sala.creador !== sender) {
+      await responder('❌ Solo quien creó la partida puede cancelarla.');
+      break;
+    }
+    clearTimeout(sala.timer);
+    delete global.salasRuleta[jid];
+    await responder('🛑 Partida cancelada correctamente.');
+  } catch (e) {
+    console.log('Error al cancelar sorteo:', e.message);
+    await responder('❌ No se pudo cancelar la partida.');
   }
   break;
 }
