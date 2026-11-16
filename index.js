@@ -3901,26 +3901,28 @@ case 'playvideo': case 'video': case 'v': case 'playdoc': {
         const yt = require('@denzy-official/youtube_scraper');
         const res = await yt.ytmp4(query);
         
-        if (!res.status || !res.download || !res.download.url) {
-          await responder('❌ No se pudo encontrar el video.');
+        const videoUrl = res?.download?.url || res?.result?.download || res?.url;
+        if (!videoUrl) {
+          await responder('❌ No se pudo obtener el enlace del video.');
           break;
         }
 
-        const meta = res.metadata;
-        const txt = '➩ Descargando › *' + meta.title + '*\n\n❖ Canal › *' + meta.author.name + '*\n⏳ Espera un momento...';
+        const title = res?.metadata?.title || res?.title || query;
+        const channel = res?.metadata?.author?.name || res?.author?.name || 'Desconocido';
+        const thumb = res?.metadata?.thumbnail || res?.thumbnail;
+
+        const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Espera un momento...';
         
-        if (meta.thumbnail) await sock.sendMessage(jid, { image: { url: meta.thumbnail }, caption: txt }, { quoted: m });
+        if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
         else await sock.sendMessage(jid, { text: txt }, { quoted: m });
 
         await responder('⬇️ Procesando video (máximo 60s)...');
         
-        // Sistema de tiempo límite (Timeout) para que no se quede colgado
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 segundos
+        const timeoutId = setTimeout(() => controller.abort(), 60000); 
 
         try {
-            // Descargamos con User-Agent para que no bloqueen el archivo
-            const fileRes = await fetch(res.download.url, { 
+            const fileRes = await fetch(videoUrl, { 
                 headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
                 signal: controller.signal 
             });
@@ -3935,22 +3937,21 @@ case 'playvideo': case 'video': case 'v': case 'playdoc': {
                break;
             }
 
-            await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + meta.title }, { quoted: m });
+            await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
 
         } catch (dlErr) {
             clearTimeout(timeoutId);
             if (dlErr.name === 'AbortError') {
-                await responder('❌ La descarga del video tardó demasiado (Timeout de 60s).');
+                await responder('❌ La descarga del video tardó demasiado (Timeout).');
             } else {
-                console.log('Error en descarga directa:', dlErr.message);
-                // Respaldo: intentar enviar el enlace directo para que Baileys lo procese
-                await sock.sendMessage(jid, { video: { url: res.download.url }, caption: '✅ ' + meta.title }, { quoted: m });
+                console.log('Error directo, usando URL de respaldo:', dlErr.message);
+                await sock.sendMessage(jid, { video: { url: videoUrl }, caption: '✅ ' + title }, { quoted: m });
             }
         }
 
       } catch (e) { 
         console.log('Error en video:', e.message);
-        await responder('❌ Error al buscar el video: ' + e.message); 
+        await responder('❌ Error al buscar el video. Intenta de nuevo.'); 
       }
       break;
     }
