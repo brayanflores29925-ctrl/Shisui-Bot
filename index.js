@@ -638,6 +638,24 @@ global.antiestafas = false
 const invitacionesPendientes = new Map()
 let contadorInvitaciones = 0
 
+
+// --- DESTRUCTOR DE INVITACIONES DE UN SOLO USO ---
+sock.ev.on('group-participants.update', async (update) => {
+  try {
+    if (update.action === 'add' && global.invitesUsoUnico && global.invitesUsoUnico[update.id]) {
+      // Alguien entró, revocamos el enlace inmediatamente
+      await sock.groupRevokeInvite(update.id);
+      delete global.invitesUsoUnico[update.id];
+      console.log('🔗 Enlace de invitación revocado automáticamente en el grupo:', update.id);
+      
+      await sock.sendMessage(update.id, { text: '⚠️ *Aviso:* El enlace de invitación de un solo uso ha sido revocado porque alguien ya ingresó.' });
+    }
+  } catch (e) {
+    console.log('Error al revocar invitación:', e.message);
+  }
+});
+// --------------------------------------------------
+
 sock.ev.on('messages.upsert', async ({ messages }) => {
   // --- BAN POR REACCION ---
   try {
@@ -3914,6 +3932,48 @@ case 'historia': case 'story': case 'his': {
   } catch (e) {
     console.log('Error en .historia:', e.message);
     await responder('❌ Error al descargar la foto/video. Intenta de nuevo.');
+  }
+  break;
+}
+
+
+case 'invitardm': case 'invi': case 'inv': {
+  if (!jid.endsWith('@g.us')) { await responder('❌ Solo funciona en grupos.'); break; }
+  
+  // Validar admin
+  const groupMetadata = await sock.groupMetadata(jid);
+  const sender = m.key.participant || m.key.remoteJid;
+  const senderParticipant = groupMetadata.participants.find(p => p.id === sender);
+  const esAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
+  
+  if (!esAdmin && !esDueno(m)) {
+    await responder('❌ Solo los administradores pueden enviar invitaciones directas.');
+    break;
+  }
+
+  const num = cuerpo.slice(cmd.length).trim().replace(/[^0-9]/g, '');
+  if (!num) { await responder('Uso: #invitardm <numero>\nEjemplo: #invitardm 50499998888'); break; }
+
+  await responder('⏳ Generando invitación de un solo uso...');
+  
+  try {
+    const code = await sock.groupInviteCode(jid);
+    const link = 'https://chat.whatsapp.com/' + code;
+    const jidTarget = num + '@s.whatsapp.net';
+    
+    // Enviar por privado
+    await sock.sendMessage(jidTarget, { 
+      text: '👋 ¡Hola! Has recibido una invitación para unirte al grupo.\n\n🔗 ' + link + '\n\n⚠️ *ATENCIÓN:* Este enlace es de *un solo uso*. En el momento en que alguien entre al grupo, el enlace se destruirá automáticamente.' 
+    });
+    
+    // Guardar en memoria para destruirlo cuando entren
+    if (!global.invitesUsoUnico) global.invitesUsoUnico = {};
+    global.invitesUsoUnico[jid] = true;
+    
+    await sock.sendMessage(jid, { text: '✅ Invitación enviada al +' + num + '.\n\n*(El enlace se autodestruirá cuando la persona ingrese al grupo).*' }, { quoted: m });
+  } catch (e) {
+    console.log('Error en .invitardm:', e.message);
+    await responder('❌ Error al generar el enlace. Asegúrate de que el bot sea administrador.');
   }
   break;
 }
