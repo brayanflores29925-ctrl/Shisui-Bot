@@ -7,6 +7,7 @@ const BOT = {
 }
 
 
+
 function getNavidadCountdown() {
   const ahora = new Date();
   let navidad = new Date(ahora.getFullYear(), 11, 25, 0, 0, 0);
@@ -16,16 +17,21 @@ function getNavidadCountdown() {
   const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
   const m = Math.floor((diff / (1000 * 60)) % 60);
   const s = Math.floor((diff / 1000) % 60);
-  return `🎅 ${d} días\n┃ 🕒 ${h} horas, ${m} minutos\n┃ ⏱️ ${s} segundos`;
+  return `🎅 ${d} días
+┃ 🕒 ${h} horas, ${m} minutos
+┃ ⏱️ ${s} segundos`;
 }
 
+
+
 function fechaHora() {
-  const ahora = new Date()
+  const ahora = new Date();
   return {
-    fecha: ahora.toLocaleDateString('es-HN', { timeZone: BOT.zona }),
-    hora: ahora.toLocaleTimeString('es-HN', { timeZone: BOT.zona, hour12: false })
-  }
+    fecha: ahora.toLocaleDateString('es-HN', { timeZone: 'America/Tegucigalpa' }),
+    hora: ahora.toLocaleTimeString('es-HN', { timeZone: 'America/Tegucigalpa', hour12: false })
+  };
 }
+
 
 const secciones = [
   ['📋 PERFILES', [
