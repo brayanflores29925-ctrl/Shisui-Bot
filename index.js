@@ -355,6 +355,32 @@ async function iniciar(opciones = {}) {
 
   sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
     if (connection === 'open') {
+      // --- BIENVENIDA SUBBOT ---
+      try {
+        const botNumber = sock.user.id.split(':')[0];
+        if (!global.subbotsBienvenidos) global.subbotsBienvenidos = new Set();
+        
+        // Si es la primera vez que este número se conecta en esta sesión
+        if (!global.subbotsBienvenidos.has(botNumber)) {
+          global.subbotsBienvenidos.add(botNumber);
+          
+          // Esperar 3 segundos para que WhatsApp termine de sincronizar
+          setTimeout(async () => {
+            const jidSelf = botNumber + '@s.whatsapp.net';
+            const mensaje = `🎉 *¡FELICIDADES!* 🎉\n\n@${botNumber} *Te has convertido en un SubBot oficial de Shisui Bot.* 🤖\n\n*Nuevas actualizaciones:*\n✅ Nuevo menú interactivo\n✅ Descargas de TikTok y YouTube rápidas\n✅ Juegos, Economía y Gacha\n✅ Invitaciones y comandos de Admin\n\n💡 *¿Qué puedes hacer ahora?*\nYa puedes usar el menú escribiendo *.menu* aquí en tu chat privado o en cualquier grupo donde te agreguen.\n\n¡Disfruta tu nuevo bot! 🚀`;
+            
+            await sock.sendMessage(jidSelf, { 
+              text: mensaje, 
+              mentions: [jidSelf] 
+            });
+            console.log('✅ Mensaje de bienvenida enviado al SubBot:', botNumber);
+          }, 3000);
+        }
+      } catch (e) {
+        console.log('Error en bienvenida de subbot:', e.message);
+      }
+      // --------------------------
+
       if (esSub) subEstado[numeroSub] = { vinculado: true }
       console.log(esSub ? 'Sub bot conectado ✅ ' + numeroSub : 'Bot conectado ✅')
       socksVivos.add(sock)
