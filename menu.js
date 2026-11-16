@@ -276,6 +276,8 @@ const secciones = [
 
   ['🎮 JUEGOS', [
     '#juegospro — Menú de juegos avanzados.',
+    '#ruleta / #ruletarusa — Juego de ruleta rusa con participantes.',
+    '#unirme — Unirse a la ruleta rusa activa.',
     '#menuclan — Menú del clan Free Fire.',
     '#ppt — Piedra, papel o tijera.',
     '#dados — Lanza un dado.',

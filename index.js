@@ -4208,6 +4208,82 @@ case 'config': {
   break;
 }
 
+
+case 'ruleta': case 'ruletarusa': {
+  const creador = m.key.participant || m.key.remoteJid;
+  if (!global.salasRuleta) global.salasRuleta = {};
+  
+  if (global.salasRuleta[jid] && global.salasRuleta[jid].activa) {
+    await responder('❌ Ya hay una ruleta activa en este grupo.');
+    break;
+  }
+  
+  global.salasRuleta[jid] = {
+    creador,
+    participantes: [creador],
+    activa: true,
+    tiempo: 30,
+    timer: null
+  };
+  
+  let txt = '🔫 *RULETA RUSA* 🔫\n\n🔴 *Se ha cargado 1 bala en el tambor de 6 tiros.*\n\n👥 *Participantes:*\n- @' + creador.split('@')[0] + '\n\n📝 Escribe *.unirme* para participar.\n⏳ Tienes 30 segundos.\n(Escribe *.iniciar* para empezar ya)';
+  await sock.sendMessage(jid, { text: txt, mentions: [creador] }, { quoted: m });
+  
+  global.salasRuleta[jid].timer = setTimeout(async () => {
+    if (global.salasRuleta[jid] && global.salasRuleta[jid].activa) {
+      iniciarRuleta(jid, sock);
+    }
+  }, 30000);
+  break;
+}
+
+case 'unirme': {
+  const sender = m.key.participant || m.key.remoteJid;
+  if (!global.salasRuleta || !global.salasRuleta[jid] || !global.salasRuleta[jid].activa) {
+    await responder('❌ No hay ninguna ruleta activa en este grupo. Usa *.ruleta* para crear una.');
+    break;
+  }
+  const sala = global.salasRuleta[jid];
+  if (sala.participantes.includes(sender)) {
+    await responder('❌ Ya estás participando en la ruleta.');
+    break;
+  }
+  sala.participantes.push(sender);
+  await sock.sendMessage(jid, { text: '✅ @' + sender.split('@')[0] + ' se ha unido a la ruleta.\nParticipantes actuales: *' + sala.participantes.length + '*', mentions: [sender] }, { quoted: m });
+  break;
+}
+
+case 'iniciar': {
+  const sender = m.key.participant || m.key.remoteJid;
+  if (!global.salasRuleta || !global.salasRuleta[jid] || !global.salasRuleta[jid].activa) {
+    await responder('❌ No hay ruleta activa.');
+    break;
+  }
+  if (global.salasRuleta[jid].creador !== sender) {
+    await responder('❌ Solo el creador puede iniciar el juego.');
+    break;
+  }
+  clearTimeout(global.salasRuleta[jid].timer);
+  iniciarRuleta(jid, sock);
+  break;
+}
+
+case 'cancelarruleta': {
+  const sender = m.key.participant || m.key.remoteJid;
+  if (!global.salasRuleta || !global.salasRuleta[jid]) {
+    await responder('❌ No hay ruleta activa.');
+    break;
+  }
+  if (global.salasRuleta[jid].creador !== sender) {
+    await responder('❌ Solo el creador puede cancelar.');
+    break;
+  }
+  clearTimeout(global.salasRuleta[jid].timer);
+  delete global.salasRuleta[jid];
+  await responder('🛑 Ruleta cancelada.');
+  break;
+}
+
 case 'musica': case 'm': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
