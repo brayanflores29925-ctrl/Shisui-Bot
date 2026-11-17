@@ -4400,6 +4400,80 @@ case 'config': {
   break;
 }
 
+
+case 'spotify': case 'sp': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #spotify <nombre de canción o enlace>'); break; }
+  
+  await responder('🎵 Buscando en Spotify: ' + query + '...');
+  
+  try {
+    const SpottyDL = require('spottydl');
+    const fs2 = require('fs');
+    const path = require('path');
+    
+    // Buscar la pista (puede ser por nombre o por URL de Spotify)
+    let trackInfo;
+    try {
+      // Si es un enlace de Spotify, obtenemos la info directamente
+      if (query.includes('open.spotify.com')) {
+        trackInfo = await SpottyDL.getTrack(query);
+      } else {
+        // Si es un texto, simulamos una búsqueda usando la URL de búsqueda de Spotify
+        // SpottyDL no tiene un método de búsqueda por texto, así que usamos el endpoint de búsqueda de Spotify
+        const searchUrl = 'https://open.spotify.com/search/' + encodeURIComponent(query);
+        // Para simplificar, intentamos obtener la info directamente con el nombre
+        // (SpottyDL puede fallar si no es una URL exacta, así que usamos un fallback)
+        throw new Error('Búsqueda por texto no soportada directamente');
+      }
+    } catch (e) {
+      // Fallback: Si no es URL o falla la búsqueda, usamos el nombre para buscar en YouTube Music
+      // y descargar la primera coincidencia.
+      console.log('Búsqueda por texto, usando fallback de YouTube Music...');
+      // Podemos usar yt-dlp para buscar en YouTube Music y descargar
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
+      const target = 'ytsearch1:"' + query + ' audio"';
+      const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
+      const info = JSON.parse(stdout.trim().split('\n')[0]);
+      
+      const txt = '➩ Descargando de Spotify › *' + info.title + '*\n\n❖ Artista › *' + (info.channel || 'Desconocido') + '*\n⏳ Espera un momento...';
+      if (info.thumbnail) await sock.sendMessage(jid, { image: { url: info.thumbnail }, caption: txt }, { quoted: m });
+      else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+      
+      const filePath = '/tmp/spotify_' + Date.now() + '.m4a';
+      await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 120000 });
+      
+      const buffer = fs2.readFileSync(filePath);
+      await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+      fs2.unlinkSync(filePath);
+      break;
+    }
+
+    // Si trackInfo se obtuvo correctamente (enlace de Spotify)
+    const txt = '➩ Descargando de Spotify › *' + trackInfo.title + '*\n\n❖ Artista › *' + trackInfo.artist + '*\n💿 Álbum › *' + trackInfo.album + '*\n⏳ Espera un momento...';
+    if (trackInfo.albumCoverURL) await sock.sendMessage(jid, { image: { url: trackInfo.albumCoverURL }, caption: txt }, { quoted: m });
+    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+
+    const downloadPath = '/tmp';
+    const result = await SpottyDL.downloadTrack(trackInfo, downloadPath);
+    
+    if (result && result[0] && result[0].status === 'Success') {
+      const fileBuffer = fs2.readFileSync(result[0].filename);
+      await sock.sendMessage(jid, { audio: fileBuffer, mimetype: 'audio/mpeg' }, { quoted: m });
+      fs2.unlinkSync(result[0].filename); // Limpiar
+    } else {
+      await responder('❌ No se pudo descargar la canción de Spotify.');
+    }
+
+  } catch (e) {
+    console.log('Error en .spotify:', e.message);
+    await responder('❌ Error al buscar o descargar de Spotify.');
+  }
+  break;
+}
+
 case 'musica': case 'm': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
