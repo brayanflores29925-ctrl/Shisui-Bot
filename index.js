@@ -1207,7 +1207,7 @@ case 'play': case 'play2': case 'spotify': case 'sp': {
       } catch (e) { await responder('❌ Error al buscar.'); break; }
     }
 
-    const txt = '➩ Descargando audio › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Preparando...';
+    const txt = '➩ Descargando audio › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Descargando audio, esto puede tardar unos minutos...';
     if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
     else await sock.sendMessage(jid, { text: txt }, { quoted: m });
     
@@ -1295,7 +1295,7 @@ case 'playvideo': case 'video': case 'v': {
       } catch (e) { await responder('❌ Error al buscar.'); break; }
     }
 
-    const txt = '➩ Descargando video › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Preparando...';
+    const txt = '➩ Descargando video › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Descargando video, esto puede tardar unos minutos...';
     if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
     else await sock.sendMessage(jid, { text: txt }, { quoted: m });
     
