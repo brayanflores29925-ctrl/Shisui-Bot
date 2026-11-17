@@ -1213,22 +1213,32 @@ case 'instagram': case 'ig': {
       break;
     }
     
-    await responder('📥 Descargando de Instagram...');
+    await responder('📥 Analizando enlace de Instagram...');
     
-    // Usamos reelflow (no requiere API Key y evita bloqueos)
-    const { getVideo } = require('reelflow');
-    const videoInfo = await getVideo(url);
+    const downloader = require('primesave-dl');
+    const data = await downloader(url);
 
-    if (!videoInfo || !videoInfo.videoUrl) {
-      await responder('❌ No se pudo obtener el video. Puede que el post sea privado o solo contenga imágenes.');
+    if (!data.success || !data.options || data.options.length === 0) {
+      await responder('❌ No se pudo extraer el video. Asegúrate de que el enlace sea público.');
       break;
     }
 
-    // Descargar el video a la memoria
-    const videoRes = await fetch(videoInfo.videoUrl);
+    // Buscamos la opción de video de mejor calidad
+    const videoOption = data.options.find(opt => opt.type === 'Video') || data.options[0];
+    
+    if (!videoOption || !videoOption.url) {
+      await responder('❌ No se encontró un enlace de video válido.');
+      break;
+    }
+
+    await responder('⬇️ Descargando video...');
+
+    const videoRes = await fetch(videoOption.url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!videoRes.ok) throw new Error('HTTP ' + videoRes.status);
+    
     const buffer = Buffer.from(await videoRes.arrayBuffer());
 
-    // WhatsApp tiene un límite de 64MB
+    // Límite de 64MB de WhatsApp
     if (buffer.length > 64 * 1024 * 1024) {
       await responder('❌ El video supera los 64MB (límite de WhatsApp).');
       break;
@@ -1237,15 +1247,15 @@ case 'instagram': case 'ig': {
     await sock.sendMessage(jid, { video: buffer, caption: '✅ Video de Instagram' }, { quoted: m });
 
   } catch (e) {
-    console.log('Error en .instagram:', e.message);
-    await responder('❌ Error al descargar. Verifica que el enlace sea público y de un video.');
+    console.log('Error en .instagram (primesave):', e.message);
+    await responder('❌ Error al descargar. Puede que el post sea privado o no contenga video.');
   }
   break;
 }
 
 
-    // === SPOTIFY Y NOVEDAD (INYECCIÓN SEGURA) ===
-    case 'spotify': case 'sp': {
+
+case 'spotify': case 'sp': {
       try {
         const query = cuerpo.slice(cmd.length).trim();
         if (!query) { await responder('Uso: #spotify <nombre de canción>'); break; }
