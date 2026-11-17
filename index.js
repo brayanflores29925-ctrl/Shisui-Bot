@@ -1204,6 +1204,86 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     
     switch (comando) {
+    // === SPOTIFY Y NOVEDAD (INYECCIÓN SEGURA) ===
+    case 'spotify': case 'sp': {
+      try {
+        const query = cuerpo.slice(cmd.length).trim();
+        if (!query) { await responder('Uso: #spotify <nombre de canción>'); break; }
+        await responder('🎵 Buscando en Spotify: ' + query + '...');
+        
+        const { exec } = require('child_process');
+        const { promisify } = require('util');
+        const execAsync = promisify(exec);
+        const fs2 = require('fs');
+        const youtubeSearch = require('youtube-search-api');
+        
+        let url = query, title = query, thumb = null, channel = 'Desconocido';
+        if (!query.startsWith('http')) {
+          try {
+            const searchResults = await youtubeSearch.GetListByKeyword(query, false, 1);
+            if (!searchResults.items || searchResults.items.length === 0) {
+              await responder('❌ No encontré resultados en Spotify.'); break;
+            }
+            const video = searchResults.items[0];
+            url = 'https://www.youtube.com/watch?v=' + video.id;
+            title = video.title; channel = video.channelTitle || 'Desconocido';
+            thumb = 'https://i.ytimg.com/vi/' + video.id + '/hqdefault.jpg';
+          } catch (e) { await responder('❌ Error al buscar.'); break; }
+        }
+
+        const txt = '➩ Descargando de Spotify › *' + title + '*\n\n❖ Artista › *' + channel + '*\n⏳ Descargando audio, esto puede tardar unos minutos...';
+        if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+        else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+        
+        let bufferFinal = null;
+        const filePathMp4 = '/tmp/sp_' + Date.now() + '.mp4';
+        const filePathM4a = '/tmp/sp_' + Date.now() + '.m4a';
+
+        // Método A
+        try {
+          await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePathM4a + '" "' + url + '"', { timeout: 20000 });
+          if (fs2.existsSync(filePathM4a)) { bufferFinal = fs2.readFileSync(filePathM4a); fs2.unlinkSync(filePathM4a); }
+        } catch (e) {}
+
+        // Método B (Video -> Audio)
+        if (!bufferFinal) {
+          try {
+            await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePathMp4 + '" "' + url + '"', { timeout: 60000 });
+            if (fs2.existsSync(filePathMp4)) {
+              await execAsync('ffmpeg -y -i "' + filePathMp4 + '" -vn -acodec copy "' + filePathM4a + '"', { timeout: 20000 });
+              if (fs2.existsSync(filePathM4a)) { bufferFinal = fs2.readFileSync(filePathM4a); fs2.unlinkSync(filePathM4a); }
+              fs2.unlinkSync(filePathMp4);
+            }
+          } catch (e) {}
+        }
+
+        if (bufferFinal) {
+          await sock.sendMessage(jid, { audio: bufferFinal, mimetype: 'audio/mp4' }, { quoted: m });
+        } else {
+          await responder('❌ No se pudo descargar el audio de Spotify.');
+        }
+      } catch (e) {
+        console.log('Error en spotify:', e.message);
+        await responder('❌ Error inesperado en Spotify.');
+      }
+      break;
+    }
+
+    case 'novedad': case 'anuncio': {
+      try {
+        if (!esDueno(m)) { await responder('❌ Solo el dueño puede usar este comando.'); break; }
+        const texto = cuerpo.slice(cmd.length).trim();
+        if (!texto) { await responder('Uso: #novedad <mensaje>\nEjemplo: #novedad Se arregló Spotify.'); break; }
+        
+        const txt = '📢 *NUEVA ACTUALIZACIÓN* 📢\n\n' + texto + '\n\n_Revisa el menú para más detalles._';
+        await sock.sendMessage(jid, { text: txt }, { quoted: m });
+      } catch (e) {
+        console.log('Error en novedad:', e.message);
+      }
+      break;
+    }
+    // ==========================================
+
 
 case 'config': {
   try {
@@ -4273,96 +4353,7 @@ case 'grupo': {
 }
 
 
-case 'novedad': case 'anuncio': {
-  if (!esDueno(m)) { await responder('❌ Solo el dueño puede enviar novedades.'); break; }
-  const texto = cuerpo.slice(cmd.length).trim();
-  if (!texto) { await responder('Uso: #novedad <mensaje>\nEjemplo: #novedad Spotify ya está disponible, revisa el menú.'); break; }
-  
-  const jidOficial = '120363...@g.us'; // (Se puede configurar desde el panel o reemplazar por el ID de tu grupo)
-  // Enviamos el mensaje al grupo actual donde se ejecutó
-  const txt = `📢 *NUEVA ACTUALIZACIÓN* 📢\n\n${texto}\n\n_Revisa el menú para más detalles._`;
-  await sock.sendMessage(jid, { text: txt }, { quoted: m });
-  
-  // Opcional: También lo envía al grupo oficial si está configurado en config.json
-  try {
-    const fs2 = require('fs');
-    const config = JSON.parse(fs2.readFileSync('./config.json', 'utf8'));
-    if (config.grupoOficial && config.grupoOficial !== jid) {
-      await sock.sendMessage(config.grupoOficial, { text: txt });
-    }
-  } catch (e) {}
-  
-  break;
-}
-
-
-case 'play': case 'play2': case 'spotify': case 'sp': {
-  try {
-    const query = cuerpo.slice(cmd.length).trim();
-    if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
-    await responder('🔍 Buscando audio de: ' + query + '...');
-    
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
-    const fs2 = require('fs');
-    const youtubeSearch = require('youtube-search-api');
-    
-    let url = query, title = query, thumb = null, channel = 'Desconocido';
-    
-    if (!query.startsWith('http')) {
-      try {
-        const searchResults = await youtubeSearch.GetListByKeyword(query, false, 1);
-        if (!searchResults.items || searchResults.items.length === 0) {
-          await responder('❌ No encontré resultados.'); break;
-        }
-        const video = searchResults.items[0];
-        url = 'https://www.youtube.com/watch?v=' + video.id;
-        title = video.title; channel = video.channelTitle || 'Desconocido';
-        thumb = 'https://i.ytimg.com/vi/' + video.id + '/hqdefault.jpg';
-      } catch (e) { await responder('❌ Error al buscar.'); break; }
-    }
-
-    const txt = '➩ Descargando audio › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Descargando audio, esto puede tardar unos minutos...';
-    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
-    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-    
-    let bufferFinal = null;
-    const filePathMp4 = '/tmp/t_' + Date.now() + '.mp4';
-    const filePathM4a = '/tmp/t_' + Date.now() + '.m4a';
-
-    // MÉTODO A: Audio directo
-    try {
-      await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePathM4a + '" "' + url + '"', { timeout: 25000 });
-      if (fs2.existsSync(filePathM4a)) { bufferFinal = fs2.readFileSync(filePathM4a); fs2.unlinkSync(filePathM4a); }
-    } catch (e) {}
-
-    // MÉTODO B: Video -> Audio
-    if (!bufferFinal) {
-      try {
-        await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePathMp4 + '" "' + url + '"', { timeout: 60000 });
-        if (fs2.existsSync(filePathMp4)) {
-          await execAsync('ffmpeg -y -i "' + filePathMp4 + '" -vn -acodec copy "' + filePathM4a + '"', { timeout: 20000 });
-          if (fs2.existsSync(filePathM4a)) { bufferFinal = fs2.readFileSync(filePathM4a); fs2.unlinkSync(filePathM4a); }
-          fs2.unlinkSync(filePathMp4);
-        }
-      } catch (e) {}
-    }
-
-    if (bufferFinal) {
-      await sock.sendMessage(jid, { audio: bufferFinal, mimetype: 'audio/mp4' }, { quoted: m });
-    } else {
-      await responder('❌ No se pudo descargar el audio.');
-    }
-  } catch (e) {
-    console.log('Error en play:', e.message);
-    await responder('❌ Error inesperado.');
-  }
-  break;
-}
-
-
-case 'playvideo': case 'video': case 'v': {
+case 'play': case 'play2': case 'playvideo': case 'video': case 'v': {
   try {
     const query = cuerpo.slice(cmd.length).trim();
     if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
