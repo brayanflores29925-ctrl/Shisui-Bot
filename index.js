@@ -1204,6 +1204,46 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     
     switch (comando) {
+
+case 'instagram': case 'ig': {
+  try {
+    const url = cuerpo.slice(cmd.length).trim();
+    if (!url || !url.includes('instagram.com')) {
+      await responder('Uso: #instagram <enlace>\nEjemplo: #ig https://www.instagram.com/p/...');
+      break;
+    }
+    
+    await responder('📥 Descargando de Instagram...');
+    
+    // Usamos reelflow (no requiere API Key y evita bloqueos)
+    const { getVideo } = require('reelflow');
+    const videoInfo = await getVideo(url);
+
+    if (!videoInfo || !videoInfo.videoUrl) {
+      await responder('❌ No se pudo obtener el video. Puede que el post sea privado o solo contenga imágenes.');
+      break;
+    }
+
+    // Descargar el video a la memoria
+    const videoRes = await fetch(videoInfo.videoUrl);
+    const buffer = Buffer.from(await videoRes.arrayBuffer());
+
+    // WhatsApp tiene un límite de 64MB
+    if (buffer.length > 64 * 1024 * 1024) {
+      await responder('❌ El video supera los 64MB (límite de WhatsApp).');
+      break;
+    }
+
+    await sock.sendMessage(jid, { video: buffer, caption: '✅ Video de Instagram' }, { quoted: m });
+
+  } catch (e) {
+    console.log('Error en .instagram:', e.message);
+    await responder('❌ Error al descargar. Verifica que el enlace sea público y de un video.');
+  }
+  break;
+}
+
+
     // === SPOTIFY Y NOVEDAD (INYECCIÓN SEGURA) ===
     case 'spotify': case 'sp': {
       try {
@@ -3845,70 +3885,7 @@ case 'tt':
       case 'facebook':
       case 'fb':
       case 'x':
-      case 'instagram':
-      case 'ig': {
-        const tiposDl = {
-          musica: 'musica', m: 'musica', play: 'musica', video: 'video', v: 'video',
-          tiktok: 'tiktok', tt: 'tiktok', facebook: 'facebook', fb: 'facebook',
-          x: 'x', instagram: 'instagram', ig: 'instagram'
-        }
-        const tipoDl = tiposDl[comando]
-        const entradaDl = cuerpo.slice(cmd.length).trim()
-        const ejemplosDl = {
-          musica: '#musica nombre de la canción',
-          video: '#video nombre del video',
-          tiktok: '#tiktok <enlace>',
-          facebook: '#facebook <enlace>',
-          x: '#x <enlace>',
-          instagram: '#instagram <enlace>'
-        }
-        if (!entradaDl) {
-          await responder('Uso: ' + ejemplosDl[tipoDl])
-          break
-        }
-        const dominiosDl = {
-          tiktok: ['tiktok.com'],
-          facebook: ['facebook.com', 'fb.watch', 'fb.com'],
-          x: ['x.com', 'twitter.com'],
-          instagram: ['instagram.com']
-        }
-        if (dominiosDl[tipoDl] && !dominiosDl[tipoDl].some(d => entradaDl.toLowerCase().includes(d))) {
-          await responder('⚠️ Envía un enlace válido de ' + tipoDl + '. Uso: ' + ejemplosDl[tipoDl])
-          break
-        }
-        const rDl = await rapido.procesar({
-          tipo: tipoDl,
-          entrada: entradaDl,
-          usuario: m.key.participant || m.key.remoteJid,
-          tarjeta: async (texto, miniatura) => {
-            if (miniatura) await sock.sendMessage(jid, { image: miniatura, caption: texto }, { quoted: m })
-            else await sock.sendMessage(jid, { text: texto }, { quoted: m })
-          }
-        })
-        if (!rDl.ok) {
-          await responder('❌ ' + rDl.error)
-          break
-        }
-        try {
-          const bufDl = fs.readFileSync(rDl.ruta)
-          if (rDl.tipo === 'audio') {
-            await sock.sendMessage(jid, { audio: bufDl, mimetype: rDl.mimetype }, { quoted: m })
-          } else if (rDl.tipo === 'image') {
-            await sock.sendMessage(jid, { image: bufDl, caption: rDl.titulo || '' }, { quoted: m })
-          } else {
-            await sock.sendMessage(jid, { video: bufDl, mimetype: 'video/mp4', caption: rDl.titulo || '' }, { quoted: m })
-          }
-        } catch (e) {
-          console.log('Error al enviar la descarga:', e.message)
-          await responder('❌ Error al enviar el archivo.')
-        } finally {
-          try { fs.unlinkSync(rDl.ruta) } catch {}
-        }
-        break
-      }
-
-      
-case 'tt': {
+      case 'tt': {
   const url = cuerpo.slice(cmd.length).trim();
   if (!url || !url.includes('tiktok.com')) {
     await responder('Uso: #tiktok <enlace de TikTok>');
