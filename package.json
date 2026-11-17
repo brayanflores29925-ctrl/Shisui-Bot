@@ -40,6 +40,7 @@
     "tiktok-api-wangyi": "^1.0.1",
     "tiktok-hks": "^1.0.4",
     "tiktok-video-scraper": "^1.0.0",
+    "youtube-search-api": "^2.0.1",
     "youtube-sr": "^4.3.12"
   },
   "optionalDependencies": {

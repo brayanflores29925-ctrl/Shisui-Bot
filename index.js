@@ -4017,132 +4017,6 @@ case 'attp': case 'attp2': case 'attp3': case 'ttp': {
   break;
 }
 
-case 'playvideo': case 'video': case 'v': {
-  const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
-  await responder('🔍 Buscando video de: ' + query + '...');
-  try {
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
-    const target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
-    
-    let title = query, thumb = null, channel = 'Desconocido', url = target;
-    
-    try {
-      const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
-      const info = JSON.parse(stdout.trim().split('\n')[0]);
-      title = info.title || query; thumb = info.thumbnail; channel = info.channel || info.uploader; url = info.webpage_url;
-    } catch (err) {
-      await responder('❌ No encontré resultados para: ' + query); break;
-    }
-    
-    const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Espera un momento...';
-    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
-    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-
-    await responder('⬇️ Procesando video (puede tardar)...');
-    const filePath = '/tmp/video_' + Date.now() + '.mp4';
-    let archivoDescargado = false;
-    try {
-      await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + url + '"', { timeout: 120000 });
-      archivoDescargado = true;
-    } catch (e) { 
-      console.log('Fallo yt-dlp:', e.message); 
-    }
-    if (archivoDescargado && require('fs').existsSync(filePath)) {
-      const fs2 = require('fs');
-      const buffer = fs2.readFileSync(filePath);
-      if (buffer.length > 64 * 1024 * 1024) await responder('❌ El video pesa más de 64MB.');
-      else await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
-      fs2.unlinkSync(filePath);
-    } else {
-      await responder('❌ No se pudo descargar el video.');
-    }
-  } catch (e) { 
-    console.log('Error en video:', e.message);
-    await responder('❌ Error al descargar el video.'); 
-  }
-  break;
-}
-
-case 'play2': {
-  const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
-  
-  await responder('🔍 Buscando audio de: ' + query + '...');
-  
-  try {
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
-    const fs2 = require('fs');
-    
-    const target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
-    
-    let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', url = target;
-    
-    // 1. Obtener info
-    try {
-      const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
-      const info = JSON.parse(stdout.trim().split('\n')[0]);
-      title = info.title || query; thumb = info.thumbnail; channel = info.channel || info.uploader; duration = info.duration_string || info.duration + 's'; url = info.webpage_url;
-    } catch (err) {
-      await responder('❌ No encontré resultados para: ' + query); break;
-    }
-    
-    const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⧖ Duración › *' + duration + '*\n⏳ Espera un momento...';
-    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
-    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-
-    await responder('⬇️ Procesando audio (puede tardar)...');
-    
-    // 2. Descargar el video (usando el mismo motor que playvideo que SÍ funciona)
-    const filePathMp4 = '/tmp/video_temp_' + Date.now() + '.mp4';
-    const filePathM4a = '/tmp/audio_temp_' + Date.now() + '.m4a';
-    
-    let archivoDescargado = false;
-    try {
-      await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePathMp4 + '" "' + url + '"', { timeout: 120000 });
-      archivoDescargado = true;
-    } catch (e) { 
-      console.log('Fallo yt-dlp al bajar video para audio:', e.message); 
-    }
-
-    if (archivoDescargado && fs2.existsSync(filePathMp4)) {
-      // 3. Extraer el audio usando ffmpeg
-      try {
-        await execAsync('ffmpeg -y -i "' + filePathMp4 + '" -vn -acodec copy "' + filePathM4a + '"', { timeout: 30000 });
-        
-        const buffer = fs2.readFileSync(filePathM4a);
-        await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
-        
-        fs2.unlinkSync(filePathMp4);
-        fs2.unlinkSync(filePathM4a);
-      } catch (ffmpegErr) {
-        // Si falla ffmpeg, enviamos el video como respaldo
-        console.log('Fallo ffmpeg, enviando video como fallback:', ffmpegErr.message);
-        const buffer = fs2.readFileSync(filePathMp4);
-        await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
-        fs2.unlinkSync(filePathMp4);
-      }
-    } else {
-      await responder('❌ No se pudo descargar el audio. Intenta de nuevo.');
-    }
-
-  } catch (e) { 
-    console.log('Error en play:', e.message);
-    await responder('❌ Error al descargar el audio.'); 
-  }
-  break;
-}
-
-
-
-
-
-
-
 case 'pin': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
@@ -4210,7 +4084,7 @@ case 'config': {
 }
 
 
-case 'play': case 'play2': {
+case 'play2': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
   
@@ -4413,6 +4287,101 @@ case 'cancelarruleta': {
   break;
 }
 
+
+case 'play': case 'play2': case 'playvideo': case 'playdoc': case 'video': case 'v': {
+  const query = cuerpo.slice(cmd.length).trim();
+  if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
+  
+  await responder('🔍 Buscando: ' + query + '...');
+  
+  try {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    const fs2 = require('fs');
+    const youtubeSearch = require('youtube-search-api');
+    
+    const esAudio = (cmd === 'play' || cmd === 'play2');
+    const esDoc = (cmd === 'playdoc');
+    
+    let title = query, thumb = null, channel = 'Desconocido', url = '';
+
+    // 1. BUSCAR EL VIDEO (Si no es un enlace directo)
+    if (query.startsWith('http')) {
+      url = query;
+    } else {
+      try {
+        const searchResults = await youtubeSearch.GetListByKeyword(query, false, 1);
+        if (!searchResults.items || searchResults.items.length === 0) {
+          await responder('❌ No encontré resultados para: ' + query);
+          break;
+        }
+        const video = searchResults.items[0];
+        url = 'https://www.youtube.com/watch?v=' + video.id;
+        title = video.title;
+        channel = video.channelTitle;
+        // La API no siempre da la miniatura, la armamos con el ID
+        thumb = 'https://i.ytimg.com/vi/' + video.id + '/hqdefault.jpg';
+      } catch (e) {
+        console.log('Error en búsqueda:', e.message);
+        await responder('❌ Error al buscar el video.');
+        break;
+      }
+    }
+
+    // 2. ENVIAR LA TARJETA
+    const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Espera un momento...';
+    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+
+    // 3. DESCARGAR (Usando btch-downloader para evitar bloqueos)
+    await responder('⬇️ Procesando archivo...');
+    let dlUrl = '';
+    try {
+      const btch = require('btch-downloader');
+      if (esAudio) {
+        const dl = await btch.ytmp3(url);
+        dlUrl = dl.result?.download || dl.result?.url || dl.result?.mp3;
+      } else {
+        const dl = await btch.ytmp4(url);
+        dlUrl = dl.result?.download || dl.result?.url || dl.result?.mp4;
+      }
+    } catch(e) { console.log('Fallo btch:', e.message); }
+
+    // 4. ENVIAR EL ARCHIVO
+    if (dlUrl) {
+      const fileRes = await fetch(dlUrl);
+      const buffer = Buffer.from(await fileRes.arrayBuffer());
+      if (esAudio) {
+        await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+      } else if (esDoc) {
+        await sock.sendMessage(jid, { document: buffer, mimetype: 'video/mp4', fileName: title.substring(0,20) + '.mp4' }, { quoted: m });
+      } else {
+        await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
+      }
+    } else {
+      // Si btch falla, intentamos con yt-dlp clásico
+      const filePath = '/tmp/dl_' + Date.now() + (esAudio ? '.m4a' : '.mp4');
+      const ytArgs = esAudio ? '-f 140/bestaudio[ext=m4a]/bestaudio' : '-f "bv*+ba/b" --merge-output-format mp4';
+      await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" ' + ytArgs + ' -o "' + filePath + '" "' + url + '"', { timeout: 120000 });
+      
+      if (fs2.existsSync(filePath)) {
+        const buffer = fs2.readFileSync(filePath);
+        if (esAudio) await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+        else await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
+        fs2.unlinkSync(filePath);
+      } else {
+        await responder('❌ El servidor de descarga falló. Intenta de nuevo.');
+      }
+    }
+
+  } catch (e) {
+    console.log('Error general en descargas:', e.message);
+    await responder('❌ Error procesando la descarga.');
+  }
+  break;
+}
+
 case 'musica': case 'm': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
@@ -4445,87 +4414,7 @@ case 'musica': case 'm': {
   break;
 }
 
-case 'video': case 'v': case 'playdoc': {
-      const query = cuerpo.slice(cmd.length).trim();
-      if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
-      await responder('🔍 Buscando video de: ' + query + '...');
-      
-      try {
-        const { exec } = require('child_process');
-        const { promisify } = require('util');
-        const execAsync = promisify(exec);
-        const fs2 = require('fs');
-        
-        const target = query.startsWith('http') ? query : 'ytsearch1:"' + query + '"';
-        let title = query, thumb = null, channel = 'Desconocido', url = target;
-        
-        // 1. Obtener información con Android (que sí funciona)
-        try {
-          const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
-          const info = JSON.parse(stdout.trim().split('\n')[0]);
-          title = info.title; thumb = info.thumbnail; channel = info.channel || info.uploader; url = info.webpage_url;
-        } catch (e) {
-          await responder('❌ No encontré resultados para: ' + query); break;
-        }
-        
-        const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Espera un momento...';
-        if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
-        else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-
-        await responder('⬇️ Procesando video (puede tardar)...');
-        
-        let archivoDescargado = false;
-        let filePath = '/tmp/video_' + Date.now() + '.mp4';
-
-        // Estrategia 1: Descargar con yt-dlp usando el cliente "web_embedded"
-        try {
-          await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + url + '"', { timeout: 120000 });
-          archivoDescargado = true;
-        } catch (e) { 
-          console.log('Fallo yt-dlp web_embedded:', e.message); 
-        }
-
-        // Estrategia 2: Usar btch-downloader
-        if (!archivoDescargado) {
-          try {
-            const btch = require('btch-downloader');
-            let dlUrl = '';
-            if (typeof btch.ytmp4 === 'function') {
-              const res = await btch.ytmp4(url);
-              dlUrl = res?.result?.download || res?.result?.url;
-            }
-            if (dlUrl) {
-              const fileRes = await fetch(dlUrl);
-              const buffer = Buffer.from(await fileRes.arrayBuffer());
-              fs2.writeFileSync(filePath, buffer);
-              archivoDescargado = true;
-            }
-          } catch (e) { 
-            console.log('Fallo btch:', e.message); 
-          }
-        }
-
-        // Enviar el video si se descargó
-        if (archivoDescargado && fs2.existsSync(filePath)) {
-          const stats = fs2.statSync(filePath);
-          if (stats.size > 64 * 1024 * 1024) {
-            await responder('❌ El video pesa más de 64MB (límite de WhatsApp).');
-          } else {
-            const buffer = fs2.readFileSync(filePath);
-            await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
-          }
-          fs2.unlinkSync(filePath); // Limpiar
-        } else {
-          await responder('❌ No se pudo descargar el video. YouTube está bloqueando la descarga en este servidor.');
-        }
-
-      } catch (e) { 
-        console.log('Error en video:', e.message);
-        await responder('❌ Error interno al procesar el video.'); 
-      }
-      break;
-    }
-case 'tiktok': case 'tt': {
+case 'video': case 'v': case 'tiktok': case 'tt': {
   const url = cuerpo.slice(cmd.length).trim();
   if (!url || !url.includes('tiktok.com')) {
     await responder('Uso: #tiktok <enlace de TikTok>');
