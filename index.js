@@ -4053,37 +4053,6 @@ case 'pin': {
   break;
 }
 
-case 'config': {
-  const args = cuerpo.slice(cmd.length).trim();
-  const f = global.filtrosConfig || {};
-
-  if (args) {
-    const num = parseInt(args);
-    if (num === 1) f.antiPorno = !f.antiPorno;
-    else if (num === 2) f.antiaudio = !f.antiaudio;
-    else if (num === 3) f.antivideos = !f.antivideos;
-    else if (num === 4) f.antisticker = !f.antisticker;
-    else if (num === 5) f.antispam = !f.antispam;
-    else if (num === 6) f.antibots = !f.antibots;
-    else if (num === 7) f.antiestafas = !f.antiestafas;
-    else { await responder('❌ Usa números del 1 al 7.'); break; }
-  }
-
-  const on = '✅ ON'; const off = '❌ OFF';
-  let txt = '⚙️ *CONFIGURACIÓN DEL BOT*\n\n';
-  txt += '*1.* 🔞 Antiporno: ' + (f.antiPorno ? on : off) + '\n';
-  txt += '*2.* 🔇 Antiaudio: ' + (f.antiaudio ? on : off) + '\n';
-  txt += '*3.* 🎬 Antivideos: ' + (f.antivideos ? on : off) + '\n';
-  txt += '*4.* 🎨 Antisticker: ' + (f.antisticker ? on : off) + '\n';
-  txt += '*5.* 📵 Antispam: ' + (f.antispam ? on : off) + '\n';
-  txt += '*6.* 🤖 Antibots: ' + (f.antibots ? on : off) + '\n';
-  txt += '*7.* ⚠️ Antiestafas: ' + (f.antiestafas ? on : off) + '\n\n';
-  txt += '💡 Envía #config 1 para cambiar el estado.';
-  await responder(txt);
-  break;
-}
-
-
 case 'play2': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
@@ -4378,6 +4347,55 @@ case 'play': case 'play2': case 'playvideo': case 'playdoc': case 'video': case 
   } catch (e) {
     console.log('Error general en descargas:', e.message);
     await responder('❌ Error procesando la descarga.');
+  }
+  break;
+}
+
+
+case 'config': {
+  try {
+    // 1. Si las variables globales no existen, las creamos aquí mismo para que no falle
+    if (!global.filtrosConfig) {
+      global.filtrosConfig = {
+        antiPorno: false, antiaudio: false, antivideos: false,
+        antisticker: false, antispam: false, antibots: false, antiestafas: false
+      };
+    }
+
+    const args = cuerpo.slice(cmd.length).trim();
+    const f = global.filtrosConfig;
+
+    // 2. Si el usuario envía un número, cambiamos el estado
+    if (args) {
+      const num = parseInt(args);
+      if (num === 1) f.antiPorno = !f.antiPorno;
+      else if (num === 2) f.antiaudio = !f.antiaudio;
+      else if (num === 3) f.antivideos = !f.antivideos;
+      else if (num === 4) f.antisticker = !f.antisticker;
+      else if (num === 5) f.antispam = !f.antispam;
+      else if (num === 6) f.antibots = !f.antibots;
+      else if (num === 7) f.antiestafas = !f.antiestafas;
+      else { await responder('❌ Opción no válida. Usa números del 1 al 7.'); break; }
+    }
+
+    // 3. Mostrar el panel
+    const on = '✅ ON'; 
+    const off = '❌ OFF';
+    
+    let txt = '⚙️ *CONFIGURACIÓN DEL BOT*\n\n';
+    txt += '*1.* 🔞 Antiporno: ' + (f.antiPorno ? on : off) + '\n';
+    txt += '*2.* 🔇 Antiaudio: ' + (f.antiaudio ? on : off) + '\n';
+    txt += '*3.* 🎬 Antivideos: ' + (f.antivideos ? on : off) + '\n';
+    txt += '*4.* 🎨 Antisticker: ' + (f.antisticker ? on : off) + '\n';
+    txt += '*5.* 📵 Antispam: ' + (f.antispam ? on : off) + '\n';
+    txt += '*6.* 🤖 Antibots: ' + (f.antibots ? on : off) + '\n';
+    txt += '*7.* ⚠️ Antiestafas: ' + (f.antiestafas ? on : off) + '\n\n';
+    txt += '💡 *Para cambiar un estado, envía:*\nEjemplo: #config 1';
+    
+    await responder(txt);
+  } catch (e) {
+    console.log('Error en comando config:', e.message);
+    await responder('❌ Error al mostrar la configuración.');
   }
   break;
 }
