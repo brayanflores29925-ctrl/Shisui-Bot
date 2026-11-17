@@ -1179,6 +1179,157 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     
     switch (comando) {
+
+case 'config': {
+  try {
+    if (!global.filtrosConfig) {
+      global.filtrosConfig = { antiPorno: false, antiaudio: false, antivideos: false, antisticker: false, antispam: false, antibots: false, antiestafas: false };
+    }
+    const args = cuerpo.slice(cmd.length).trim();
+    const f = global.filtrosConfig;
+    if (args) {
+      const num = parseInt(args);
+      if (num === 1) f.antiPorno = !f.antiPorno;
+      else if (num === 2) f.antiaudio = !f.antiaudio;
+      else if (num === 3) f.antivideos = !f.antivideos;
+      else if (num === 4) f.antisticker = !f.antisticker;
+      else if (num === 5) f.antispam = !f.antispam;
+      else if (num === 6) f.antibots = !f.antibots;
+      else if (num === 7) f.antiestafas = !f.antiestafas;
+      else { await responder('❌ Usa números del 1 al 7.'); break; }
+    }
+    const on = '✅ ON'; const off = '❌ OFF';
+    let txt = '⚙️ *CONFIGURACIÓN*\n\n';
+    txt += '*1.* 🔞 Antiporno: ' + (f.antiPorno ? on : off) + '\n';
+    txt += '*2.* 🔇 Antiaudio: ' + (f.antiaudio ? on : off) + '\n';
+    txt += '*3.* 🎬 Antivideos: ' + (f.antivideos ? on : off) + '\n';
+    txt += '*4.* 🎨 Antisticker: ' + (f.antisticker ? on : off) + '\n';
+    txt += '*5.* 📵 Antispam: ' + (f.antispam ? on : off) + '\n';
+    txt += '*6.* 🤖 Antibots: ' + (f.antibots ? on : off) + '\n';
+    txt += '*7.* ⚠️ Antiestafas: ' + (f.antiestafas ? on : off) + '\n\n';
+    txt += '💡 Envía #config 1 para cambiar.';
+    await responder(txt);
+  } catch (e) { await responder('❌ Error en config.'); }
+  break;
+}
+
+case 'play': case 'play2': case 'spotify': case 'sp': {
+  try {
+    const query = cuerpo.slice(cmd.length).trim();
+    if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
+    await responder('🔍 Buscando: ' + query + '...');
+    
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    const fs2 = require('fs');
+    const youtubeSearch = require('youtube-search-api');
+    
+    let url = query, title = query, thumb = null, channel = 'Desconocido';
+    if (!query.startsWith('http')) {
+      try {
+        const searchResults = await youtubeSearch.GetListByKeyword(query, false, 1);
+        if (!searchResults.items || searchResults.items.length === 0) {
+          await responder('❌ No encontré resultados.'); break;
+        }
+        const video = searchResults.items[0];
+        url = 'https://www.youtube.com/watch?v=' + video.id;
+        title = video.title; channel = video.channelTitle || 'Desconocido';
+        thumb = 'https://i.ytimg.com/vi/' + video.id + '/hqdefault.jpg';
+      } catch (e) { await responder('❌ Error al buscar.'); break; }
+    }
+
+    const txt = '➩ Descargando audio › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Espera un momento...';
+    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+    
+    await responder('⬇️ Procesando (Método Video->Audio)...');
+
+    // DESCARGA 1: Bajar el video completo (que sí funciona)
+    const filePathMp4 = '/tmp/temp_' + Date.now() + '.mp4';
+    const filePathM4a = '/tmp/temp_' + Date.now() + '.m4a';
+    
+    await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePathMp4 + '" "' + url + '"', { timeout: 120000 });
+
+    if (fs2.existsSync(filePathMp4)) {
+      // DESCARGA 2: Extraer solo el audio con ffmpeg
+      await execAsync('ffmpeg -y -i "' + filePathMp4 + '" -vn -acodec copy "' + filePathM4a + '"', { timeout: 30000 });
+      
+      if (fs2.existsSync(filePathM4a)) {
+        const buffer = fs2.readFileSync(filePathM4a);
+        await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
+        fs2.unlinkSync(filePathM4a);
+      } else {
+        // Si falla ffmpeg, enviamos el video como respaldo
+        const bufferVid = fs2.readFileSync(filePathMp4);
+        await sock.sendMessage(jid, { video: bufferVid, caption: '✅ ' + title + ' (Audio extraído falló, enviando video)' }, { quoted: m });
+      }
+      fs2.unlinkSync(filePathMp4);
+    } else {
+      await responder('❌ El servidor no pudo descargar el video base.');
+    }
+  } catch (e) {
+    console.log('Error audio:', e.message);
+    await responder('❌ Error al descargar el audio.');
+  }
+  break;
+}
+
+case 'playvideo': case 'video': case 'v': {
+  try {
+    const query = cuerpo.slice(cmd.length).trim();
+    if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
+    await responder('🔍 Buscando: ' + query + '...');
+    
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    const fs2 = require('fs');
+    const youtubeSearch = require('youtube-search-api');
+    
+    let url = query, title = query, thumb = null, channel = 'Desconocido';
+    if (!query.startsWith('http')) {
+      try {
+        const searchResults = await youtubeSearch.GetListByKeyword(query, false, 1);
+        if (!searchResults.items || searchResults.items.length === 0) {
+          await responder('❌ No encontré resultados.'); break;
+        }
+        const video = searchResults.items[0];
+        url = 'https://www.youtube.com/watch?v=' + video.id;
+        title = video.title; channel = video.channelTitle || 'Desconocido';
+        thumb = 'https://i.ytimg.com/vi/' + video.id + '/hqdefault.jpg';
+      } catch (e) { await responder('❌ Error al buscar.'); break; }
+    }
+
+    const txt = '➩ Descargando video › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Espera un momento...';
+    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+    await responder('⬇️ Procesando archivo...');
+
+    const filePath = '/tmp/vid_' + Date.now() + '.mp4';
+    await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + url + '"', { timeout: 120000 });
+
+    if (fs2.existsSync(filePath)) {
+      const stats = fs2.statSync(filePath);
+      if (stats.size > 64 * 1024 * 1024) {
+        await responder('❌ El archivo pesa más de 64MB. WhatsApp no permite enviar videos tan pesados.');
+        fs2.unlinkSync(filePath);
+        break;
+      }
+      const buffer = fs2.readFileSync(filePath);
+      await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
+      fs2.unlinkSync(filePath);
+    } else {
+      await responder('❌ El servidor no pudo descargar el video.');
+    }
+  } catch (e) {
+    console.log('Error video:', e.message);
+    await responder('❌ Error al descargar el video.');
+  }
+  break;
+}
+
+
     // --- COMANDOS DE EMERGENCIA (CONFIG Y PIN) ---
     case 'racha': case 'rc': {
   const sender = m.key.participant || m.key.remoteJid;
@@ -4184,126 +4335,7 @@ case 'cancelarruleta': {
 }
 
 
-case 'play2': 
-// ==========================================
-// COMANDOS REPARADOS Y BLINDADOS
-// ==========================================
-
-case 'play': case 'play2': case 'playvideo': case 'v': case 'video': {
-  try {
-    const query = cuerpo.slice(cmd.length).trim();
-    if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
-    await responder('🔍 Buscando: ' + query + '...');
-    
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
-    const fs2 = require('fs');
-    const youtubeSearch = require('youtube-search-api');
-    
-    // Buscar en YouTube
-    let url = query;
-    let title = query, thumb = null, channel = 'Desconocido';
-    
-    if (!query.startsWith('http')) {
-      try {
-        const searchResults = await youtubeSearch.GetListByKeyword(query, false, 1);
-        if (!searchResults.items || searchResults.items.length === 0) {
-          await responder('❌ No encontré resultados para: ' + query);
-          break;
-        }
-        const video = searchResults.items[0];
-        url = 'https://www.youtube.com/watch?v=' + video.id;
-        title = video.title;
-        channel = video.channelTitle || 'Desconocido';
-        thumb = 'https://i.ytimg.com/vi/' + video.id + '/hqdefault.jpg';
-      } catch (e) {
-        await responder('❌ Error al buscar el video.');
-        break;
-      }
-    }
-
-    const esVideo = (cmd === 'playvideo' || cmd === 'video' || cmd === 'v');
-    const txt = '➩ Descargando › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⏳ Espera un momento...';
-    if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
-    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-    await responder('⬇️ Procesando archivo...');
-
-    // Descargar con yt-dlp (web_embedded funciona bien)
-    const filePathBase = '/tmp/media_' + Date.now();
-    const filePath = filePathBase + (esVideo ? '.mp4' : '.m4a');
-    
-    const ytArgs = esVideo ? '-f "bv*+ba/b" --merge-output-format mp4' : '-f 140/bestaudio[ext=m4a]/bestaudio';
-    const downloadCmd = 'yt-dlp --extractor-args "youtube:player_client=web_embedded,android" ' + ytArgs + ' -o "' + filePath + '" "' + url + '"';
-    
-    await execAsync(downloadCmd, { timeout: 120000, maxBuffer: 1024 * 1024 * 50 });
-
-    if (fs2.existsSync(filePath)) {
-      const stats = fs2.statSync(filePath);
-      // LÍMITE DE WHATSAPP: 64MB
-      if (stats.size > 64 * 1024 * 1024) {
-        await responder('❌ El archivo pesa más de 64MB. WhatsApp no permite enviar videos o audios tan pesados. Intenta con una canción o video más corto.');
-        fs2.unlinkSync(filePath);
-        break;
-      }
-      
-      const buffer = fs2.readFileSync(filePath);
-      
-      if (!esVideo) {
-        await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
-      } else {
-        await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
-      }
-      fs2.unlinkSync(filePath);
-    } else {
-      await responder('❌ El servidor no pudo descargar el archivo (posible bloqueo de YouTube).');
-    }
-  } catch (e) {
-    console.log('Error en play/video:', e.message);
-    await responder('❌ Error al descargar. Puede que el video sea muy largo o esté bloqueado.');
-  }
-  break;
-}
-
-case 'config': {
-  try {
-    if (!global.filtrosConfig) {
-      global.filtrosConfig = { antiPorno: false, antiaudio: false, antivideos: false, antisticker: false, antispam: false, antibots: false, antiestafas: false };
-    }
-    const args = cuerpo.slice(cmd.length).trim();
-    const f = global.filtrosConfig;
-    
-    if (args) {
-      const num = parseInt(args);
-      if (num === 1) f.antiPorno = !f.antiPorno;
-      else if (num === 2) f.antiaudio = !f.antiaudio;
-      else if (num === 3) f.antivideos = !f.antivideos;
-      else if (num === 4) f.antisticker = !f.antisticker;
-      else if (num === 5) f.antispam = !f.antispam;
-      else if (num === 6) f.antibots = !f.antibots;
-      else if (num === 7) f.antiestafas = !f.antiestafas;
-      else { await responder('❌ Usa números del 1 al 7.'); break; }
-    }
-    
-    const on = '✅ ON'; const off = '❌ OFF';
-    let txt = '⚙️ *CONFIGURACIÓN*\n\n';
-    txt += '*1.* 🔞 Antiporno: ' + (f.antiPorno ? on : off) + '\n';
-    txt += '*2.* 🔇 Antiaudio: ' + (f.antiaudio ? on : off) + '\n';
-    txt += '*3.* 🎬 Antivideos: ' + (f.antivideos ? on : off) + '\n';
-    txt += '*4.* 🎨 Antisticker: ' + (f.antisticker ? on : off) + '\n';
-    txt += '*5.* 📵 Antispam: ' + (f.antispam ? on : off) + '\n';
-    txt += '*6.* 🤖 Antibots: ' + (f.antibots ? on : off) + '\n';
-    txt += '*7.* ⚠️ Antiestafas: ' + (f.antiestafas ? on : off) + '\n\n';
-    txt += '💡 Envía #config 1 para cambiar.';
-    await responder(txt);
-  } catch (e) {
-    console.log('Error config:', e.message);
-    await responder('❌ Error al abrir configuración.');
-  }
-  break;
-}
-
-case 'grupo': {
+case 'play2': case 'grupo': {
   try {
     if (!jid.endsWith('@g.us')) { await responder('❌ Solo funciona en grupos.'); break; }
     
@@ -4329,43 +4361,6 @@ case 'grupo': {
   } catch (e) {
     console.log('Error grupo:', e.message);
     await responder('❌ Error al cambiar el estado del grupo.');
-  }
-  break;
-}
-
-case 'spotify': case 'sp': {
-  try {
-    const query = cuerpo.slice(cmd.length).trim();
-    if (!query) { await responder('Uso: #spotify <nombre de canción>'); break; }
-    await responder('🎵 Buscando en Spotify: ' + query + '...');
-    
-    // Como no tenemos API real de Spotify, usamos YouTube Music para buscar y descargar
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
-    const fs2 = require('fs');
-    
-    const target = 'ytsearch1:"' + query + ' audio"';
-    const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + target + '"', { timeout: 30000 });
-    const info = JSON.parse(stdout.trim().split('\n')[0]);
-    
-    const txt = '➩ Descargando de Spotify › *' + info.title + '*\n\n❖ Artista › *' + (info.channel || 'Desconocido') + '*\n⏳ Espera un momento...';
-    if (info.thumbnail) await sock.sendMessage(jid, { image: { url: info.thumbnail }, caption: txt }, { quoted: m });
-    else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-    
-    const filePath = '/tmp/spotify_' + Date.now() + '.m4a';
-    await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 120000 });
-    
-    if (fs2.existsSync(filePath)) {
-      const buffer = fs2.readFileSync(filePath);
-      await sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: m });
-      fs2.unlinkSync(filePath);
-    } else {
-      await responder('❌ No se pudo descargar la canción.');
-    }
-  } catch (e) {
-    console.log('Error spotify:', e.message);
-    await responder('❌ Error al buscar en Spotify.');
   }
   break;
 }
