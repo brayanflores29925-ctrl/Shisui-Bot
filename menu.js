@@ -216,6 +216,7 @@ const secciones = [
     '#clear — Limpia la consola del servidor.',
     '#consola / #cmd / #sh — Ejecuta comandos de terminal (Solo owner).',
     '#logs / #errores — Muestra los últimos logs y errores del bot.',
+    '#novedad / #anuncio <texto> — Anuncia una actualización (Solo owner).',
     '#fixapi / #testapi — Actualiza yt-dlp y diagnostica las APIs (IA, TikTok, Roblox).',
     '#clearlogs — Borra los logs guardados en la memoria.'
   ]],
