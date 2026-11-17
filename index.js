@@ -75,6 +75,7 @@ const {
 const pino = require('pino')
 const readline = require('readline')
 const { generarMenu } = require('./menu')
+const extras = require('./extras')
 const admin = require('./admin')
 const rapido = require('./rapido')
 const herramientas = require('./herramientas')
@@ -3662,7 +3663,7 @@ case 'ytsearch': {
 
 
 
-case 'villancico':
+case 'villancico_viejo':
       case 'tt': {
   const url = cuerpo.slice(cmd.length).trim();
   if (!url || !url.includes('tiktok.com')) {
@@ -3791,7 +3792,7 @@ case 'tt': {
 }
 
 
-case 'mapa': {
+case 'mapa_viejo': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #mapa <lugar>'); break; }
   
@@ -3927,7 +3928,7 @@ case 'eliminarrespuesta': {
 }
 
 
-case 'mapa': {
+case 'mapa_viejo': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #mapa <lugar>'); break; }
   
@@ -3979,7 +3980,7 @@ case 'attp2': case 'attp3': case 'ttp': {
 }
 
 
-case 'mapa': case 'maps': {
+case 'mapa_viejo': case 'maps': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #mapa <lugar>'); break; }
   const link = 'https://www.google.com/maps/search/' + encodeURIComponent(query);
@@ -6556,6 +6557,64 @@ case 'kick': {
         if (rAdm.texto) {
           await sock.sendMessage(jid, { text: rAdm.texto, mentions: rAdm.mentions || [] }, { quoted: m })
         }
+        break
+      }
+
+      case 'villancico': {
+        const titulosVl = [
+          'Noche de paz', 'Campana sobre campana', 'Los peces en el río', 'Mi burrito sabanero',
+          'Ay del chiquirritín', 'Pastores venid', 'Arre borriquito', 'Din don dan',
+          'La marimorena', 'Hacia Belén va una burra', 'Feliz Navidad'
+        ]
+        const pedidoVl = cuerpo.slice(cmd.length).trim()
+        const buscarVl = 'villancico ' + (pedidoVl || titulosVl[Math.floor(Math.random() * titulosVl.length)])
+        const rVl = await rapido.procesar({
+          tipo: 'musica',
+          entrada: buscarVl,
+          usuario: m.key.participant || m.key.remoteJid,
+          tarjeta: async (texto, miniatura) => {
+            if (miniatura) await sock.sendMessage(jid, { image: miniatura, caption: texto }, { quoted: m })
+            else await sock.sendMessage(jid, { text: texto }, { quoted: m })
+          }
+        })
+        if (!rVl.ok) {
+          await responder('❌ ' + rVl.error)
+          break
+        }
+        try {
+          await sock.sendMessage(jid, { audio: fs.readFileSync(rVl.ruta), mimetype: rVl.mimetype }, { quoted: m })
+        } catch (e) {
+          console.log('Error al enviar el villancico:', e.message)
+          await responder('❌ Error al enviar el archivo.')
+        } finally {
+          try { fs.unlinkSync(rVl.ruta) } catch {}
+        }
+        break
+      }
+
+      case 'mapa': {
+        const lugarMp = cuerpo.slice(cmd.length).trim()
+        if (!lugarMp) {
+          await responder('Uso: #mapa <lugar>. Ejemplo: #mapa Obelisco Buenos Aires')
+          break
+        }
+        const rMp = await extras.buscarLugar(lugarMp)
+        if (!rMp.ok) {
+          await responder('❌ ' + rMp.error)
+          break
+        }
+        try {
+          await sock.sendMessage(jid, {
+            location: { degreesLatitude: rMp.lat, degreesLongitude: rMp.lon, name: rMp.nombre, address: rMp.direccion }
+          }, { quoted: m })
+        } catch (e) {
+          console.log('Error al enviar la ubicación:', e.message)
+        }
+        await sock.sendMessage(jid, {
+          text: '📍 *' + rMp.nombre + '*\n' + rMp.direccion +
+            '\n\n🗺️ Google Maps: https://maps.google.com/?q=' + rMp.lat + ',' + rMp.lon +
+            '\n🌍 OpenStreetMap: https://www.openstreetmap.org/?mlat=' + rMp.lat + '&mlon=' + rMp.lon + '#map=16/' + rMp.lat + '/' + rMp.lon
+        }, { quoted: m })
         break
       }
 
