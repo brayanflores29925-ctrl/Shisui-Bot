@@ -356,6 +356,31 @@ async function iniciar(opciones = {}) {
 
   sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
     if (connection === 'open') {
+      // --- BIENVENIDA SUBBOT (SIN SPAM) ---
+      try {
+        const botNumber = sock.user.id.split(':')[0];
+        const fs2 = require('fs');
+        let bienvenidos = {};
+        try { bienvenidos = JSON.parse(fs2.readFileSync('./subbots_welcomed.json', 'utf8')); } catch { bienvenidos = {}; }
+        
+        if (!bienvenidos[botNumber]) {
+          bienvenidos[botNumber] = true;
+          fs2.writeFileSync('./subbots_welcomed.json', JSON.stringify(bienvenidos, null, 2));
+          
+          setTimeout(async () => {
+            const jidSelf = botNumber + '@s.whatsapp.net';
+            const mensaje = `🎉 *¡FELICIDADES!* 🎉\n\n@${botNumber} *Te has convertido en un SubBot oficial de Shisui Bot.* 🤖\n\n*Recuerda que hay nuevas actualizaciones:*\n✅ Menú renovado\n✅ Nuevas descargas\n✅ Juegos y Economía\n\n💡 Escribe *.menu* aquí o en cualquier grupo para empezar.\n\n¡Disfruta tu nuevo bot! 🚀`;
+            
+            // Se envía SOLO al privado del SubBot, no al grupo
+            await sock.sendMessage(jidSelf, { text: mensaje, mentions: [jidSelf] });
+            console.log('✅ Mensaje de bienvenida enviado al SubBot:', botNumber);
+          }, 5000); // Espera 5 segundos a que termine de sincronizar
+        }
+      } catch (e) {
+        console.log('Error en bienvenida de subbot:', e.message);
+      }
+      // ------------------------------------
+    
       // --- CANCELAR TIMEOUT SUBBOT ---
       try {
         const botNumberOpen = sock.user.id.split(':')[0];
@@ -4321,6 +4346,29 @@ case 'play2': case 'grupo': {
     console.log('Error grupo:', e.message);
     await responder('❌ Error al cambiar el estado del grupo.');
   }
+  break;
+}
+
+
+case 'novedad': case 'anuncio': {
+  if (!esDueno(m)) { await responder('❌ Solo el dueño puede enviar novedades.'); break; }
+  const texto = cuerpo.slice(cmd.length).trim();
+  if (!texto) { await responder('Uso: #novedad <mensaje>\nEjemplo: #novedad Spotify ya está disponible, revisa el menú.'); break; }
+  
+  const jidOficial = '120363...@g.us'; // (Se puede configurar desde el panel o reemplazar por el ID de tu grupo)
+  // Enviamos el mensaje al grupo actual donde se ejecutó
+  const txt = `📢 *NUEVA ACTUALIZACIÓN* 📢\n\n${texto}\n\n_Revisa el menú para más detalles._`;
+  await sock.sendMessage(jid, { text: txt }, { quoted: m });
+  
+  // Opcional: También lo envía al grupo oficial si está configurado en config.json
+  try {
+    const fs2 = require('fs');
+    const config = JSON.parse(fs2.readFileSync('./config.json', 'utf8'));
+    if (config.grupoOficial && config.grupoOficial !== jid) {
+      await sock.sendMessage(config.grupoOficial, { text: txt });
+    }
+  } catch (e) {}
+  
   break;
 }
 
