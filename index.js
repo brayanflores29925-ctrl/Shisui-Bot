@@ -1227,11 +1227,21 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     switch (comando) {
 
     // ==========================================
-    // INTERRUPTOR GLOBAL PARA SUBBOTS
+    // INTERRUPTOR GLOBAL PARA SUBBOTS (BLINDADO)
     // ==========================================
     case 'apagarsubs': case 'subsoff': {
       try {
-        if (!esDueno(m)) { await responder('❌ Solo el dueño puede apagar los SubBots.'); break; }
+        // Lista de dueños directa (por si esDueno falla)
+        const OWNERS = ['50493482934', '50494874330', '50495939120'];
+        const senderNum = (m.key.participant || m.key.remoteJid || '').split('@')[0].split(':')[0];
+        const esDuenoReal = OWNERS.some(n => senderNum.includes(n));
+        
+        if (!esDuenoReal) {
+          await responder('❌ Solo el dueño principal puede apagar los SubBots.');
+          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch(e) {}
+          break;
+        }
+        
         const fs2 = require('fs');
         let cfg = {};
         try { cfg = JSON.parse(fs2.readFileSync('./config.json', 'utf8')); } catch { cfg = {}; }
@@ -1240,13 +1250,26 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         fs2.writeFileSync('./config.json', JSON.stringify(cfg, null, 2));
         
         await responder('🔴 *SubBots apagados globalmente.*\nNingún SubBot responderá a comandos hasta que uses #encendersubs.');
-      } catch (e) { await responder('❌ Error al apagar SubBots.'); }
+        try { await sock.sendMessage(jid, { react: { text: '🔴', key: m.key } }); } catch(e) {}
+      } catch (e) {
+        console.log('Error en .apagarsubs:', e.message);
+        await responder('❌ Error al apagar SubBots: ' + e.message);
+      }
       break;
     }
 
     case 'encendersubs': case 'subson': {
       try {
-        if (!esDueno(m)) { await responder('❌ Solo el dueño puede encender los SubBots.'); break; }
+        const OWNERS = ['50493482934', '50494874330', '50495939120'];
+        const senderNum = (m.key.participant || m.key.remoteJid || '').split('@')[0].split(':')[0];
+        const esDuenoReal = OWNERS.some(n => senderNum.includes(n));
+        
+        if (!esDuenoReal) {
+          await responder('❌ Solo el dueño principal puede encender los SubBots.');
+          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch(e) {}
+          break;
+        }
+        
         const fs2 = require('fs');
         let cfg = {};
         try { cfg = JSON.parse(fs2.readFileSync('./config.json', 'utf8')); } catch { cfg = {}; }
@@ -1255,12 +1278,19 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         fs2.writeFileSync('./config.json', JSON.stringify(cfg, null, 2));
         
         await responder('🟢 *SubBots encendidos globalmente.*\nAhora todos los SubBots pueden responder a comandos.');
-      } catch (e) { await responder('❌ Error al encender SubBots.'); }
+        try { await sock.sendMessage(jid, { react: { text: '🟢', key: m.key } }); } catch(e) {}
+      } catch (e) {
+        console.log('Error en .encendersubs:', e.message);
+        await responder('❌ Error al encender SubBots: ' + e.message);
+      }
       break;
     }
 
 
 
+    // ==========================================
+    // INTERRUPTOR GLOBAL PARA SUBBOTS
+    // ==========================================
     case 'instagram': case 'ig': {
       try {
         const url = cuerpo.slice(cmd.length).trim();
