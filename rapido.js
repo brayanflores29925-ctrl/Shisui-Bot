@@ -200,9 +200,9 @@ async function procesar(op) {
     if (tipo === 'musica') {
       args.push('-f', 'bestaudio[ext=m4a]/bestaudio')
     } else if (tipo === 'video') {
-      args.push('-f', 'bv*[height<=480][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=480][vcodec^=avc1]+ba/b[height<=480][ext=mp4]/bv*[height<=480]+ba/b', '--merge-output-format', 'mp4')
+      args.push('-f', 'bv*[height<=480][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=480][vcodec^=avc1]+ba/b[height<=480][vcodec^=h264]/b[height<=480][vcodec^=avc1]/b[height<=480][ext=mp4]/bv*[height<=480]+ba/b', '--merge-output-format', 'mp4')
     } else {
-      args.push('-f', 'bv*[vcodec^=avc1]+ba[acodec^=mp4a]/bv*[vcodec^=avc1]+ba/b[ext=mp4]/bv*+ba/b', '--merge-output-format', 'mp4')
+      args.push('-f', 'bv*[vcodec^=avc1]+ba[acodec^=mp4a]/bv*[vcodec^=avc1]+ba/b[vcodec^=h264]/b[vcodec^=avc1]/b[ext=mp4]/bv*+ba/b', '--merge-output-format', 'mp4')
     }
     args.push(objetivo)
 
