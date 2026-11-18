@@ -1205,6 +1205,45 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     switch (comando) {
 
+    case 'regalo': {
+      try {
+        const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
+        if (!mencionado) {
+          await responder('Uso: #regalo @usuario\nEjemplo: #regalo @Leandro');
+          break;
+        }
+
+        const sender = m.key.participant || m.key.remoteJid;
+        const nombreSender = sender.split('@')[0].split(':')[0];
+        const nombreTarget = mencionado.split('@')[0].split(':')[0];
+
+        const regalos = [
+          '🎁 una caja llena de abrazos',
+          '🧸 un osito de peluche gigante',
+          '🍫 un chocolate delicioso',
+          '🌹 una rosa roja',
+          '💎 un diamante brillante',
+          '🎮 un videojuego nuevo',
+          '🎂 un pastel de cumpleaños',
+          '🎈 un globo con mucho amor'
+        ];
+        const reg = regalos[Math.floor(Math.random() * regalos.length)];
+
+        await sock.sendMessage(jid, {
+          text: '🎁 @' + nombreSender + ' le regala ' + reg + ' a @' + nombreTarget + ' ❤️',
+          mentions: [sender, mencionado]
+        }, { quoted: m });
+
+        try { await sock.sendMessage(jid, { react: { text: '🎁', key: m.key } }); } catch (e) {}
+      } catch (e) {
+        console.log('Error en .regalo:', e.message);
+        await responder('❌ Error al enviar el regalo.');
+      }
+      break;
+    }
+
+
+
     // ==========================================
     // DESCARGA OPTIMIZADA (SOLO 2 MENSAJES)
     // ==========================================
