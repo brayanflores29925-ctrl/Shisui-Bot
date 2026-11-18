@@ -1427,14 +1427,23 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         let bufferFinal = null;
         let tituloFinal = query;
         let thumbFinal = null;
+        const descargarArchivo = async (url) => {
+          const r = await fetch(url);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const tipo = (r.headers.get('content-type') || '').toLowerCase();
+          if (/text\/html|application\/json/.test(tipo)) throw new Error('Respuesta no válida');
+          const b = Buffer.from(await r.arrayBuffer());
+          if (b.length < 1024) throw new Error('Archivo vacío o incompleto');
+          return b;
+        };
+
 
         // API 1: Denzy
         try {
           const yt = require('@denzy-official/youtube_scraper');
           const res = await yt.ytmp3(query);
           if (res && res.download && res.download.url) {
-            const resFetch = await fetch(res.download.url);
-            bufferFinal = Buffer.from(await resFetch.arrayBuffer());
+            bufferFinal = await descargarArchivo(res.download.url);
             tituloFinal = (res.metadata && res.metadata.title) ? res.metadata.title : query;
             thumbFinal = res.metadata ? res.metadata.thumbnail : null;
           }
@@ -1504,14 +1513,23 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         let bufferFinal = null;
         let tituloFinal = query;
         let thumbFinal = null;
+        const descargarArchivo = async (url) => {
+          const r = await fetch(url);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const tipo = (r.headers.get('content-type') || '').toLowerCase();
+          if (/text\/html|application\/json/.test(tipo)) throw new Error('Respuesta no válida');
+          const b = Buffer.from(await r.arrayBuffer());
+          if (b.length < 1024) throw new Error('Archivo vacío o incompleto');
+          return b;
+        };
+
 
         // API 1: Denzy
         try {
           const yt = require('@denzy-official/youtube_scraper');
           const res = await yt.ytmp4(query);
           if (res && res.download && res.download.url) {
-            const resFetch = await fetch(res.download.url);
-            bufferFinal = Buffer.from(await resFetch.arrayBuffer());
+            bufferFinal = await descargarArchivo(res.download.url);
             tituloFinal = (res.metadata && res.metadata.title) ? res.metadata.title : query;
             thumbFinal = res.metadata ? res.metadata.thumbnail : null;
           }
