@@ -2337,38 +2337,49 @@ case 'buscartt': {
       break
     }
 
-    let enviados = 0
-
-    for (const elemento of resultados.slice(0, 2)) {
-      const post = elemento.post || elemento
-      const enlace = post.url || post.share_url || post.web_url || post.video_url || elemento.url
-
-      if (!enlace || !/^https?:\/\//i.test(enlace)) continue
-
+    const tareas = resultados.slice(0, 2).map(async (elemento) => {
       try {
+        const post = elemento.post || elemento
+        const enlace = post.url || post.share_url || post.web_url || post.video_url || elemento.url
+
+        if (!enlace || !/^https?:\/\//i.test(enlace)) return null
+
         const descarga = await descargar('video', enlace, null, null)
-        if (!descarga?.ok || !descarga.url) continue
+        if (!descarga?.ok || !descarga.url) return null
 
         const buffer = await bajarMedia(descarga.url, 50)
-        if (!buffer || !buffer.length) continue
+        if (!buffer || !buffer.length) return null
 
         const autor = post.author?.username || post.author?.nickname || 'TikTok'
-        const descripcion = String(post.caption || post.description || post.text || consulta).slice(0, 700)
+        const descripcion = String(post.caption || post.description || post.text || consulta).slice(0, 500)
+        const vistas = post.play_count ?? post.statistics?.play_count
+        const duracion = post.duration
 
-        await sock.sendMessage(jid, {
-          video: buffer,
-          caption: '🎬 ' + descripcion + '\n👤 ' + autor
-        }, { quoted: m })
+        let caption = '🎬 ' + descripcion + '\\n👤 ' + autor
+        if (typeof duracion === 'number') caption += '\\n⏱️ Duración: ' + duracion + ' s'
+        if (typeof vistas === 'number') caption += '\\n👁️ Vistas: ' + vistas.toLocaleString('en-US')
+        caption += '\\n🔗 ' + enlace
 
-        enviados++
+        return { buffer, caption }
       } catch (errorVideo) {
         console.log('Error descargando resultado de .buscar:', errorVideo.message)
+        return null
       }
+    })
+
+    const descargados = await Promise.all(tareas)
+    const enviados = descargados.filter(Boolean)
+
+    for (const resultado of enviados) {
+      await sock.sendMessage(jid, {
+        video: resultado.buffer,
+        caption: resultado.caption
+      }, { quoted: m })
     }
 
-    if (enviados === 0) {
+    if (enviados.length === 0) {
       await responder('❌ Encontré resultados, pero no pude descargar sus videos.')
-    } else if (enviados === 1) {
+    } else if (enviados.length === 1) {
       await responder('⚠️ Solo pude enviar 1 de los 2 videos encontrados.')
     }
   } catch (error) {
