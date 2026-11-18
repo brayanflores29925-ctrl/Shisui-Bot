@@ -1154,7 +1154,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
     
     // --- FILTRO INTELIGENTE DE COMANDOS ---
-    if (global.listaComandos && comando && !global.listaComandos.includes(comando)) {
+    if (global.listaComandos && comando && !COMANDOS.has(comando) && !global.listaComandos.includes(comando)) {
       let sugerencia = '';
       let menorDistancia = 3;
       const comandoMalEscrito = comando.toLowerCase().trim();
@@ -1192,7 +1192,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     if (typeof comando !== 'undefined' && comando && global.listaComandos) {
       const cmdLimpio = comando.toLowerCase().trim();
       // Si el comando NO existe en la lista y tiene más de 1 letra
-      if (!global.listaComandos.includes(cmdLimpio) && cmdLimpio.length > 1) {
+      if (!COMANDOS.has(cmdLimpio) && !global.listaComandos.includes(cmdLimpio) && cmdLimpio.length > 1) {
         let sug = '';
         let min = 3;
         const p = (typeof prefijo !== 'undefined' && prefijo) ? prefijo : (comando && comando[0]) ? comando[0] : '#';
