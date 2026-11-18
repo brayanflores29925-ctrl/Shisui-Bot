@@ -1205,6 +1205,51 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     switch (comando) {
 
+    case 'facebook': case 'fb': {
+      try {
+        const url = cuerpo.slice(cmd.length).trim();
+        if (!url || !url.includes('facebook.com')) {
+          await responder('Uso: #facebook <enlace>\nEjemplo: #fb https://www.facebook.com/share/r/...');
+          break;
+        }
+        
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+        
+        const { exec } = require('child_process');
+        const { promisify } = require('util');
+        const execAsync = promisify(exec);
+        const fs2 = require('fs');
+        
+        const filePath = '/tmp/fb_' + Date.now() + '.mp4';
+        
+        // Descargamos con yt-dlp
+        await execAsync('yt-dlp --no-warnings -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + url + '"', { timeout: 60000 });
+        
+        if (fs2.existsSync(filePath)) {
+          const buffer = fs2.readFileSync(filePath);
+          
+          if (buffer.length > 64 * 1024 * 1024) {
+            await responder('❌ El video supera los 64MB (límite de WhatsApp).');
+            try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+          } else {
+            await sock.sendMessage(jid, { video: buffer, caption: '✅ Video de Facebook' }, { quoted: m });
+            try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
+          }
+          fs2.unlinkSync(filePath);
+        } else {
+          await responder('❌ No se pudo descargar el video. Puede que sea privado.');
+          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+        }
+      } catch (e) {
+        console.log('Error en .facebook:', e.message);
+        await responder('❌ Error al descargar. El video puede ser privado o requerir inicio de sesión.');
+        try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+      }
+      break;
+    }
+
+
+
     case 'regalo': {
       try {
         const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
@@ -4035,8 +4080,6 @@ case 'villancico_viejo':
   break;
 }
 case 'tt':
-      case 'facebook':
-      case 'fb':
       case 'x':
       case 'tt': {
   const url = cuerpo.slice(cmd.length).trim();
