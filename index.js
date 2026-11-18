@@ -1100,6 +1100,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     const cuerpo = soloMenu ? textoLimpio : coincidePrefijo[2].trim()
     const [cmd, ...args] = cuerpo.split(/\s+/)
     const comando = sinTildes(cmd)
+    const prefijo = soloMenu ? '#' : (coincidePrefijo?.[1] || '#')
     const jid = m.key.remoteJid
     let marcaFinal = null
     const reaccionar = e => sock.sendMessage(jid, { react: { text: e, key: m.key } }).catch(() => {})
@@ -1132,78 +1133,38 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     if (conocido) await reaccionar('⏳')
 
     
-    // --- FILTRO INTELIGENTE DE COMANDOS ---
-    if (global.listaComandos && comando && !global.listaComandos.includes(comando)) {
-      let sugerencia = '';
-      let menorDistancia = 3;
-      const comandoMalEscrito = comando.toLowerCase().trim();
+    // --- Validación basada en comandos implementados ---
+    if (!COMANDOS.has(comando)) {
+      let sugerencia = ''
+      let menorDistancia = 3
+      const comandoMalEscrito = comando.toLowerCase().trim()
       if (comandoMalEscrito.length > 1) {
-        for (const comandoValido of global.listaComandos) {
-          const distancia = calcularSimilitud(comandoMalEscrito, comandoValido);
+        for (const comandoValido of COMANDOS) {
+          const distancia = calcularSimilitud(comandoMalEscrito, comandoValido)
           if (distancia < menorDistancia && distancia > 0) {
-            menorDistancia = distancia;
-            sugerencia = comandoValido;
+            menorDistancia = distancia
+            sugerencia = comandoValido
           }
         }
       }
-      
+
       if (sugerencia) {
-        
-        try {
-          if (sugerencia) {
-            await responder(`❌ El comando *${comando}* no existe.\n\n💡 ¿Quizás quisiste decir *${prefijo}${sugerencia}*?`);
-          } else {
-            await responder(`❌ Lo siento, el comando *${comando}* no está disponible.\n📋 Usa ${prefijo}menu para ver los comandos.`);
-          }
-        } catch (err) {
-          console.log('Error en sugerencia:', err.message);
-          await responder('❌ Ese comando no existe.');
-        }
+        await responder('❌ El comando *' + comando + '* no existe.\n\n💡 ¿Quizás quisiste decir *' + prefijo + sugerencia + '*?')
       } else {
-        await responder(`❌ Lo siento, el comando *${comando}* no está disponible.\n📋 Usa ${prefijo}menu para ver los comandos.`);
+        await responder('❌ Lo siento, el comando *' + comando + '* no está disponible.\n📋 Usa ' + prefijo + 'menu para ver los comandos.')
       }
-      return; // Detiene la ejecución para que no llegue al switch
+      return
     }
-    // --------------------------------------
+
 
     
-    // --- GUARDIÁN INTELIGENTE DE COMANDOS ---
-    if (typeof comando !== 'undefined' && comando && global.listaComandos) {
-      const cmdLimpio = comando.toLowerCase().trim();
-      // Si el comando NO existe en la lista y tiene más de 1 letra
-      if (!global.listaComandos.includes(cmdLimpio) && cmdLimpio.length > 1) {
-        let sug = '';
-        let min = 3;
-        const p = (typeof prefijo !== 'undefined' && prefijo) ? prefijo : (comando && comando[0]) ? comando[0] : '#';
-        
-        for (const val of global.listaComandos) {
-          // Calculamos la distancia matemáticamente
-          const m = Array.from({ length: val.length + 1 }, () => Array(cmdLimpio.length + 1).fill(0));
-          for (let i = 0; i <= val.length; i++) m[i][0] = i;
-          for (let j = 0; j <= cmdLimpio.length; j++) m[0][j] = j;
-          for (let i = 1; i <= val.length; i++) {
-            for (let j = 1; j <= cmdLimpio.length; j++) {
-              m[i][j] = val[i - 1] === cmdLimpio[j - 1] ? m[i - 1][j - 1] : Math.min(m[i - 1][j - 1] + 1, Math.min(m[i][j - 1] + 1, m[i - 1][j] + 1));
-            }
-          }
-          const d = m[val.length][cmdLimpio.length];
-          if (d < min && d > 0) { min = d; sug = val; }
-        }
-        
-        if (sug) {
-          await responder(`❌ El comando *${comando}* no existe.\n\n💡 ¿Quizás quisiste decir *${p}${sug}*?`);
-        } else {
-          await responder(`❌ Lo siento, el comando *${comando}* no está disponible.\n📋 Usa ${p}menu.`);
-        }
-        return; // Detiene la ejecución para que no llegue al switch original
-      }
-    }
-    // --- FIN GUARDIÁN ---
+
     
     
     
     
-    switch (comando) {
+    try {
+      switch (comando) {
 
 case 'instagram': case 'ig': {
   try {
@@ -6604,8 +6565,18 @@ case 'kick': {
         }
         break
       }
+      }
+    } catch (errorComando) {
+      marcaFinal = '❌'
+      console.error('Error al ejecutar el comando ' + comando + ':', errorComando?.stack || errorComando)
+      try {
+        await responder('❌ Ocurrió un error al ejecutar este comando. Inténtalo de nuevo más tarde.')
+      } catch (errorRespuesta) {
+        console.error('No se pudo enviar el error del comando:', errorRespuesta?.message || errorRespuesta)
+      }
+    } finally {
+      if (conocido) await reaccionar(marcaFinal || EMOJIS_GACHA[comando] || EMOJIS[comando] || '✅')
     }
-    if (conocido) await reaccionar(marcaFinal || EMOJIS_GACHA[comando] || EMOJIS[comando] || '✅')
   })
 }
 
