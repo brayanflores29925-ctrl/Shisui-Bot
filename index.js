@@ -4189,36 +4189,45 @@ case 'attp': case 'attp2': case 'attp3': case 'ttp': {
 
 case 'pin': {
   const query = cuerpo.slice(cmd.length).trim();
-  if (!query) { await responder('Uso: #pin <búsqueda>'); break; }
-  await responder('🔍 Buscando: ' + query);
-  
-  let enviado = false;
-  try {
-    const googleImages = require('free-google-images');
-    const results = await googleImages.search(query);
-    if (results && results.length > 0) {
-      for (let i = 0; i < Math.min(2, results.length); i++) {
-        await sock.sendMessage(jid, { image: { url: results[i].image.url }, caption: '🖼️ Foto de: ' + query }, { quoted: m });
-      }
-      enviado = true;
-    }
-  } catch (e) { console.log('Error free-google-images:', e.message); }
+  if (!query) {
+    await responder('Uso: .pin <búsqueda>');
+    break;
+  }
 
-  if (!enviado) {
-    await responder('⚠️ Generando con IA...');
-    try {
-      const { generate, provider } = await import('g4f-image');
-      for (let i = 1; i <= 2; i++) {
-        const base64 = await generate(query, provider.PollinationsAI);
-        if (base64) {
-          const buffer = Buffer.from(base64, 'base64');
-          await sock.sendMessage(jid, { image: buffer, caption: '🖼️ IA Foto ' + i + ': ' + query }, { quoted: m });
-        }
-      }
-    } catch (e) {
-      console.log('Error g4f-image:', e.message);
-      await responder('❌ No se pudo generar la imagen.');
+  await responder('🔍 Buscando imágenes: ' + query);
+
+  try {
+    const { buscarImagenes } = require('./descargas');
+    const resultados = await buscarImagenes(query, 3);
+
+    if (!resultados.length) {
+      await responder('❌ No se encontraron imágenes.');
+      break;
     }
+
+    for (const foto of resultados) {
+      try {
+        const res = await fetch(foto.url, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(15000)
+        });
+
+        if (!res.ok) continue;
+
+        const buffer = Buffer.from(await res.arrayBuffer());
+        if (!buffer.length || buffer.length > 8 * 1024 * 1024) continue;
+
+        await sock.sendMessage(jid, {
+          image: buffer,
+          caption: '📌 ' + foto.titulo
+        }, { quoted: m });
+      } catch (e) {
+        console.log('Error enviando imagen PIN:', e.message);
+      }
+    }
+  } catch (e) {
+    console.log('Error buscando PIN:', e.message);
+    await responder('❌ No se pudieron buscar las imágenes.');
   }
   break;
 }
