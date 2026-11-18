@@ -217,6 +217,8 @@ const secciones = [
     '#consola / #cmd / #sh — Ejecuta comandos de terminal (Solo owner).',
     '#logs / #errores — Muestra los últimos logs y errores del bot.',
     '#novedad / #anuncio <texto> — Anuncia una actualización (Solo owner).',
+    '#apagarsubs / #subsoff — Apaga TODOS los subbots globalmente.',
+    '#encendersubs / #subson — Enciende TODOS los subbots globalmente.',
     '#fixapi / #testapi — Actualiza yt-dlp y diagnostica las APIs (IA, TikTok, Roblox).',
     '#clearlogs — Borra los logs guardados en la memoria.'
   ]],
