@@ -1427,6 +1427,8 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         let bufferFinal = null;
         let tituloFinal = query;
         let thumbFinal = null;
+        let canalFinal = null;
+        let duracionFinal = null;
         const descargarArchivo = async (url) => {
           const r = await fetch(url);
           if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1446,21 +1448,31 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             bufferFinal = await descargarArchivo(res.download.url);
             tituloFinal = (res.metadata && res.metadata.title) ? res.metadata.title : query;
             thumbFinal = res.metadata ? res.metadata.thumbnail : null;
+            canalFinal = res.metadata?.author?.name || null;
+            duracionFinal = res.metadata?.timestamp || res.metadata?.duration?.timestamp || null;
           }
         } catch (e) {}
 
-        // API 2: Shadowx
+        // API 2: ShadowX
         if (!bufferFinal) {
           try {
             const ytdl = require('shadowx-ytdl');
-            const res = await ytdl.downloadAudio(query, 128);
-            if (res && res.download && res.download.downloadUrl) {
-              const resFetch = await fetch(res.download.downloadUrl);
-              bufferFinal = Buffer.from(await resFetch.arrayBuffer());
-              tituloFinal = res.title || query;
-              thumbFinal = res.thumbnail || null;
+            const busqueda = await ytdl.searchYouTube(query);
+            const video = busqueda && busqueda.status && Array.isArray(busqueda.results)
+              ? busqueda.results.find(v => v.type === 'video' && v.url)
+              : null;
+
+            if (video) {
+              const res = await ytdl.downloadAudio(video.url, 128);
+              if (res && res.status && res.download && res.download.status && res.download.downloadUrl) {
+                bufferFinal = await descargarArchivo(res.download.downloadUrl);
+                tituloFinal = (res.metadata && res.metadata.title) || video.title || query;
+                thumbFinal = (res.metadata && res.metadata.thumbnail) || video.thumbnail || video.image || null;
+                canalFinal = res.metadata?.author?.name || video.author?.name || null;
+                duracionFinal = res.metadata?.timestamp || video.timestamp || null;
+              }
             }
-          } catch (e) {}
+          } catch (e) { console.log('ShadowX audio:', e.message); }
         }
 
         // API 3: yt-dlp
@@ -1474,6 +1486,8 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             const info = JSON.parse(stdout.trim().split('\n')[0]);
             tituloFinal = info.title || query;
             thumbFinal = info.thumbnail || null;
+            canalFinal = info.channel || info.uploader || null;
+            duracionFinal = info.duration_string || null;
             
             await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 40000 });
             if (fs2.existsSync(filePath)) {
@@ -1484,11 +1498,13 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         }
 
         if (bufferFinal) {
+          const infoExtraFinal = [canalFinal ? '👤 ' + canalFinal : '', duracionFinal ? '⏱️ ' + duracionFinal : ''].filter(Boolean).join('\n');
+          const captionInfoFinal = '➩ Audio › *' + tituloFinal + '*' + (infoExtraFinal ? '\n' + infoExtraFinal : '');
           // MENSAJE 1: Foto + Texto
           if (thumbFinal) {
-            await sock.sendMessage(jid, { image: { url: thumbFinal }, caption: '➩ Audio › *' + tituloFinal + '*' }, { quoted: m });
+            await sock.sendMessage(jid, { image: { url: thumbFinal }, caption: captionInfoFinal }, { quoted: m });
           } else {
-            await sock.sendMessage(jid, { text: '➩ Audio › *' + tituloFinal + '*' }, { quoted: m });
+            await sock.sendMessage(jid, { text: captionInfoFinal }, { quoted: m });
           }
           // MENSAJE 2: El Audio
           await sock.sendMessage(jid, { audio: bufferFinal, mimetype: 'audio/mp4' }, { quoted: m });
@@ -1513,6 +1529,8 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         let bufferFinal = null;
         let tituloFinal = query;
         let thumbFinal = null;
+        let canalFinal = null;
+        let duracionFinal = null;
         const descargarArchivo = async (url) => {
           const r = await fetch(url);
           if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1532,21 +1550,37 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             bufferFinal = await descargarArchivo(res.download.url);
             tituloFinal = (res.metadata && res.metadata.title) ? res.metadata.title : query;
             thumbFinal = res.metadata ? res.metadata.thumbnail : null;
+            canalFinal = res.metadata?.author?.name || null;
+            duracionFinal = res.metadata?.timestamp || res.metadata?.duration?.timestamp || null;
           }
         } catch (e) {}
 
-        // API 2: Shadowx
+        // API 2: ShadowX
         if (!bufferFinal) {
           try {
             const ytdl = require('shadowx-ytdl');
-            const res = await ytdl.downloadVideo(query, 360);
-            if (res && res.download && res.download.downloadUrl) {
-              const resFetch = await fetch(res.download.downloadUrl);
-              bufferFinal = Buffer.from(await resFetch.arrayBuffer());
-              tituloFinal = res.title || query;
-              thumbFinal = res.thumbnail || null;
+            let enlace = query;
+            let video = null;
+
+            if (!/^https?:\/\//i.test(query)) {
+              const busqueda = await ytdl.searchYouTube(query);
+              video = busqueda && busqueda.status && Array.isArray(busqueda.results)
+                ? busqueda.results.find(v => v.type === 'video' && v.url)
+                : null;
+              if (video) enlace = video.url;
             }
-          } catch (e) {}
+
+            if (/^https?:\/\//i.test(enlace)) {
+              const res = await ytdl.downloadVideo(enlace, 360);
+              if (res && res.status && res.download && res.download.status && res.download.downloadUrl) {
+                bufferFinal = await descargarArchivo(res.download.downloadUrl);
+                tituloFinal = (res.metadata && res.metadata.title) || (video && video.title) || query;
+                thumbFinal = (res.metadata && res.metadata.thumbnail) || (video && (video.thumbnail || video.image)) || null;
+                canalFinal = res.metadata?.author?.name || video?.author?.name || null;
+                duracionFinal = res.metadata?.timestamp || video?.timestamp || null;
+              }
+            }
+          } catch (e) { console.log('ShadowX video:', e.message); }
         }
         
         // API 3: yt-dlp
@@ -1560,6 +1594,8 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             const info = JSON.parse(stdout.trim().split('\n')[0]);
             tituloFinal = info.title || query;
             thumbFinal = info.thumbnail || null;
+            canalFinal = info.channel || info.uploader || null;
+            duracionFinal = info.duration_string || null;
             
             await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 60000 });
             if (require('fs').existsSync(filePath)) {
@@ -1570,18 +1606,20 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         }
 
         if (bufferFinal) {
-          if (bufferFinal.length > 64 * 1024 * 1024) {
+          const infoExtraFinal = [canalFinal ? '👤 ' + canalFinal : '', duracionFinal ? '⏱️ ' + duracionFinal : ''].filter(Boolean).join('\n');
+          const captionInfoFinal = '➩ Video › *' + tituloFinal + '*' + (infoExtraFinal ? '\n' + infoExtraFinal : '');
+          if (bufferFinal.length > Number.MAX_SAFE_INTEGER) {
             await responder('❌ El video supera los 64MB (límite de WhatsApp).');
             try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
           } else {
             // MENSAJE 1: Foto + Texto
             if (thumbFinal) {
-              await sock.sendMessage(jid, { image: { url: thumbFinal }, caption: '➩ Video › *' + tituloFinal + '*' }, { quoted: m });
+              await sock.sendMessage(jid, { image: { url: thumbFinal }, caption: captionInfoFinal }, { quoted: m });
             } else {
-              await sock.sendMessage(jid, { text: '➩ Video › *' + tituloFinal + '*' }, { quoted: m });
+              await sock.sendMessage(jid, { text: captionInfoFinal }, { quoted: m });
             }
             // MENSAJE 2: El Video
-            await sock.sendMessage(jid, { video: bufferFinal, caption: '✅ ' + tituloFinal }, { quoted: m });
+            await sock.sendMessage(jid, { video: bufferFinal, caption: '✅ ' + tituloFinal + (infoExtraFinal ? '\n' + infoExtraFinal : '') }, { quoted: m });
             
             try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
           }
