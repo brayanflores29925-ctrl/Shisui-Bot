@@ -5276,6 +5276,60 @@ case 'fotogrupo':
       }
 
       case 'del': case 'borrar': {
+  if (!jid.endsWith('@g.us')) {
+    await responder('❌ Solo en grupos.');
+    break;
+  }
+
+  const target = m.message?.extendedTextMessage?.contextInfo?.participant;
+  if (!target) {
+    await responder('❌ Responde al mensaje de la persona cuyos mensajes quieres borrar.');
+    break;
+  }
+
+  let borrados = 0;
+  const objetivo = target.split('@')[0].split(':')[0];
+
+  try {
+    const lista = mensajesRecientes[jid] || [];
+    const msgsABorrar = lista.filter(x =>
+      Array.isArray(x.ids) && x.ids.includes(objetivo)
+    );
+
+    const eliminados = [];
+
+    for (const entrada of msgsABorrar) {
+      try {
+        await sock.sendMessage(jid, { delete: entrada.key });
+        borrados++;
+        eliminados.push(entrada);
+        await new Promise(r => setTimeout(r, 250));
+      } catch (err) {
+        console.log('Error al borrar mensaje individual:', err.message);
+      }
+    }
+
+    mensajesRecientes[jid] = lista.filter(x => !eliminados.includes(x));
+
+    if (borrados > 0) {
+      try {
+        await sock.sendMessage(jid, { react: { text: '🗑️', key: m.key } });
+      } catch (e) {}
+
+      await sock.sendMessage(jid, {
+        text: '🗑️ Se eliminaron ' + borrados + ' mensajes de @' + objetivo + '.',
+        mentions: [target]
+      }, { quoted: m });
+    } else {
+      await responder('⚠️ No encontré mensajes recientes de esa persona o necesito ser administrador.');
+    }
+  } catch (e) {
+    console.log('Error en .del:', e.message);
+    await responder('❌ No se pudieron borrar los mensajes.');
+  }
+  break;
+}
+case 'borrar': {
   if (!jid.endsWith('@g.us')) { await responder('❌ Solo en grupos.'); break; }
   
   let target = m.message?.extendedTextMessage?.contextInfo?.participant;
