@@ -1374,7 +1374,8 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
     case 'regalo': {
       try {
-        const mencionado = (m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])[0];
+        const ctxRegalo = m.message?.extendedTextMessage?.contextInfo;
+        const mencionado = (ctxRegalo?.mentionedJid || [])[0] || ctxRegalo?.participant;
         if (!mencionado) {
           await responder('Uso: #regalo @usuario\nEjemplo: #regalo @Leandro');
           break;
