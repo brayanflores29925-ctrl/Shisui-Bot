@@ -4496,26 +4496,48 @@ case 'pin': {
       break;
     }
 
-    for (const foto of resultados) {
+    // Descargar las imágenes en paralelo.
+    const tareas = await Promise.all(resultados.map(async (foto) => {
       try {
         const res = await fetch(foto.url, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
           signal: AbortSignal.timeout(15000)
         });
 
-        if (!res.ok) continue;
+        if (!res.ok) return null;
 
         const buffer = Buffer.from(await res.arrayBuffer());
-        if (!buffer.length || buffer.length > 8 * 1024 * 1024) continue;
+        if (!buffer.length || buffer.length > 8 * 1024 * 1024) return null;
 
-        await sock.sendMessage(jid, {
-          image: buffer,
-          caption: '📌 ' + foto.titulo
-        }, { quoted: m });
+        return { buffer, titulo: String(foto.titulo || query).slice(0, 900) };
       } catch (e) {
-        console.log('Error enviando imagen PIN:', e.message);
+        console.log('Error descargando imagen PIN:', e.message);
+        return null;
       }
+    }));
+
+    const imagenes = tareas.filter(Boolean);
+
+    if (!imagenes.length) {
+      await responder('❌ No se pudieron descargar las imágenes.');
+      break;
     }
+
+    // Crear el mensaje principal del álbum.
+    const album = await sock.sendMessage(jid, {
+      album: { expectedImageCount: imagenes.length }
+    }, { quoted: m });
+
+    // Asociar cada imagen al mismo álbum.
+    for (const foto of imagenes) {
+      await sock.sendMessage(jid, {
+        image: foto.buffer,
+        caption: '📌 ' + foto.titulo,
+        albumParentKey: album.key
+      });
+    }
+
+    try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
   } catch (e) {
     console.log('Error buscando PIN:', e.message);
     await responder('❌ No se pudieron buscar las imágenes.');
