@@ -1232,9 +1232,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     case 'apagarsubs': case 'subsoff': {
       try {
         // Lista de dueños directa (por si esDueno falla)
-        const OWNERS = ['50493482934', '50494874330', '50495939120'];
-        const senderNum = (m.key.participant || m.key.remoteJid || '').split('@')[0].split(':')[0];
-        const esDuenoReal = OWNERS.some(n => senderNum.includes(n));
+        const esDuenoReal = esDuenoPrincipal(m);
         
         if (!esDuenoReal) {
           await responder('❌ Solo el dueño principal puede apagar los SubBots.');
@@ -1260,9 +1258,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
     case 'encendersubs': case 'subson': {
       try {
-        const OWNERS = ['50493482934', '50494874330', '50495939120'];
-        const senderNum = (m.key.participant || m.key.remoteJid || '').split('@')[0].split(':')[0];
-        const esDuenoReal = OWNERS.some(n => senderNum.includes(n));
+        const esDuenoReal = esDuenoPrincipal(m);
         
         if (!esDuenoReal) {
           await responder('❌ Solo el dueño principal puede encender los SubBots.');
