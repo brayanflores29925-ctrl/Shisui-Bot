@@ -4301,7 +4301,7 @@ case 'grupo': {
 }
 
 
-case 'play': case 'play2': case 'playvideo': case 'video': case 'v': {
+case 'play2': case 'playvideo': case 'video': case 'v': {
   try {
     const query = cuerpo.slice(cmd.length).trim();
     if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
@@ -4368,7 +4368,7 @@ case 'play': case 'play2': case 'playvideo': case 'video': case 'v': {
   break;
 }
 
-case 'musica': case 'm': {
+case 'play': case 'musica': case 'm': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
   await responder('🔍 Buscando audio de: ' + query + '...');
