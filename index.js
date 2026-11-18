@@ -731,6 +731,27 @@ sock.ev.on('group-participants.update', async (update) => {
 // --------------------------------------------------
 
 sock.ev.on('messages.upsert', async ({ messages }) => {
+
+  // --- FILTRO GLOBAL DE SUBBOTS ---
+  try {
+    const msg0 = messages[0];
+    if (msg0 && !msg0.key.fromMe) {
+      const fs2 = require('fs');
+      let cfg = {};
+      try { cfg = JSON.parse(fs2.readFileSync('./config.json', 'utf8')); } catch { cfg = {}; }
+      
+      if (cfg.subbots_off === true) {
+        const miNumero = sock.user.id.split(':')[0].split('@')[0];
+        const botPrincipal = cfg.botPrincipal;
+        // Si NO soy el bot principal, significa que soy un subbot y debo ignorar
+        if (botPrincipal && miNumero !== botPrincipal) {
+          return; // Ignora el mensaje silenciosamente
+        }
+      }
+    }
+  } catch (e) {}
+  // ---------------------------------
+
   // --- CONTADOR DE MENSAJES ---
   try {
     const msg = messages[0];
@@ -1204,6 +1225,41 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     
     switch (comando) {
+
+    // ==========================================
+    // INTERRUPTOR GLOBAL PARA SUBBOTS
+    // ==========================================
+    case 'apagarsubs': case 'subsoff': {
+      try {
+        if (!esDueno(m)) { await responder('❌ Solo el dueño puede apagar los SubBots.'); break; }
+        const fs2 = require('fs');
+        let cfg = {};
+        try { cfg = JSON.parse(fs2.readFileSync('./config.json', 'utf8')); } catch { cfg = {}; }
+        
+        cfg.subbots_off = true;
+        fs2.writeFileSync('./config.json', JSON.stringify(cfg, null, 2));
+        
+        await responder('🔴 *SubBots apagados globalmente.*\nNingún SubBot responderá a comandos hasta que uses #encendersubs.');
+      } catch (e) { await responder('❌ Error al apagar SubBots.'); }
+      break;
+    }
+
+    case 'encendersubs': case 'subson': {
+      try {
+        if (!esDueno(m)) { await responder('❌ Solo el dueño puede encender los SubBots.'); break; }
+        const fs2 = require('fs');
+        let cfg = {};
+        try { cfg = JSON.parse(fs2.readFileSync('./config.json', 'utf8')); } catch { cfg = {}; }
+        
+        cfg.subbots_off = false;
+        fs2.writeFileSync('./config.json', JSON.stringify(cfg, null, 2));
+        
+        await responder('🟢 *SubBots encendidos globalmente.*\nAhora todos los SubBots pueden responder a comandos.');
+      } catch (e) { await responder('❌ Error al encender SubBots.'); }
+      break;
+    }
+
+
 
     case 'instagram': case 'ig': {
       try {
@@ -1762,24 +1818,6 @@ case 'menu': {
         cfgDel.duenos = cfgDel.duenos.filter(n => n !== quitar)
         guardarConfig(cfgDel)
         await responder('✅ Dueño eliminado: ' + quitar)
-        break
-      }
-      case 'activarbot':
-      case 'desactivarbot': {
-        if (!esDueno(m)) {
-          await responder('⛔ Solo el dueño del bot puede usar este comando.')
-          break
-        }
-        const cfgBot = leerConfig()
-        if (comando === 'activarbot') {
-          delete cfgBot.apagado
-          guardarConfig(cfgBot)
-          await responder('✅ Bot activado. Ya responde a todos.')
-        } else {
-          cfgBot.apagado = true
-          guardarConfig(cfgBot)
-          await responder('⛔ Bot desactivado. Solo responderá a los dueños. Usa #activarbot para encenderlo.')
-        }
         break
       }
       case 'setnombre': {
