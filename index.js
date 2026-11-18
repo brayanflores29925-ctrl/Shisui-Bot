@@ -1417,6 +1417,14 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     // ==========================================
     case 'play': case 'play2': case 'spotify': case 'sp': {
       try {
+        const query = cuerpo.slice(cmd.length).trim();
+        const conTiempo = (promesa, ms) => new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('Tiempo agotado')), ms);
+          Promise.resolve(promesa).then(
+            valor => { clearTimeout(timer); resolve(valor); },
+            error => { clearTimeout(timer); reject(error); }
+          );
+        });
 
         if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
         
@@ -1502,7 +1510,11 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
           const captionInfoFinal = '➩ Audio › *' + tituloFinal + '*' + (infoExtraFinal ? '\n' + infoExtraFinal : '');
           // MENSAJE 1: Foto + Texto
           if (thumbFinal) {
-            await sock.sendMessage(jid, { image: { url: thumbFinal }, caption: captionInfoFinal }, { quoted: m });
+            try {
+              await sock.sendMessage(jid, { image: { url: thumbFinal }, caption: captionInfoFinal }, { quoted: m });
+            } catch (e) {
+              await sock.sendMessage(jid, { text: captionInfoFinal }, { quoted: m });
+            }
           } else {
             await sock.sendMessage(jid, { text: captionInfoFinal }, { quoted: m });
           }
