@@ -1205,6 +1205,46 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     switch (comando) {
 
+    case 'instagram': case 'ig': {
+      try {
+        const url = cuerpo.slice(cmd.length).trim();
+        if (!url || !url.includes('instagram.com')) {
+          await responder('Uso: #instagram <enlace>\nEjemplo: #ig https://www.instagram.com/reel/...');
+          break;
+        }
+        
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+        
+        const { alldl } = require('rahad-all-downloader-v2');
+        const res = await alldl(url, { retries: 2 });
+
+        if (!res || !res.data || !res.data.videoUrl) {
+          await responder('❌ No se pudo extraer el video. Asegúrate de que el enlace sea de un Reel o video público.');
+          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+          break;
+        }
+
+        const videoRes = await fetch(res.data.videoUrl);
+        const buffer = Buffer.from(await videoRes.arrayBuffer());
+
+        if (buffer.length > 64 * 1024 * 1024) {
+          await responder('❌ El video supera los 64MB (límite de WhatsApp).');
+          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+        } else {
+          const titulo = res.data.title || 'Video de Instagram';
+          await sock.sendMessage(jid, { video: buffer, caption: '✅ *' + titulo + '*' }, { quoted: m });
+          try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
+        }
+      } catch (e) {
+        console.log('Error en .instagram (rahad):', e.message);
+        await responder('❌ Error al descargar. Puede que el post sea privado o no contenga video.');
+        try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+      }
+      break;
+    }
+
+
+
     case 'facebook': case 'fb': {
       try {
         const url = cuerpo.slice(cmd.length).trim();
@@ -1485,57 +1525,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     // ==========================================
     // SISTEMA DE DESCARGA CON MÚLTIPLES APIS
     // ==========================================
-    case 'instagram': case 'ig': {
-  try {
-    const url = cuerpo.slice(cmd.length).trim();
-    if (!url || !url.includes('instagram.com')) {
-      await responder('Uso: #instagram <enlace>\nEjemplo: #ig https://www.instagram.com/p/...');
-      break;
-    }
-    
-    await responder('📥 Analizando enlace de Instagram...');
-    
-    const downloader = require('primesave-dl');
-    const data = await downloader(url);
-
-    if (!data.success || !data.options || data.options.length === 0) {
-      await responder('❌ No se pudo extraer el video. Asegúrate de que el enlace sea público.');
-      break;
-    }
-
-    // Buscamos la opción de video de mejor calidad
-    const videoOption = data.options.find(opt => opt.type === 'Video') || data.options[0];
-    
-    if (!videoOption || !videoOption.url) {
-      await responder('❌ No se encontró un enlace de video válido.');
-      break;
-    }
-
-    await responder('⬇️ Descargando video...');
-
-    const videoRes = await fetch(videoOption.url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (!videoRes.ok) throw new Error('HTTP ' + videoRes.status);
-    
-    const buffer = Buffer.from(await videoRes.arrayBuffer());
-
-    // Límite de 64MB de WhatsApp
-    if (buffer.length > 64 * 1024 * 1024) {
-      await responder('❌ El video supera los 64MB (límite de WhatsApp).');
-      break;
-    }
-
-    await sock.sendMessage(jid, { video: buffer, caption: '✅ Video de Instagram' }, { quoted: m });
-
-  } catch (e) {
-    console.log('Error en .instagram (primesave):', e.message);
-    await responder('❌ Error al descargar. Puede que el post sea privado o no contenga video.');
-  }
-  break;
-}
-
-
-
-case 'novedad': case 'anuncio': {
+    case 'novedad': case 'anuncio': {
       try {
         if (!esDueno(m)) { await responder('❌ Solo el dueño puede usar este comando.'); break; }
         const texto = cuerpo.slice(cmd.length).trim();
