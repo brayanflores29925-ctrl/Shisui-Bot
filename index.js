@@ -1206,17 +1206,20 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     switch (comando) {
 
     // ==========================================
-    // SISTEMA DE DESCARGA CON MÚLTIPLES APIS
+    // DESCARGA OPTIMIZADA (SOLO 2 MENSAJES)
     // ==========================================
     case 'play': case 'play2': case 'spotify': case 'sp': {
       try {
         const query = cuerpo.slice(cmd.length).trim();
         if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
-        await responder('🔍 Buscando audio de: ' + query + '...');
         
+        // Reacción de "trabajando" para no mandar mensaje de texto
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+
         const fs2 = require('fs');
         let bufferFinal = null;
         let tituloFinal = query;
+        let thumbFinal = null;
 
         // API 1: Denzy
         try {
@@ -1226,8 +1229,9 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             const resFetch = await fetch(res.download.url);
             bufferFinal = Buffer.from(await resFetch.arrayBuffer());
             tituloFinal = (res.metadata && res.metadata.title) ? res.metadata.title : query;
+            thumbFinal = res.metadata ? res.metadata.thumbnail : null;
           }
-        } catch (e) { console.log('API 1 fallo'); }
+        } catch (e) {}
 
         // API 2: Shadowx
         if (!bufferFinal) {
@@ -1238,32 +1242,48 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               const resFetch = await fetch(res.download.downloadUrl);
               bufferFinal = Buffer.from(await resFetch.arrayBuffer());
               tituloFinal = res.title || query;
+              thumbFinal = res.thumbnail || null;
             }
-          } catch (e) { console.log('API 2 fallo'); }
+          } catch (e) {}
         }
 
-        // API 3: yt-dlp (Respaldo)
+        // API 3: yt-dlp
         if (!bufferFinal) {
           try {
             const { exec } = require('child_process');
             const { promisify } = require('util');
             const execAsync = promisify(exec);
             const filePath = '/tmp/fb_' + Date.now() + '.m4a';
-            await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePath + '" "ytsearch1:' + query + '"', { timeout: 40000 });
+            const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query + '"', { timeout: 40000 });
+            const info = JSON.parse(stdout.trim().split('\n')[0]);
+            tituloFinal = info.title || query;
+            thumbFinal = info.thumbnail || null;
+            
+            await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 40000 });
             if (fs2.existsSync(filePath)) {
               bufferFinal = fs2.readFileSync(filePath);
               fs2.unlinkSync(filePath);
             }
-          } catch (e) { console.log('API 3 fallo'); }
+          } catch (e) {}
         }
 
         if (bufferFinal) {
-          await sock.sendMessage(jid, { text: '➩ Audio › *' + tituloFinal + '*\n⏳ Enviando...' }, { quoted: m });
+          // MENSAJE 1: Foto + Texto
+          if (thumbFinal) {
+            await sock.sendMessage(jid, { image: { url: thumbFinal }, caption: '➩ Audio › *' + tituloFinal + '*' }, { quoted: m });
+          } else {
+            await sock.sendMessage(jid, { text: '➩ Audio › *' + tituloFinal + '*' }, { quoted: m });
+          }
+          // MENSAJE 2: El Audio
           await sock.sendMessage(jid, { audio: bufferFinal, mimetype: 'audio/mp4' }, { quoted: m });
+          
+          // Cambiamos la reacción a "Listo"
+          try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
         } else {
           await responder('❌ No se pudo descargar el audio.');
+          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
         }
-      } catch (e) { await responder('❌ Error inesperado.'); }
+      } catch (e) { console.log('Error play:', e.message); }
       break;
     }
 
@@ -1271,10 +1291,12 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
       try {
         const query = cuerpo.slice(cmd.length).trim();
         if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
-        await responder('🔍 Buscando video de: ' + query + '...');
         
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+
         let bufferFinal = null;
         let tituloFinal = query;
+        let thumbFinal = null;
 
         // API 1: Denzy
         try {
@@ -1284,8 +1306,9 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             const resFetch = await fetch(res.download.url);
             bufferFinal = Buffer.from(await resFetch.arrayBuffer());
             tituloFinal = (res.metadata && res.metadata.title) ? res.metadata.title : query;
+            thumbFinal = res.metadata ? res.metadata.thumbnail : null;
           }
-        } catch (e) { console.log('API 1 fallo'); }
+        } catch (e) {}
 
         // API 2: Shadowx
         if (!bufferFinal) {
@@ -1296,29 +1319,61 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               const resFetch = await fetch(res.download.downloadUrl);
               bufferFinal = Buffer.from(await resFetch.arrayBuffer());
               tituloFinal = res.title || query;
+              thumbFinal = res.thumbnail || null;
             }
-          } catch (e) { console.log('API 2 fallo'); }
+          } catch (e) {}
+        }
+        
+        // API 3: yt-dlp
+        if (!bufferFinal) {
+          try {
+            const { exec } = require('child_process');
+            const { promisify } = require('util');
+            const execAsync = promisify(exec);
+            const filePath = '/tmp/fb_v_' + Date.now() + '.mp4';
+            const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query + '"', { timeout: 40000 });
+            const info = JSON.parse(stdout.trim().split('\n')[0]);
+            tituloFinal = info.title || query;
+            thumbFinal = info.thumbnail || null;
+            
+            await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 60000 });
+            if (require('fs').existsSync(filePath)) {
+              bufferFinal = require('fs').readFileSync(filePath);
+              require('fs').unlinkSync(filePath);
+            }
+          } catch (e) {}
         }
 
         if (bufferFinal) {
           if (bufferFinal.length > 64 * 1024 * 1024) {
             await responder('❌ El video supera los 64MB (límite de WhatsApp).');
+            try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
           } else {
-            await sock.sendMessage(jid, { text: '➩ Video › *' + tituloFinal + '*\n⏳ Enviando...' }, { quoted: m });
+            // MENSAJE 1: Foto + Texto
+            if (thumbFinal) {
+              await sock.sendMessage(jid, { image: { url: thumbFinal }, caption: '➩ Video › *' + tituloFinal + '*' }, { quoted: m });
+            } else {
+              await sock.sendMessage(jid, { text: '➩ Video › *' + tituloFinal + '*' }, { quoted: m });
+            }
+            // MENSAJE 2: El Video
             await sock.sendMessage(jid, { video: bufferFinal, caption: '✅ ' + tituloFinal }, { quoted: m });
+            
+            try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
           }
         } else {
           await responder('❌ No se pudo descargar el video.');
+          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
         }
-      } catch (e) { await responder('❌ Error inesperado.'); }
+      } catch (e) { console.log('Error video:', e.message); }
       break;
     }
-
+    
     case 'ytsearch': {
       try {
         const query = cuerpo.slice(cmd.length).trim();
         if (!query) { await responder('Uso: #ytsearch <búsqueda>'); break; }
-        await responder('🔍 Buscando en YouTube: ' + query + '...');
+        
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
         
         const Youtube = require('youtube-search-api');
         const results = await Youtube.GetListByKeyword(query, false, 5);
@@ -1336,13 +1391,17 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
           txt += '🔗 https://www.youtube.com/watch?v=' + v.id + '\n\n';
         }
         await sock.sendMessage(jid, { text: txt }, { quoted: m });
+        try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
       } catch (e) { await responder('❌ Error al buscar.'); }
       break;
     }
 
 
 
-case 'instagram': case 'ig': {
+    // ==========================================
+    // SISTEMA DE DESCARGA CON MÚLTIPLES APIS
+    // ==========================================
+    case 'instagram': case 'ig': {
   try {
     const url = cuerpo.slice(cmd.length).trim();
     if (!url || !url.includes('instagram.com')) {
