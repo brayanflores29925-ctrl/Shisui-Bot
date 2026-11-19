@@ -3480,18 +3480,16 @@ case 'llama': {
   }
   break;
 }
-case 'chatgpt': case 'chatpgt': case 'gpt': {
+case 'chatgpt': {
   const prompt = cuerpo.slice(cmd.length).trim();
   if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
   await responder('🤖 Consultando a ChatGPT...');
   try {
-    const res = await fetch('https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
-    await sock.sendMessage(jid, { text: '🤖 ' + text.trim() }, { quoted: m });
+    const respuestaIA = await consultarGroq(prompt);
+    await sock.sendMessage(jid, { text: '🤖 ' + respuestaIA }, { quoted: m });
   } catch (e) {
     console.log('Error .chatgpt:', e.message);
-    await responder('❌ Error consultando a ChatGPT. Intenta de nuevo.');
+    await responder('❌ Error con la IA. Comprueba que GROQ_API_KEY esté configurada.');
   }
   break;
 }
