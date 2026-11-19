@@ -1438,7 +1438,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         let canalFinal = null;
         let duracionFinal = null;
         const descargarArchivo = async (url) => {
-          const r = await fetch(url);
+          const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
           if (!r.ok) throw new Error('HTTP ' + r.status);
           const tipo = (r.headers.get('content-type') || '').toLowerCase();
           if (/text\/html|application\/json/.test(tipo)) throw new Error('Respuesta no válida');
@@ -1451,7 +1451,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         // API 1: Denzy
         try {
           const yt = require('@denzy-official/youtube_scraper');
-          const res = await conTiempo(yt.ytmp3(query), 12000);
+          const res = await conTiempo(yt.ytmp3(query), 8000);
           if (res && res.download && res.download.url) {
             bufferFinal = await descargarArchivo(res.download.url);
             tituloFinal = (res.metadata && res.metadata.title) ? res.metadata.title : query;
@@ -1465,13 +1465,13 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         if (!bufferFinal) {
           try {
             const ytdl = require('shadowx-ytdl');
-            const busqueda = await conTiempo(ytdl.searchYouTube(query), 10000);
+            const busqueda = await conTiempo(ytdl.searchYouTube(query), 7000);
             const video = busqueda && busqueda.status && Array.isArray(busqueda.results)
               ? busqueda.results.find(v => v.type === 'video' && v.url)
               : null;
 
             if (video) {
-              const res = await conTiempo(ytdl.downloadAudio(video.url, 128), 15000);
+              const res = await conTiempo(ytdl.downloadAudio(video.url, 128), 10000);
               if (res && res.status && res.download && res.download.status && res.download.downloadUrl) {
                 bufferFinal = await descargarArchivo(res.download.downloadUrl);
                 tituloFinal = (res.metadata && res.metadata.title) || video.title || query;
@@ -1490,14 +1490,14 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             const { promisify } = require('util');
             const execAsync = promisify(exec);
             const filePath = '/tmp/fb_' + Date.now() + '.m4a';
-            const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query + '"', { timeout: 25000 });
+            const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query + '"', { timeout: 18000 });
             const info = JSON.parse(stdout.trim().split('\n')[0]);
             tituloFinal = info.title || query;
             thumbFinal = info.thumbnail || null;
             canalFinal = info.channel || info.uploader || null;
             duracionFinal = info.duration_string || null;
             
-            await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 25000 });
+            await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 18000 });
             if (fs2.existsSync(filePath)) {
               bufferFinal = fs2.readFileSync(filePath);
               fs2.unlinkSync(filePath);
