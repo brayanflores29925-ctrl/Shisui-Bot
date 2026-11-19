@@ -2318,8 +2318,9 @@ case 'buscartt': {
   }
 
   const apiKey = process.env.SOCIALCRAWL_API_KEY
-  if (!apiKey) {
-    await responder('❌ No está configurada la API de SocialCrawl.')
+  const apiKeyRespaldo = process.env.HASDATA_API_KEY
+  if (!apiKey && !apiKeyRespaldo) {
+    await responder('❌ No hay ninguna API de búsqueda configurada.')
     break
   }
 
@@ -2356,27 +2357,78 @@ case 'buscartt': {
   try {
     await responder('🔎 Buscando 2 videos de TikTok sobre: ' + consulta)
 
-    const urlApi = new URL('https://www.socialcrawl.dev/v1/tiktok/search')
-    urlApi.searchParams.set('query', consulta)
-    urlApi.searchParams.set('limit', '2')
-    urlApi.searchParams.set('sort_by', 'relevance')
+    let resultados = []
+    let errorSocialCrawl = null
+    let errorHasData = null
 
-    const respuestaApi = await fetch(urlApi, {
-      headers: { 'x-api-key': apiKey, 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(45000)
-    })
+    if (apiKey) {
+      try {
+        const urlApi = new URL('https://www.socialcrawl.dev/v1/tiktok/search')
+        urlApi.searchParams.set('query', consulta)
+        urlApi.searchParams.set('limit', '2')
+        urlApi.searchParams.set('sort_by', 'relevance')
 
-    const datosApi = await respuestaApi.json()
-    if (!respuestaApi.ok || datosApi.success === false) {
-      throw new Error(datosApi.error?.message || datosApi.message || 'Error HTTP ' + respuestaApi.status)
+        const respuestaApi = await fetch(urlApi, {
+          headers: { 'x-api-key': apiKey, 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(45000)
+        })
+        const datosApi = await respuestaApi.json()
+        if (!respuestaApi.ok || datosApi.success === false) {
+          throw new Error(datosApi.error?.message || datosApi.message || 'Error HTTP ' + respuestaApi.status)
+        }
+
+        resultados = datosApi.data?.items || datosApi.items || []
+        if (!Array.isArray(resultados)) resultados = []
+        if (!resultados.length) throw new Error('SocialCrawl no devolvió videos')
+
+        busquedaCobro = true
+        console.log('Búsqueda realizada con SocialCrawl.')
+      } catch (e) {
+        errorSocialCrawl = e
+        console.log('SocialCrawl falló; se probará HasData:', e.message)
+      }
     }
 
-    busquedaCobro = true
-    const resultados = datosApi.data?.items || datosApi.items || []
+    if (!resultados.length && apiKeyRespaldo) {
+      try {
+        const urlRespaldo = new URL('https://api.hasdata.com/scrape/tiktok/search')
+        urlRespaldo.searchParams.set('keyword', consulta)
+        urlRespaldo.searchParams.set('type', 'video')
 
-    if (!Array.isArray(resultados) || resultados.length === 0) {
-      await responder('❌ No encontré videos para esa búsqueda.')
-      break
+        const respuestaRespaldo = await fetch(urlRespaldo, {
+          headers: { 'x-api-key': apiKeyRespaldo, 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(45000)
+        })
+        const datosRespaldo = await respuestaRespaldo.json()
+
+        if (!respuestaRespaldo.ok) {
+          throw new Error(datosRespaldo.message || datosRespaldo.error || 'Error HTTP ' + respuestaRespaldo.status)
+        }
+
+        resultados = Array.isArray(datosRespaldo)
+          ? datosRespaldo
+          : (datosRespaldo.videos || datosRespaldo.data?.videos || datosRespaldo.data?.items || [])
+
+        if (!Array.isArray(resultados) || !resultados.length) {
+          resultados = []
+          throw new Error('HasData no devolvió videos')
+        }
+
+        busquedaCobro = true
+        console.log('Búsqueda realizada con HasData (respaldo).')
+      } catch (e) {
+        errorHasData = e
+        console.log('Error en respaldo HasData:', e.message)
+      }
+    }
+
+    if (!resultados.length) {
+      throw new Error(
+        'Fallaron las APIs. SocialCrawl: ' +
+        (errorSocialCrawl?.message || 'sin resultados') +
+        '; HasData: ' +
+        (errorHasData?.message || (apiKeyRespaldo ? 'sin resultados' : 'no configurada'))
+      )
     }
 
     const tareas = resultados.slice(0, 2).map(async (elemento) => {
@@ -2394,7 +2446,7 @@ case 'buscartt': {
 
         const autor = post.author?.username || post.author?.nickname || 'TikTok'
         const descripcion = String(post.caption || post.description || post.text || consulta).slice(0, 500)
-        const vistas = post.play_count ?? post.statistics?.play_count
+        const vistas = post.play_count ?? post.statistics?.play_count ?? post.plays
         const duracion = post.duration
 
         let caption = '🎬 ' + descripcion + '\\n👤 ' + autor

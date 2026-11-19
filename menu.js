@@ -412,15 +412,21 @@ function generarMenu(nsfw, filtro = "") {
     const navidad = !!config.navidadMenu
     let texto = informacion
 
-    if (navidad) {
-      texto += `💡 ¿Quieres encontrar un comando más rápido?
+    texto += navidad
+      ? `💡 ¿Quieres encontrar un comando más rápido?
 Escribe #menu seguido de una categoría o número.
 Ejemplos:
 ❄️ #menu perfiles
 ❄️ #menu 1
 
 `
-    }
+      : `💡 ¿Quieres encontrar un comando más rápido?
+Escribe #menu seguido de una categoría o número.
+Ejemplos:
+#menu perfiles
+#menu 1
+
+`
 
     for (const [titulo, comandos] of secciones) {
       if (!nsfw && titulo.includes('+18')) continue
