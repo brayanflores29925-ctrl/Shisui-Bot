@@ -1253,7 +1253,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               const v = results.items[0];
               url = 'https://www.youtube.com/watch?v=' + v.id;
               title = v.title || query;
-              thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail) : null;
+              thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail.thumbnails?.[0]?.url || v.thumbnail.thumbnails?.[1]?.url || null) : null;
               channel = v.channelTitle || 'Desconocido';
               duration = v.length ? v.length.text : 'Desconocido';
             } else {
@@ -1341,12 +1341,12 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             const execAsync = promisify(exec);
             const fMp4 = filePathBase + '.mp4';
             const fM4a = filePathBase + '.m4a';
-            await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + fMp4 + '" "' + url + '"', { timeout: 60000 });
-            if (fs2.existsSync(fMp4)) {
-              await execAsync('ffmpeg -y -i "' + fMp4 + '" -vn -acodec copy "' + fM4a + '"', { timeout: 20000 });
-              if (fs2.existsSync(fM4a)) { bufferFinal = fs2.readFileSync(fM4a); fs2.unlinkSync(fM4a); }
-              fs2.unlinkSync(fMp4);
+            await execAsync('yt-dlp --no-playlist --socket-timeout 10 --retries 1 --fragment-retries 1 -f "bestaudio[ext=m4a]/bestaudio" -o "' + fM4a + '" "' + url + '"', { timeout: 45000 });
+            if (fs2.existsSync(fM4a)) {
+              bufferFinal = fs2.readFileSync(fM4a);
+              fs2.unlinkSync(fM4a);
             }
+            if (fs2.existsSync(fMp4)) fs2.unlinkSync(fMp4);
           } catch (e) { console.log('Fallo API 5 (yt-dlp):', e.message); }
         }
 
@@ -1386,7 +1386,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               const v = results.items[0];
               url = 'https://www.youtube.com/watch?v=' + v.id;
               title = v.title || query;
-              thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail) : null;
+              thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail.thumbnails?.[0]?.url || v.thumbnail.thumbnails?.[1]?.url || null) : null;
               channel = v.channelTitle || 'Desconocido';
               duration = v.length ? v.length.text : 'Desconocido';
             } else {
@@ -1420,14 +1420,26 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         let bufferFinal = null;
         const fileBase = '/tmp/vid_' + Date.now();
 
+        // LÍMITE DE ESPERA PARA CADA API
+        const conTiempo = (promesa, ms) => {
+          let timer;
+          return Promise.race([
+            promesa,
+            new Promise((_, reject) => {
+              timer = setTimeout(() => reject(new Error('Tiempo agotado')), ms);
+            })
+          ]).finally(() => clearTimeout(timer));
+        };
+
         // API 1: yt-direct
         try {
           const ytdl = require('yt-direct');
-          const video = await ytdl(url, { quality: '360p', format: 'mp4' });
-          await video.download(fileBase + '.mp4');
-          if (fs2.existsSync(fileBase + '.mp4')) {
-            bufferFinal = fs2.readFileSync(fileBase + '.mp4');
-            fs2.unlinkSync(fileBase + '.mp4');
+          const fApi1 = fileBase + '_api1.mp4';
+          const video = await conTiempo(ytdl(url, { quality: '360p', format: 'mp4' }), 20000);
+          await conTiempo(video.download(fApi1), 20000);
+          if (fs2.existsSync(fApi1)) {
+            bufferFinal = fs2.readFileSync(fApi1);
+            fs2.unlinkSync(fApi1);
           }
         } catch (e) { console.log('Fallo API 1 (yt-direct):', e.message); }
 
@@ -1435,9 +1447,10 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         if (!bufferFinal) {
           try {
             const yt = require('@denzy-official/youtube_scraper');
-            const res = await yt.ytmp4(url);
+            const res = await conTiempo(yt.ytmp4(url), 20000);
             if (res && res.download && res.download.url) {
-              const rFetch = await fetch(res.download.url);
+              const rFetch = await fetch(res.download.url, { signal: AbortSignal.timeout(20000) });
+              if (!rFetch.ok) throw new Error('Servidor respondió ' + rFetch.status);
               bufferFinal = Buffer.from(await rFetch.arrayBuffer());
             }
           } catch (e) { console.log('Fallo API 2 (denzy):', e.message); }
@@ -1447,9 +1460,10 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         if (!bufferFinal) {
           try {
             const ytdl = require('shadowx-ytdl');
-            const res = await ytdl.downloadVideo(url, 360);
+            const res = await conTiempo(ytdl.downloadVideo(url, 360), 20000);
             if (res && res.download && res.download.downloadUrl) {
-              const rFetch = await fetch(res.download.downloadUrl);
+              const rFetch = await fetch(res.download.downloadUrl, { signal: AbortSignal.timeout(20000) });
+              if (!rFetch.ok) throw new Error('Servidor respondió ' + rFetch.status);
               bufferFinal = Buffer.from(await rFetch.arrayBuffer());
             }
           } catch (e) { console.log('Fallo API 3 (shadowx):', e.message); }
@@ -1457,16 +1471,42 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
         // API 4: cloud-ytdl
         if (!bufferFinal) {
+          let stream;
           try {
             const ytdl = require('cloud-ytdl');
-            const stream = ytdl(url, { quality: 'highest' });
-            const chunks = [];
-            for await (const chunk of stream) chunks.push(chunk);
-            bufferFinal = Buffer.concat(chunks);
-          } catch (e) { console.log('Fallo API 4 (cloud-ytdl):', e.message); }
+            stream = ytdl(url, { quality: 'highest' });
+            const descargar = async () => {
+              const chunks = [];
+              for await (const chunk of stream) chunks.push(chunk);
+              return Buffer.concat(chunks);
+            };
+            bufferFinal = await conTiempo(descargar(), 20000);
+          } catch (e) {
+            if (stream && typeof stream.destroy === 'function') stream.destroy();
+            console.log('Fallo API 4 (cloud-ytdl):', e.message);
+          }
         }
 
-        // 5. CONVERTIR Y ENVIAR (Con validación de peso)
+        // API 5: yt-dlp (Último respaldo de video)
+        if (!bufferFinal) {
+          try {
+            const { exec } = require('child_process');
+            const { promisify } = require('util');
+            const execAsync = promisify(exec);
+            const fVideo = fileBase + '.mp4';
+
+            await execAsync('yt-dlp --no-playlist --socket-timeout 10 --retries 1 --fragment-retries 1 -f "best[height<=480][ext=mp4]/best[height<=480]/best" --merge-output-format mp4 --max-filesize 60M -o "' + fVideo + '" "' + url + '"', { timeout: 60000 });
+
+            if (fs2.existsSync(fVideo)) {
+              bufferFinal = fs2.readFileSync(fVideo);
+              fs2.unlinkSync(fVideo);
+            }
+          } catch (e) {
+            console.log('Fallo API 5 (yt-dlp video):', e.message);
+          }
+        }
+
+        // 6. CONVERTIR Y ENVIAR (Con validación de peso)
         if (bufferFinal && bufferFinal.length > 5000) {
           if (bufferFinal.length > 64 * 1024 * 1024) {
             await responder('❌ El video supera los 64MB (límite de WhatsApp).');
@@ -1480,7 +1520,10 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
           try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
         }
 
-      } catch (e) { console.log('Error video:', e.message); }
+      } catch (e) {
+        console.log('Error video:', e);
+        try { await responder('❌ Ocurrió un error al preparar el video. Intenta nuevamente.'); } catch (_) {}
+      }
       break;
     }
 
