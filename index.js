@@ -196,7 +196,7 @@ function nsfwActivo(jid) {
 
 function menuActual(nsfw, filtro) {
   const cfg = leerConfig()
-  if (!cfg.menu) return generarMenu(nsfw)
+  if (!cfg.menu) return generarMenu(nsfw, filtro)
   const zona = 'America/Tegucigalpa'
   const ahora = new Date()
   return cfg.menu

@@ -387,7 +387,7 @@ function generarMenu(nsfw, filtro = "") {
   const nombre = config.nombre || BOT.nombre
   const red = config.red || 'https://whatsapp.com/channel/0029VbDBJk4BfxoCBx5ov41y'
 
-  let texto = `╭━━━━━━━━━━━━━━━━━━━━╮
+  const informacion = `╭━━━━━━━━━━━━━━━━━━━━╮
        🤖 *${nombre.toUpperCase()}*
        ✦ MENÚ PRINCIPAL ✦
 ╰━━━━━━━━━━━━━━━━━━━━╯
@@ -400,25 +400,100 @@ function generarMenu(nsfw, filtro = "") {
 ┃ ⏳ ${getNavidadCountdown()}
 ┃ ⚡ Prefijos: ${BOT.prefijos}
 ┃ 📢 Canal: ${red}
-╰━━━━━━━━━━━━━━━━━━━━\n`
+╰━━━━━━━━━━━━━━━━━━━━
+`
 
-  for (const [titulo, comandos] of secciones) {
-    let fLimpio = filtro.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    let tLimpio = titulo.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    if (fLimpio !== "" && !tLimpio.includes(fLimpio)) continue;
+  const normalizar = t => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const buscar = normalizar(String(filtro || '').trim())
 
-    if (!nsfw && titulo.includes('+18')) continue
-    texto += `\n┏━━「 ${titulo} 」\n`
-    texto += comandos.map(c => `┃ ➳ ${c}`).join('\n')
-    texto += '\n┗━━━━━━━━━━━━━━━━━━\n'
+  if (!buscar) {
+    let texto = informacion
+    for (const [titulo, comandos] of secciones) {
+      if (!nsfw && titulo.includes('+18')) continue
+      texto += `\n┏━━「 ${titulo} 」\n`
+      texto += comandos.map(c => `┃ ➳ ${c}`).join('\n')
+      texto += '\n┗━━━━━━━━━━━━━━━━━━\n'
+    }
+    texto += '\n╭━━━━━━━━━━━━━━━━━━━━╮\n'
+    texto += '      ✦ *SHISUI BOT v1.5.0* ✦\n'
+    texto += '       Gracias por utilizarlo\n'
+    texto += '╰━━━━━━━━━━━━━━━━━━━━╯'
+    return texto
   }
 
-  texto += '\n╭━━━━━━━━━━━━━━━━━━━━╮\n'
-  texto += '      ✦ *SHISUI BOT v1.5.0* ✦\n'
-  texto += '       Gracias por utilizarlo\n'
-  texto += '╰━━━━━━━━━━━━━━━━━━━━╯'
+  const alias = [
+    ['perfil', 'perfiles', '1'],
+    ['info', 'informacion', 'ayuda', '2'],
+    ['descargas', 'descarga', '3'],
+    ['stickers', 'multimedia', '4'],
+    ['ia', 'inteligencia', '5'],
+    ['racha', 'rachas', '6'],
+    ['gacha', '7'],
+    ['eventos', '8'],
+    ['admin', 'administracion', 'grupos', '9'],
+    ['dueno', 'owner', 'dueño', '10'],
+    ['subbots', '11'],
+    ['mantenimiento', 'seguridad', '12'],
+    ['anime', '13'],
+    ['rankings', '14'],
+    ['diversion', '15'],
+    ['juegos', '16'],
+    ['admin2', '17'],
+    ['efectos', '18'],
+    ['herramientas', '19'],
+    ['roblox', '20'],
+    ['18+', 'nsfw', '21']
+  ]
 
-  return texto
+  let indice = /^\d+$/.test(buscar) ? Number(buscar) - 1 : -1
+  let seleccion = indice >= 0 ? secciones[indice] : null
+
+  if (!seleccion) {
+    seleccion = secciones.find(([titulo], i) =>
+      normalizar(titulo).includes(buscar) ||
+      (alias[i] || []).some(a => normalizar(a) === buscar)
+    )
+  }
+
+  if (!seleccion) {
+    return informacion + '\n❌ Categoría no encontrada.\nUsa #menu para ver las categorías.'
+  }
+
+  const [titulo, comandos] = seleccion
+  if (!nsfw && titulo.includes('+18')) {
+    return informacion + '\n❌ Esta categoría está desactivada.'
+  }
+
+  const icono = titulo.split(' ')[0]
+  const nombreCategoria = titulo.replace(/^[^\p{L}\p{N}]+/u, '').trim()
+
+  const letras = {
+    a:'ᴀ', b:'ʙ', c:'ᴄ', d:'ᴅ', e:'ᴇ', f:'ꜰ', g:'ɢ',
+    h:'ʜ', i:'ɪ', j:'ᴊ', k:'ᴋ', l:'ʟ', m:'ᴍ', n:'ɴ',
+    o:'ᴏ', p:'ᴘ', q:'ǫ', r:'ʀ', s:'ꜱ', t:'ᴛ', u:'ᴜ',
+    v:'ᴠ', w:'ᴡ', x:'x', y:'ʏ', z:'ᴢ'
+  }
+
+  const decorado = normalizar(nombreCategoria).split('').map(c => letras[c] || c).join('')
+  const descripcion = titulo.includes('PERFILES')
+    ? 'Perfil, información y comandos extra.'
+    : `Comandos de ${nombreCategoria.toLowerCase()}.`
+
+  let texto = `➮☆ ۣۜۜ ${icono} ${decorado} ꔷ㆒⸼݇҉ֻ᠂⃟✥
+➮ ${descripcion}
+
+╭─•
+`
+
+  for (const comando of comandos) {
+    const partes = comando.split(' — ')
+    const nombreComando = (partes[0] || '').replace(/\s*\(#[^)]+\)/g, '')
+    const explicacion = partes.slice(1).join(' — ')
+    texto += `❏ ${nombreComando}\n» ${explicacion}\n`
+  }
+
+  texto += '╰────┈ · ·'
+  return informacion + '\n' + texto
 }
 
 module.exports = { generarMenu }
