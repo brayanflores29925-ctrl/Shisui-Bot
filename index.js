@@ -1231,11 +1231,11 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     switch (comando) {
 
     // ==========================================
-    // DESCARGAS CON BÚSQUEDA RÁPIDA Y MULTI-API
+    // BUSQUEDA Y DESCARGA A PRUEBA DE FALLOS
     // ==========================================
     case 'play': case 'play2': case 'spotify': case 'sp': {
       try {
-        const query = cuerpo.slice(cmd.length).trim();
+        let query = cuerpo.slice(cmd.length).trim();
         if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
         
         try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
@@ -1243,8 +1243,9 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         const fs2 = require('fs');
         let url = query;
         let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0;
+        let busquedaExitosa = false;
 
-        // 1. BÚSQUEDA RÁPIDA (youtube-search-api)
+        // BÚSQUEDA CON RESPALDO 1: youtube-search-api
         if (!query.startsWith('http')) {
           try {
             const Youtube = require('youtube-search-api');
@@ -1256,27 +1257,51 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail) : null;
               channel = v.channelTitle || 'Desconocido';
               duration = v.length ? v.length.text : 'Desconocido';
-            } else {
-              await responder('❌ No encontré resultados para: ' + query); break;
+              busquedaExitosa = true;
             }
-          } catch (e) {
-            console.log('Error youtube-search-api:', e.message);
-            await responder('❌ Error al buscar el video.'); break;
+          } catch (e) { console.log('Fallo youtube-search-api, intentando respaldo...'); }
+
+          // BÚSQUEDA CON RESPALDO 2: yt-dlp (Si la primera falla)
+          if (!busquedaExitosa) {
+            try {
+              const { exec } = require('child_process');
+              const { promisify } = require('util');
+              const execAsync = promisify(exec);
+              const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query + '"', { timeout: 25000 });
+              const info = JSON.parse(stdout.trim().split('\n')[0]);
+              url = info.webpage_url;
+              title = info.title || query;
+              thumb = info.thumbnail;
+              channel = info.channel || info.uploader || 'Desconocido';
+              duration = info.duration_string || (info.duration ? info.duration + 's' : 'Desconocido');
+              views = info.view_count || 0;
+              busquedaExitosa = true;
+            } catch (e) { 
+              console.log('Fallo yt-dlp búsqueda:', e.message); 
+            }
+          }
+
+          if (!busquedaExitosa) {
+            await responder('❌ No encontré resultados para: ' + query); 
+            try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+            break;
           }
         }
 
-        // 2. OBTENER INFO EXACTA (Vistas y Duración con yt-dlp)
-        try {
-          const { exec } = require('child_process');
-          const { promisify } = require('util');
-          const execAsync = promisify(exec);
-          const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + url + '"', { timeout: 20000 });
-          const info = JSON.parse(stdout.trim().split('\n')[0]);
-          if (info.view_count) views = info.view_count;
-          if (info.duration_string) duration = info.duration_string;
-        } catch (e) { console.log('No se pudieron obtener vistas exactas, usando datos básicos.'); }
+        // SI ENCONTRAMOS LA URL, PERO FALTAN DATOS (vistas, etc), los sacamos con yt-dlp
+        if (!views && url.includes('youtube.com')) {
+          try {
+            const { exec } = require('child_process');
+            const { promisify } = require('util');
+            const execAsync = promisify(exec);
+            const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + url + '"', { timeout: 20000 });
+            const info = JSON.parse(stdout.trim().split('\n')[0]);
+            views = info.view_count || 0;
+            duration = info.duration_string || duration;
+          } catch (e) {}
+        }
 
-        // 3. ENVIAR TARJETA (FOTO CON INFO)
+        // 3. ENVIAR TARJETA
         const txt = '➩ Audio › *' + title + '*\n\n' +
                     '❖ Canal › *' + channel + '*\n' +
                     '⧖ Duración › *' + duration + '*\n' +
@@ -1287,7 +1312,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
         else await sock.sendMessage(jid, { text: txt }, { quoted: m });
 
-        // 4. CADENA DE APIS PARA DESCARGAR AUDIO
+        // 4. DESCARGAR AUDIO (CADENA DE APIS)
         let bufferFinal = null;
         const filePathBase = '/tmp/aud_' + Date.now();
         
@@ -1298,7 +1323,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             const rFetch = await fetch(res.download.url);
             bufferFinal = Buffer.from(await rFetch.arrayBuffer());
           }
-        } catch (e) {}
+        } catch (e) { console.log('API1 fallo'); }
 
         if (!bufferFinal) {
           try {
@@ -1306,7 +1331,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             const dl = await btch.youtube(url);
             const dlUrl = dl.mp3 || (dl.result && dl.result.mp3);
             if (dlUrl) { const r = await fetch(dlUrl); bufferFinal = Buffer.from(await r.arrayBuffer()); }
-          } catch (e) {}
+          } catch (e) { console.log('API2 fallo'); }
         }
 
         if (!bufferFinal) {
@@ -1322,7 +1347,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               if (fs2.existsSync(fM4a)) { bufferFinal = fs2.readFileSync(fM4a); fs2.unlinkSync(fM4a); }
               fs2.unlinkSync(fMp4);
             }
-          } catch (e) {}
+          } catch (e) { console.log('API3 fallo'); }
         }
 
         if (bufferFinal) {
@@ -1339,7 +1364,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
     case 'playvideo': case 'video': case 'v': {
       try {
-        const query = cuerpo.slice(cmd.length).trim();
+        let query = cuerpo.slice(cmd.length).trim();
         if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
         
         try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
@@ -1347,8 +1372,9 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         const fs2 = require('fs');
         let url = query;
         let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0;
+        let busquedaExitosa = false;
 
-        // 1. BÚSQUEDA RÁPIDA
+        // BÚSQUEDA CON RESPALDO
         if (!query.startsWith('http')) {
           try {
             const Youtube = require('youtube-search-api');
@@ -1360,24 +1386,47 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail) : null;
               channel = v.channelTitle || 'Desconocido';
               duration = v.length ? v.length.text : 'Desconocido';
-            } else {
-              await responder('❌ No encontré resultados para: ' + query); break;
+              busquedaExitosa = true;
             }
-          } catch (e) { await responder('❌ Error al buscar.'); break; }
+          } catch (e) { console.log('Fallo youtube-search-api...'); }
+
+          if (!busquedaExitosa) {
+            try {
+              const { exec } = require('child_process');
+              const { promisify } = require('util');
+              const execAsync = promisify(exec);
+              const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query + '"', { timeout: 25000 });
+              const info = JSON.parse(stdout.trim().split('\n')[0]);
+              url = info.webpage_url;
+              title = info.title || query;
+              thumb = info.thumbnail;
+              channel = info.channel || info.uploader || 'Desconocido';
+              duration = info.duration_string || (info.duration ? info.duration + 's' : 'Desconocido');
+              views = info.view_count || 0;
+              busquedaExitosa = true;
+            } catch (e) {}
+          }
+
+          if (!busquedaExitosa) {
+            await responder('❌ No encontré resultados para: ' + query);
+            try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+            break;
+          }
         }
 
-        // 2. INFO EXACTA
-        try {
-          const { exec } = require('child_process');
-          const { promisify } = require('util');
-          const execAsync = promisify(exec);
-          const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + url + '"', { timeout: 20000 });
-          const info = JSON.parse(stdout.trim().split('\n')[0]);
-          if (info.view_count) views = info.view_count;
-          if (info.duration_string) duration = info.duration_string;
-        } catch (e) {}
+        if (!views && url.includes('youtube.com')) {
+          try {
+            const { exec } = require('child_process');
+            const { promisify } = require('util');
+            const execAsync = promisify(exec);
+            const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + url + '"', { timeout: 20000 });
+            const info = JSON.parse(stdout.trim().split('\n')[0]);
+            views = info.view_count || 0;
+            duration = info.duration_string || duration;
+          } catch (e) {}
+        }
 
-        // 3. TARJETA
+        // TARJETA
         const txt = '➩ Video › *' + title + '*\n\n' +
                     '❖ Canal › *' + channel + '*\n' +
                     '⧖ Duración › *' + duration + '*\n' +
@@ -1388,7 +1437,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
         else await sock.sendMessage(jid, { text: txt }, { quoted: m });
 
-        // 4. CADENA DE APIS PARA DESCARGAR VIDEO
+        // CADENA DE APIS PARA VIDEO
         let bufferFinal = null;
         const fileBase = '/tmp/vid_' + Date.now();
 
@@ -1421,7 +1470,6 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
           } catch (e) {}
         }
 
-        // 5. CONVERTIR Y ENVIAR
         if (bufferFinal) {
           const fFinal = fileBase + '_final.mp4';
           const fTemp = fileBase + '_temp.mp4';
@@ -1463,7 +1511,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
 
     // ==========================================
-    // DESCARGA DE VIDEO CON MÚLTIPLES APIS (SILENT FALLBACK)
+    // DESCARGAS CON BÚSQUEDA RÁPIDA Y MULTI-API
     // ==========================================
     case 'facebook': case 'fb': {
       try {
