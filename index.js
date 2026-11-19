@@ -2347,7 +2347,7 @@ case 'buscartt': {
         const descarga = await descargar('video', enlace, null, null)
         if (!descarga?.ok || !descarga.url) return null
 
-        const buffer = await bajarMedia(descarga.url, 50)
+        const buffer = await bajarMedia(descarga.url)
         if (!buffer || !buffer.length) return null
 
         const autor = post.author?.username || post.author?.nickname || 'TikTok'
