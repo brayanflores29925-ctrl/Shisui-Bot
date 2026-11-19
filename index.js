@@ -1227,6 +1227,124 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     switch (comando) {
 
     // ==========================================
+    // PLAYVIDEO Y FACEBOOK (CON FFMPEG)
+    // ==========================================
+    case 'playvideo': case 'video': case 'v': {
+      try {
+        const query = cuerpo.slice(cmd.length).trim();
+        if (!query) { await responder('Uso: #' + cmd + ' <nombre o enlace>'); break; }
+        
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+        await responder('⏳ Buscando información y preparando tu video...');
+        
+        const { exec } = require('child_process');
+        const { promisify } = require('util');
+        const execAsync = promisify(exec);
+        const fs2 = require('fs');
+        
+        let url = query;
+        let title = query, thumb = null, channel = 'Desconocido';
+        
+        if (!query.startsWith('http')) {
+          const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query + '"', { timeout: 30000 });
+          const info = JSON.parse(stdout.trim().split('\n')[0]);
+          url = info.webpage_url;
+          title = info.title;
+          channel = info.channel || info.uploader || 'Desconocido';
+          thumb = info.thumbnail;
+        }
+
+        const txt = '➩ Video › *' + title + '*\n\n👤 ' + channel + '\n🔗 ' + url;
+        if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+        else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+
+        const fileMp4 = '/tmp/vid_' + Date.now() + '.mp4';
+        const fileFinal = '/tmp/vid_final_' + Date.now() + '.mp4';
+        
+        await responder('⬇️ Descargando y convirtiendo (puede tardar)...');
+        
+        await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b" -o "' + fileMp4 + '" "' + url + '"', { timeout: 120000 });
+        
+        if (fs2.existsSync(fileMp4)) {
+          await execAsync('ffmpeg -y -i "' + fileMp4 + '" -c:v libx264 -preset veryfast -crf 28 -c:a aac -b:a 128k -movflags +faststart "' + fileFinal + '"', { timeout: 60000 });
+          
+          if (fs2.existsSync(fileFinal)) {
+            const stats = fs2.statSync(fileFinal);
+            if (stats.size > 64 * 1024 * 1024) {
+              await responder('❌ El video pesa más de 64MB después de comprimir.');
+            } else {
+              const buffer = fs2.readFileSync(fileFinal);
+              await sock.sendMessage(jid, { video: buffer, caption: '✅ ' + title }, { quoted: m });
+              try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
+            }
+            fs2.unlinkSync(fileFinal);
+          } else {
+            await responder('❌ Error al convertir el video con ffmpeg.');
+          }
+          fs2.unlinkSync(fileMp4);
+        } else {
+          await responder('❌ No se pudo descargar el video.');
+        }
+      } catch (e) {
+        console.log('Error en playvideo:', e.message);
+        await responder('❌ Error al procesar el video.');
+      }
+      break;
+    }
+
+    case 'facebook': case 'fb': {
+      try {
+        const url = cuerpo.slice(cmd.length).trim();
+        if (!url || !url.includes('facebook.com')) {
+          await responder('Uso: #facebook <enlace>');
+          break;
+        }
+        
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+        await responder('📥 Descargando video de Facebook...');
+        
+        const { exec } = require('child_process');
+        const { promisify } = require('util');
+        const execAsync = promisify(exec);
+        const fs2 = require('fs');
+        
+        const fileOriginal = '/tmp/fb_orig_' + Date.now() + '.mp4';
+        const fileFinal = '/tmp/fb_final_' + Date.now() + '.mp4';
+        
+        await execAsync('yt-dlp --no-warnings -f "bv*+ba/b" -o "' + fileOriginal + '" "' + url + '"', { timeout: 60000 });
+        
+        if (fs2.existsSync(fileOriginal)) {
+          await execAsync('ffmpeg -y -i "' + fileOriginal + '" -c:v libx264 -preset veryfast -crf 28 -c:a aac -b:a 128k -movflags +faststart "' + fileFinal + '"', { timeout: 60000 });
+          
+          if (fs2.existsSync(fileFinal)) {
+            const stats = fs2.statSync(fileFinal);
+            if (stats.size > 64 * 1024 * 1024) {
+              await responder('❌ El video de Facebook pesa más de 64MB.');
+              try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+            } else {
+              const buffer = fs2.readFileSync(fileFinal);
+              await sock.sendMessage(jid, { video: buffer, caption: '✅ Video de Facebook' }, { quoted: m });
+              try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
+            }
+            fs2.unlinkSync(fileFinal);
+          } else {
+            await responder('❌ Error al convertir el video con ffmpeg.');
+          }
+          fs2.unlinkSync(fileOriginal);
+        } else {
+          await responder('❌ No se pudo descargar el video (puede ser privado).');
+          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+        }
+      } catch (e) {
+        console.log('Error en facebook:', e.message);
+        await responder('❌ Error al descargar o convertir el video.');
+      }
+      break;
+    }
+
+
+
+    // ==========================================
     // INTERRUPTOR GLOBAL PARA SUBBOTS (BLINDADO)
     // ==========================================
     case 'apagarsubs': case 'subsoff': {
@@ -1325,79 +1443,6 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
       break;
     }
 
-
-
-    case 'facebook': case 'fb': {
-      const fs2 = require('fs');
-      const path2 = require('path');
-      const { execFile } = require('child_process');
-      const { promisify } = require('util');
-      const execFileAsync = promisify(execFile);
-      const base = '/tmp/fb_' + Date.now();
-      const filePath = base + '.mp4';
-      const fileWA = base + '_wa.mp4';
-
-      try {
-        const url = cuerpo.slice(cmd.length).trim();
-        if (!url || !/facebook\.com|fb\.watch/i.test(url)) {
-          await responder('Uso: #facebook <enlace>\nEjemplo: #fb https://www.facebook.com/share/r/...');
-          break;
-        }
-
-        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
-
-        await execFileAsync('yt-dlp', [
-          '--no-warnings',
-          '--no-playlist',
-          '-f', 'bv*+ba/b',
-          '--merge-output-format', 'mp4',
-          '-o', filePath,
-          url
-        ], { timeout: 90000, maxBuffer: 10 * 1024 * 1024 });
-
-        if (!fs2.existsSync(filePath)) {
-          throw new Error('No se encontró el video descargado');
-        }
-
-        await execFileAsync('ffmpeg', [
-          '-y', '-i', filePath,
-          '-map', '0:v:0',
-          '-map', '0:a?',
-          '-c:v', 'libx264',
-          '-preset', 'veryfast',
-          '-crf', '26',
-          '-pix_fmt', 'yuv420p',
-          '-c:a', 'aac',
-          '-b:a', '128k',
-          '-movflags', '+faststart',
-          fileWA
-        ], { timeout: 120000, maxBuffer: 10 * 1024 * 1024 });
-
-        if (!fs2.existsSync(fileWA)) {
-          throw new Error('No se pudo convertir el video');
-        }
-
-        const buffer = fs2.readFileSync(fileWA);
-        if (!buffer.length) throw new Error('El video convertido está vacío');
-
-        await sock.sendMessage(jid, {
-          video: buffer,
-          mimetype: 'video/mp4',
-          caption: '✅ Video de Facebook'
-        }, { quoted: m });
-
-        try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
-      } catch (e) {
-        console.log('Error en .facebook:', e.message);
-        await responder('❌ No se pudo descargar o convertir el video de Facebook.');
-        try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
-      } finally {
-        for (const f of [filePath, fileWA]) {
-          try { if (fs2.existsSync(f)) fs2.unlinkSync(f); } catch (e) {}
-        }
-      }
-      break;
-    }
 
 
     case 'regalo': {
@@ -1568,131 +1613,6 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
       break;
     }
 
-    case 'playvideo': case 'video': case 'v': {
-      try {
-        const query = cuerpo.slice(cmd.length).trim();
-        const conTiempo = (promesa, ms) => new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('Tiempo agotado')), ms);
-          Promise.resolve(promesa).then(
-            valor => { clearTimeout(timer); resolve(valor); },
-            error => { clearTimeout(timer); reject(error); }
-          );
-        });
-
-        if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
-        
-        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
-        await responder('⏳ Buscando información y preparando tu video...');
-
-        let bufferFinal = null;
-        let tituloFinal = query;
-        let thumbFinal = null;
-        let canalFinal = null;
-        let duracionFinal = null;
-        let vistasFinal = null;
-        let enlaceFinal = null;
-        const descargarArchivo = async (url) => {
-          const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          const tipo = (r.headers.get('content-type') || '').toLowerCase();
-          if (/text\/html|application\/json/.test(tipo)) throw new Error('Respuesta no válida');
-          const b = Buffer.from(await r.arrayBuffer());
-          if (b.length < 1024) throw new Error('Archivo vacío o incompleto');
-          return b;
-        };
-
-
-        // API 1: Denzy
-        try {
-          const yt = require('@denzy-official/youtube_scraper');
-          const res = await conTiempo(yt.ytmp4(query), 6000);
-          if (res && res.download && res.download.url) {
-            bufferFinal = await descargarArchivo(res.download.url);
-            tituloFinal = (res.metadata && res.metadata.title) ? res.metadata.title : query;
-            thumbFinal = res.metadata ? res.metadata.thumbnail : null;
-            canalFinal = res.metadata?.author?.name || null;
-            duracionFinal = res.metadata?.timestamp || res.metadata?.duration?.timestamp || null;
-            vistasFinal = res.metadata?.views || res.metadata?.viewCount || null;
-            enlaceFinal = res.metadata?.url || res.metadata?.webpage_url || null;
-          }
-        } catch (e) {}
-
-        // API 2: ShadowX
-        if (!bufferFinal) {
-          try {
-            const ytdl = require('shadowx-ytdl');
-            let enlace = query;
-            let video = null;
-
-            if (!/^https?:\/\//i.test(query)) {
-              const busqueda = await conTiempo(ytdl.searchYouTube(query), 7000);
-              video = busqueda && busqueda.status && Array.isArray(busqueda.results)
-                ? busqueda.results.find(v => v.type === 'video' && v.url)
-                : null;
-              if (video) enlace = video.url;
-            }
-
-            if (/^https?:\/\//i.test(enlace)) {
-              const res = await conTiempo(ytdl.downloadVideo(enlace, 360), 8000);
-              if (res && res.status && res.download && res.download.status && res.download.downloadUrl) {
-                bufferFinal = await descargarArchivo(res.download.downloadUrl);
-                tituloFinal = (res.metadata && res.metadata.title) || (video && video.title) || query;
-                thumbFinal = (res.metadata && res.metadata.thumbnail) || (video && (video.thumbnail || video.image)) || null;
-                canalFinal = res.metadata?.author?.name || video?.author?.name || null;
-                duracionFinal = res.metadata?.timestamp || video?.timestamp || null;
-                vistasFinal = res.metadata?.views || res.metadata?.viewCount || video?.views || video?.viewCount || null;
-                enlaceFinal = res.metadata?.url || res.metadata?.webpage_url || video?.url || null;
-              }
-            }
-          } catch (e) { console.log('ShadowX video:', e.message); }
-        }
-        
-        // API 3: yt-dlp
-        if (!bufferFinal) {
-          try {
-            const { exec } = require('child_process');
-            const { promisify } = require('util');
-            const execAsync = promisify(exec);
-            const filePath = '/tmp/fb_v_' + Date.now() + '.mp4';
-            const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query + '"', { timeout: 15000 });
-            const info = JSON.parse(stdout.trim().split('\n')[0]);
-            tituloFinal = info.title || query;
-            thumbFinal = info.thumbnail || null;
-            canalFinal = info.channel || info.uploader || null;
-            duracionFinal = info.duration_string || null;
-            vistasFinal = info.view_count || null;
-            enlaceFinal = info.webpage_url || null;
-            
-            await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 40000 });
-            if (require('fs').existsSync(filePath)) {
-              bufferFinal = require('fs').readFileSync(filePath);
-              require('fs').unlinkSync(filePath);
-            }
-          } catch (e) {}
-        }
-
-        if (bufferFinal) {
-          const infoExtraFinal = [canalFinal ? '👤 ' + canalFinal : '', duracionFinal ? '⏱️ ' + duracionFinal : '', vistasFinal ? '👁️ ' + Number(vistasFinal).toLocaleString('es-HN') + ' visualizaciones' : '', enlaceFinal ? '🔗 ' + enlaceFinal : ''].filter(Boolean).join('\n');
-          const captionInfoFinal = '➩ Video › *' + tituloFinal + '*' + (infoExtraFinal ? '\n' + infoExtraFinal : '');
-          if (thumbFinal) {
-            try {
-              await sock.sendMessage(jid, { image: { url: thumbFinal }, caption: captionInfoFinal }, { quoted: m });
-            } catch (e) {
-              await sock.sendMessage(jid, { text: captionInfoFinal }, { quoted: m });
-            }
-          } else {
-            await sock.sendMessage(jid, { text: captionInfoFinal }, { quoted: m });
-          }
-          await sock.sendMessage(jid, { video: bufferFinal, caption: '✅ ' + tituloFinal + (infoExtraFinal ? '\\n' + infoExtraFinal : '') }, { quoted: m });
-          try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
-        } else {
-          await responder('❌ No se pudo descargar el video.');
-          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
-        }
-      } catch (e) { console.log('Error video:', e.message); }
-      break;
-    }
-    
     case 'ytsearch': {
       try {
         const query = cuerpo.slice(cmd.length).trim();
