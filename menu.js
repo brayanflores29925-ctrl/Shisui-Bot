@@ -28,7 +28,7 @@ function fechaHora() {
   const ahora = new Date();
   return {
     fecha: ahora.toLocaleDateString('es-HN', { timeZone: 'America/Tegucigalpa' }),
-    hora: ahora.toLocaleTimeString('es-HN', { timeZone: 'America/Tegucigalpa', hour12: false })
+    hora: ahora.toLocaleTimeString('es-HN', { timeZone: 'America/Tegucigalpa', hour12: true })
   };
 }
 
@@ -187,6 +187,8 @@ const secciones = [
   ['👑 COMANDOS DEL DUEÑO', [
     '#registrargrupo — Registra un grupo en el sistema.',
     '#setmenu — Personaliza el menú.',
+    '#navidadmenu — Activa el diseño navideño del menú principal.',
+    '#menunormal — Restaura el diseño normal del menú principal.',
     '#setowner — Agrega un propietario.',
     '#delowner — Elimina un propietario.',
     '#owners — Muestra los propietarios.',
@@ -407,17 +409,42 @@ function generarMenu(nsfw, filtro = "") {
   const buscar = normalizar(String(filtro || '').trim())
 
   if (!buscar) {
+    const navidad = !!config.navidadMenu
     let texto = informacion
+
+    if (navidad) {
+      texto += `💡 ¿Quieres encontrar un comando más rápido?
+Escribe #menu seguido de una categoría o número.
+Ejemplos:
+❄️ #menu perfiles
+❄️ #menu 1
+
+`
+    }
+
     for (const [titulo, comandos] of secciones) {
       if (!nsfw && titulo.includes('+18')) continue
-      texto += `\n┏━━「 ${titulo} 」\n`
-      texto += comandos.map(c => `┃ ➳ ${c}`).join('\n')
-      texto += '\n┗━━━━━━━━━━━━━━━━━━\n'
+
+      if (navidad) {
+        texto += `\n🎄┏━━「 ❄️ ${titulo} ❄️ 」━━🎄\n`
+        texto += comandos.map(c => {
+          const partes = c.split(' — ')
+          const nombreComando = partes.shift() || c
+          const explicacion = partes.join(' — ')
+          return `┃ ❄️ ${nombreComando} 🌲${explicacion ? `\n┃ » ${explicacion}` : ''}`
+        }).join('\n')
+        texto += '\n🎄┗━━━━━━━━━━━━━━━━━━🎄\n'
+      } else {
+        texto += `\n┏━━「 ${titulo} 」\n`
+        texto += comandos.map(c => `┃ ➳ ${c}`).join('\n')
+        texto += '\n┗━━━━━━━━━━━━━━━━━━\n'
+      }
     }
-    texto += '\n╭━━━━━━━━━━━━━━━━━━━━╮\n'
-    texto += '      ✦ *SHISUI BOT v1.5.0* ✦\n'
-    texto += '       Gracias por utilizarlo\n'
-    texto += '╰━━━━━━━━━━━━━━━━━━━━╯'
+
+    texto += navidad
+      ? '\n╭━━━━━━━━━━━━━━━━━━━━╮\n      🎄 *SHISUI BOT v1.5.0* 🎄\n       ¡Felices fiestas! ❄️\n╰━━━━━━━━━━━━━━━━━━━━╯'
+      : '\n╭━━━━━━━━━━━━━━━━━━━━╮\n      ✦ *SHISUI BOT v1.5.0* ✦\n       Gracias por utilizarlo\n╰━━━━━━━━━━━━━━━━━━━━╯'
+
     return texto
   }
 

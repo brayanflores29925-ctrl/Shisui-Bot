@@ -1141,7 +1141,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
       'activarbot', 'desactivarbot',
       'setnombre', 'setbienvenida', 'setdespedida',
       'setperfil', 'setban', 'setred', 'key',
-      'setprotect', 'setnsfw', 'setmenu', 'miid', 'registrargrupo'
+      'setprotect', 'setnsfw', 'setmenu', 'navidadmenu', 'menunormal', 'miid', 'registrargrupo'
     ])
 
     if (comandosSoloDueno.has(comando) && !esDueno(m)) {
@@ -6950,6 +6950,22 @@ case 'kick': {
             '\n\n🗺️ Google Maps: https://maps.google.com/?q=' + rMp.lat + ',' + rMp.lon +
             '\n🌍 OpenStreetMap: https://www.openstreetmap.org/?mlat=' + rMp.lat + '&mlon=' + rMp.lon + '#map=16/' + rMp.lat + '/' + rMp.lon
         }, { quoted: m })
+        break
+      }
+
+      case 'navidadmenu': {
+        const cfg = leerConfig()
+        cfg.navidadMenu = true
+        guardarConfig(cfg)
+        await responder('🎄❄️ Diseño navideño activado para el menú principal. Usa #menu para verlo.')
+        break
+      }
+
+      case 'menunormal': {
+        const cfg = leerConfig()
+        cfg.navidadMenu = false
+        guardarConfig(cfg)
+        await responder('✅ Diseño original del menú restaurado. Usa #menu para verlo.')
         break
       }
 
