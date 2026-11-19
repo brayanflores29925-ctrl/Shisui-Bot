@@ -1231,21 +1231,19 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     switch (comando) {
 
     // ==========================================
-    // BUSQUEDA Y DESCARGA A PRUEBA DE FALLOS
+    // DESCARGAS Y IA BLINDADAS
     // ==========================================
     case 'play': case 'play2': case 'spotify': case 'sp': {
       try {
-        let query = cuerpo.slice(cmd.length).trim();
+        const query = cuerpo.slice(cmd.length).trim();
         if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
         
         try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
-        
+
         const fs2 = require('fs');
         let url = query;
         let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0;
-        let busquedaExitosa = false;
 
-        // BÚSQUEDA CON RESPALDO 1: youtube-search-api
         if (!query.startsWith('http')) {
           try {
             const Youtube = require('youtube-search-api');
@@ -1257,104 +1255,65 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail) : null;
               channel = v.channelTitle || 'Desconocido';
               duration = v.length ? v.length.text : 'Desconocido';
-              busquedaExitosa = true;
+            } else {
+              await responder('❌ No encontré resultados.'); break;
             }
-          } catch (e) { console.log('Fallo youtube-search-api, intentando respaldo...'); }
-
-          // BÚSQUEDA CON RESPALDO 2: yt-dlp (Si la primera falla)
-          if (!busquedaExitosa) {
-            try {
-              const { exec } = require('child_process');
-              const { promisify } = require('util');
-              const execAsync = promisify(exec);
-              const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query + '"', { timeout: 25000 });
-              const info = JSON.parse(stdout.trim().split('\n')[0]);
-              url = info.webpage_url;
-              title = info.title || query;
-              thumb = info.thumbnail;
-              channel = info.channel || info.uploader || 'Desconocido';
-              duration = info.duration_string || (info.duration ? info.duration + 's' : 'Desconocido');
-              views = info.view_count || 0;
-              busquedaExitosa = true;
-            } catch (e) { 
-              console.log('Fallo yt-dlp búsqueda:', e.message); 
-            }
-          }
-
-          if (!busquedaExitosa) {
-            await responder('❌ No encontré resultados para: ' + query); 
-            try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
-            break;
-          }
+          } catch (e) { await responder('❌ Error al buscar.'); break; }
         }
 
-        // SI ENCONTRAMOS LA URL, PERO FALTAN DATOS (vistas, etc), los sacamos con yt-dlp
-        if (!views && url.includes('youtube.com')) {
-          try {
-            const { exec } = require('child_process');
-            const { promisify } = require('util');
-            const execAsync = promisify(exec);
-            const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + url + '"', { timeout: 20000 });
-            const info = JSON.parse(stdout.trim().split('\n')[0]);
-            views = info.view_count || 0;
-            duration = info.duration_string || duration;
-          } catch (e) {}
-        }
+        try {
+          const { exec } = require('child_process');
+          const { promisify } = require('util');
+          const execAsync = promisify(exec);
+          const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + url + '"', { timeout: 20000 });
+          const info = JSON.parse(stdout.trim().split('\n')[0]);
+          views = info.view_count || 0;
+          duration = info.duration_string || duration;
+        } catch (e) {}
 
-        // 3. ENVIAR TARJETA
         const txt = '➩ Audio › *' + title + '*\n\n' +
                     '❖ Canal › *' + channel + '*\n' +
                     '⧖ Duración › *' + duration + '*\n' +
                     (views ? '❀ Vistas › *' + views.toLocaleString() + '*\n' : '') +
-                    '❐ Enlace › ' + url + '\n\n' +
-                    '⏳ Descargando audio, esto puede tardar unos minutos...';
+                    '⏳ Preparando audio...';
                     
         if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
         else await sock.sendMessage(jid, { text: txt }, { quoted: m });
 
-        // 4. DESCARGAR AUDIO (CADENA DE APIS)
         let bufferFinal = null;
-        const filePathBase = '/tmp/aud_' + Date.now();
+        const filePath = '/tmp/aud_' + Date.now() + '.m4a';
         
+        // INTENTO 1: yt-dlp (Validando peso)
         try {
-          const yt = require('@denzy-official/youtube_scraper');
-          const res = await yt.ytmp3(url);
-          if (res && res.download && res.download.url) {
-            const rFetch = await fetch(res.download.url);
-            bufferFinal = Buffer.from(await rFetch.arrayBuffer());
+          const { exec } = require('child_process');
+          const { promisify } = require('util');
+          const execAsync = promisify(exec);
+          await execAsync('yt-dlp --extractor-args "youtube:player_client=ios,android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePath + '" "' + url + '"', { timeout: 45000 });
+          
+          if (fs2.existsSync(filePath)) {
+             const stats = fs2.statSync(filePath);
+             if (stats.size > 5000) bufferFinal = fs2.readFileSync(filePath);
+             fs2.unlinkSync(filePath);
           }
-        } catch (e) { console.log('API1 fallo'); }
+        } catch (e) {}
 
+        // INTENTO 2: API externa (Si yt-dlp falla o da archivo vacío)
         if (!bufferFinal) {
           try {
-            const btch = require('btch-downloader');
-            const dl = await btch.youtube(url);
-            const dlUrl = dl.mp3 || (dl.result && dl.result.mp3);
-            if (dlUrl) { const r = await fetch(dlUrl); bufferFinal = Buffer.from(await r.arrayBuffer()); }
-          } catch (e) { console.log('API2 fallo'); }
-        }
-
-        if (!bufferFinal) {
-          try {
-            const { exec } = require('child_process');
-            const { promisify } = require('util');
-            const execAsync = promisify(exec);
-            const fMp4 = filePathBase + '.mp4';
-            const fM4a = filePathBase + '.m4a';
-            await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + fMp4 + '" "' + url + '"', { timeout: 60000 });
-            if (fs2.existsSync(fMp4)) {
-              await execAsync('ffmpeg -y -i "' + fMp4 + '" -vn -acodec copy "' + fM4a + '"', { timeout: 20000 });
-              if (fs2.existsSync(fM4a)) { bufferFinal = fs2.readFileSync(fM4a); fs2.unlinkSync(fM4a); }
-              fs2.unlinkSync(fMp4);
+            const res = await fetch('https://api.paxsenix.biz.id/dl/ytmp3?url=' + encodeURIComponent(url));
+            const json = await res.json();
+            if (json.status && json.result && json.result.download) {
+              const r = await fetch(json.result.download);
+              bufferFinal = Buffer.from(await r.arrayBuffer());
             }
-          } catch (e) { console.log('API3 fallo'); }
+          } catch(e) {}
         }
 
-        if (bufferFinal) {
+        if (bufferFinal && bufferFinal.length > 5000) {
           await sock.sendMessage(jid, { audio: bufferFinal, mimetype: 'audio/mp4' }, { quoted: m });
           try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
         } else {
-          await responder('❌ No se pudo descargar el audio.');
+          await responder('❌ El archivo está vacío o bloqueado.');
           try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
         }
 
@@ -1364,7 +1323,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
     case 'playvideo': case 'video': case 'v': {
       try {
-        let query = cuerpo.slice(cmd.length).trim();
+        const query = cuerpo.slice(cmd.length).trim();
         if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
         
         try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
@@ -1372,9 +1331,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         const fs2 = require('fs');
         let url = query;
         let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0;
-        let busquedaExitosa = false;
 
-        // BÚSQUEDA CON RESPALDO
         if (!query.startsWith('http')) {
           try {
             const Youtube = require('youtube-search-api');
@@ -1386,121 +1343,69 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail) : null;
               channel = v.channelTitle || 'Desconocido';
               duration = v.length ? v.length.text : 'Desconocido';
-              busquedaExitosa = true;
+            } else {
+              await responder('❌ No encontré resultados.'); break;
             }
-          } catch (e) { console.log('Fallo youtube-search-api...'); }
-
-          if (!busquedaExitosa) {
-            try {
-              const { exec } = require('child_process');
-              const { promisify } = require('util');
-              const execAsync = promisify(exec);
-              const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query + '"', { timeout: 25000 });
-              const info = JSON.parse(stdout.trim().split('\n')[0]);
-              url = info.webpage_url;
-              title = info.title || query;
-              thumb = info.thumbnail;
-              channel = info.channel || info.uploader || 'Desconocido';
-              duration = info.duration_string || (info.duration ? info.duration + 's' : 'Desconocido');
-              views = info.view_count || 0;
-              busquedaExitosa = true;
-            } catch (e) {}
-          }
-
-          if (!busquedaExitosa) {
-            await responder('❌ No encontré resultados para: ' + query);
-            try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
-            break;
-          }
+          } catch (e) { await responder('❌ Error al buscar.'); break; }
         }
 
-        if (!views && url.includes('youtube.com')) {
-          try {
-            const { exec } = require('child_process');
-            const { promisify } = require('util');
-            const execAsync = promisify(exec);
-            const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + url + '"', { timeout: 20000 });
-            const info = JSON.parse(stdout.trim().split('\n')[0]);
-            views = info.view_count || 0;
-            duration = info.duration_string || duration;
-          } catch (e) {}
-        }
+        try {
+          const { exec } = require('child_process');
+          const { promisify } = require('util');
+          const execAsync = promisify(exec);
+          const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + url + '"', { timeout: 20000 });
+          const info = JSON.parse(stdout.trim().split('\n')[0]);
+          views = info.view_count || 0;
+          duration = info.duration_string || duration;
+        } catch (e) {}
 
-        // TARJETA
         const txt = '➩ Video › *' + title + '*\n\n' +
                     '❖ Canal › *' + channel + '*\n' +
                     '⧖ Duración › *' + duration + '*\n' +
                     (views ? '❀ Vistas › *' + views.toLocaleString() + '*\n' : '') +
-                    '❐ Enlace › ' + url + '\n\n' +
-                    '⏳ Descargando video, esto puede tardar unos minutos...';
+                    '⏳ Preparando video...';
                     
         if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
         else await sock.sendMessage(jid, { text: txt }, { quoted: m });
 
-        // CADENA DE APIS PARA VIDEO
         let bufferFinal = null;
-        const fileBase = '/tmp/vid_' + Date.now();
-
+        const filePath = '/tmp/vid_' + Date.now() + '.mp4';
+        
+        // INTENTO 1: yt-dlp (Validando peso)
         try {
-          const yt = require('@denzy-official/youtube_scraper');
-          const res = await yt.ytmp4(url);
-          if (res && res.download && res.download.url) {
-            const r = await fetch(res.download.url);
-            bufferFinal = Buffer.from(await r.arrayBuffer());
+          const { exec } = require('child_process');
+          const { promisify } = require('util');
+          const execAsync = promisify(exec);
+          await execAsync('yt-dlp --extractor-args "youtube:player_client=ios,android" -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]" -o "' + filePath + '" "' + url + '"', { timeout: 45000 });
+          
+          if (fs2.existsSync(filePath)) {
+             const stats = fs2.statSync(filePath);
+             if (stats.size > 5000) bufferFinal = fs2.readFileSync(filePath);
+             fs2.unlinkSync(filePath);
           }
         } catch (e) {}
 
+        // INTENTO 2: API externa
         if (!bufferFinal) {
           try {
-            const btch = require('btch-downloader');
-            const dl = await btch.youtube(url);
-            const dlUrl = dl.mp4 || (dl.result && dl.result.mp4);
-            if (dlUrl) { const r = await fetch(dlUrl); bufferFinal = Buffer.from(await r.arrayBuffer()); }
-          } catch (e) {}
+            const res = await fetch('https://api.paxsenix.biz.id/dl/ytmp4?url=' + encodeURIComponent(url));
+            const json = await res.json();
+            if (json.status && json.result && json.result.download) {
+              const r = await fetch(json.result.download);
+              bufferFinal = Buffer.from(await r.arrayBuffer());
+            }
+          } catch(e) {}
         }
 
-        if (!bufferFinal) {
-          try {
-            const { exec } = require('child_process');
-            const { promisify } = require('util');
-            const execAsync = promisify(exec);
-            const fPath = fileBase + '.mp4';
-            await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + fPath + '" "' + url + '"', { timeout: 60000 });
-            if (fs2.existsSync(fPath)) { bufferFinal = fs2.readFileSync(fPath); fs2.unlinkSync(fPath); }
-          } catch (e) {}
-        }
-
-        if (bufferFinal) {
-          const fFinal = fileBase + '_final.mp4';
-          const fTemp = fileBase + '_temp.mp4';
-          fs2.writeFileSync(fTemp, bufferFinal);
-          
-          try {
-            const { exec } = require('child_process');
-            const { promisify } = require('util');
-            const execAsync = promisify(exec);
-            await execAsync('ffmpeg -y -i "' + fTemp + '" -c:v libx264 -preset veryfast -crf 28 -c:a aac -b:a 128k -movflags +faststart "' + fFinal + '"', { timeout: 60000 });
-            if (fs2.existsSync(fFinal)) {
-              const finalBuffer = fs2.readFileSync(fFinal);
-              if (finalBuffer.length > 64 * 1024 * 1024) {
-                await responder('❌ El video supera los 64MB (límite de WhatsApp).');
-              } else {
-                await sock.sendMessage(jid, { video: finalBuffer, caption: '✅ ' + title }, { quoted: m });
-                try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
-              }
-              fs2.unlinkSync(fFinal);
-            }
-            fs2.unlinkSync(fTemp);
-          } catch (e) {
-            if (bufferFinal.length > 64 * 1024 * 1024) await responder('❌ El video supera los 64MB.');
-            else {
-              await sock.sendMessage(jid, { video: bufferFinal, caption: '✅ ' + title }, { quoted: m });
-              try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
-            }
-            if (fs2.existsSync(fTemp)) fs2.unlinkSync(fTemp);
+        if (bufferFinal && bufferFinal.length > 5000) {
+          if (bufferFinal.length > 64 * 1024 * 1024) {
+             await responder('❌ El video supera los 64MB.');
+          } else {
+             await sock.sendMessage(jid, { video: bufferFinal, caption: '✅ ' + title }, { quoted: m });
+             try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
           }
         } else {
-          await responder('❌ No se pudo descargar el video.');
+          await responder('❌ El archivo está vacío o bloqueado.');
           try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
         }
 
@@ -1508,10 +1413,35 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
       break;
     }
 
+    case 'ia': case 'chatgpt': case 'gpt': {
+      try {
+        const prompt = cuerpo.slice(cmd.length).trim();
+        if (!prompt) { await responder('Uso: #' + cmd + ' <pregunta>'); break; }
+        
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+        
+        const res = await fetch('https://api.paxsenix.biz.id/ai/gpt4?text=' + encodeURIComponent(prompt));
+        const json = await res.json();
+        
+        if (json.status && json.answer) {
+          await sock.sendMessage(jid, { text: json.answer }, { quoted: m });
+          try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
+        } else {
+          await responder('❌ La IA no pudo responder.');
+          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+        }
+      } catch (e) {
+        console.log('Error IA:', e.message);
+        await responder('❌ Error de conexión con la IA.');
+        try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+      }
+      break;
+    }
+
 
 
     // ==========================================
-    // DESCARGAS CON BÚSQUEDA RÁPIDA Y MULTI-API
+    // BUSQUEDA Y DESCARGA A PRUEBA DE FALLOS
     // ==========================================
     case 'facebook': case 'fb': {
       try {
@@ -3548,90 +3478,7 @@ case 'llama': {
   }
   break;
 }
-case 'ia': case 'chatgpt': {
-  const prompt = cuerpo.slice(cmd.length).trim();
-  if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
-
-  await responder('🤖 Consultando a la IA...');
-  try {
-    let respuestaIA;
-    try {
-      respuestaIA = await consultarGroq(prompt);
-      console.log('ChatGPT: respuesta obtenida de Groq');
-    } catch (errorGroq) {
-      console.log('Groq falló, usando respaldo público:', errorGroq.message);
-
-      const res = await fetch('https://vireonix.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(30000),
-        body: JSON.stringify({
-          model: 'auto',
-          messages: [
-            { role: 'system', content: 'Eres Levi Bot, un asistente útil. Responde en español claro y directamente.' },
-            { role: 'user', content: prompt }
-          ]
-        })
-      });
-
-      if (!res.ok) throw new Error('Respaldo HTTP ' + res.status);
-      const data = await res.json();
-      respuestaIA = data.choices?.[0]?.message?.content?.trim();
-      if (!respuestaIA) throw new Error('El respaldo no devolvió respuesta');
-      console.log('ChatGPT: respuesta obtenida de Vireonix');
-    }
-
-    await sock.sendMessage(jid, { text: '🤖 ' + respuestaIA }, { quoted: m });
-  } catch (e) {
-    console.log('Error .chatgpt:', e.message);
-    await responder('❌ Groq y la API de respaldo no están disponibles. Intenta más tarde.');
-  }
-  break;
-}
-case 'chatpgt': case 'gpt': {
-  const prompt = cuerpo.slice(cmd.length).trim();
-  if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
-  await responder('🤖 Consultando a ChatGPT...');
-  try {
-    const res = await fetch('https://keylessai.thryx.workers.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    await sock.sendMessage(jid, { text: '🤖 ' + data.choices[0].message.content.trim() }, { quoted: m });
-  } catch (e) {
-    console.log('Error .chatgpt:', e.message);
-    await responder('❌ La IA gratuita está saturada. Intenta de nuevo en unos segundos.');
-  }
-  break;
-}
-case 'chatpgt': case 'gpt': {
-  const prompt = cuerpo.slice(cmd.length).trim();
-  if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
-  
-  let apiKey = '';
-  try { apiKey = JSON.parse(require('fs').readFileSync('./config.json', 'utf8')).openaiKey; } catch {}
-  if (!apiKey) { await responder('❌ Primero configura tu API con el comando #setapi <tu_clave>'); break; }
-  
-  await responder('🤖 Consultando a ChatGPT...');
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }] })
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    await sock.sendMessage(jid, { text: '🤖 ' + data.choices[0].message.content.trim() }, { quoted: m });
-  } catch (e) {
-    console.log('Error .chatgpt:', e.message);
-    await responder('❌ Error consultando a ChatGPT. Revisa tu API Key o saldo.');
-  }
-  break;
-}
-case 'llama': {
+case 'chatpgt': case 'chatpgt': case 'llama': {
   const prompt = cuerpo.slice(cmd.length).trim();
   if (!prompt) { await responder('Uso: #llama <pregunta>'); break; }
   
@@ -3680,46 +3527,7 @@ case 'simi': {
   }
   break;
 }
-case 'chatpgt': case 'gpt': {
-  const prompt = cuerpo.slice(cmd.length).trim();
-  if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
-  await responder('🤖 Consultando a ChatGPT...');
-  try {
-    const res = await fetch('https://api.blackbox.ai/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [{ role: 'user', content: prompt }],
-        model: 'gpt-4o'
-      })
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
-    let respuesta = text;
-    try { const json = JSON.parse(text); respuesta = json.choices?.[0]?.message?.content || json.response || text; } catch(e) {}
-    await sock.sendMessage(jid, { text: '🤖 ' + respuesta.trim() }, { quoted: m });
-  } catch (e) {
-    console.log('Error .chatgpt:', e.message);
-    await responder('❌ Error consultando a ChatGPT.');
-  }
-  break;
-}
-case 'chatpgt': case 'gpt': {
-  const prompt = cuerpo.slice(cmd.length).trim();
-  if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
-  await responder('🤖 Consultando a ChatGPT...');
-  try {
-    const res = await fetch('https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
-    await sock.sendMessage(jid, { text: '🤖 ' + text.trim() }, { quoted: m });
-  } catch (e) {
-    console.log('Error .chatgpt:', e.message);
-    await responder('❌ Error consultando a ChatGPT.');
-  }
-  break;
-}
-case 'google': case 'buscar': {
+case 'chatpgt': case 'chatpgt': case 'google': case 'buscar': {
   const query = cuerpo.slice(cmd.length).trim();
   if (!query) { await responder(`Uso: #google <búsqueda>
 Ej: #google Shakira`); break; }
