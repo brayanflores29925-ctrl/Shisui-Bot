@@ -1328,48 +1328,76 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
 
     case 'facebook': case 'fb': {
+      const fs2 = require('fs');
+      const path2 = require('path');
+      const { execFile } = require('child_process');
+      const { promisify } = require('util');
+      const execFileAsync = promisify(execFile);
+      const base = '/tmp/fb_' + Date.now();
+      const filePath = base + '.mp4';
+      const fileWA = base + '_wa.mp4';
+
       try {
         const url = cuerpo.slice(cmd.length).trim();
-        if (!url || !url.includes('facebook.com')) {
+        if (!url || !/facebook\.com|fb\.watch/i.test(url)) {
           await responder('Uso: #facebook <enlace>\nEjemplo: #fb https://www.facebook.com/share/r/...');
           break;
         }
-        
+
         try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
-        
-        const { exec } = require('child_process');
-        const { promisify } = require('util');
-        const execAsync = promisify(exec);
-        const fs2 = require('fs');
-        
-        const filePath = '/tmp/fb_' + Date.now() + '.mp4';
-        
-        // Descargamos con yt-dlp
-        await execAsync('yt-dlp --no-warnings -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + url + '"', { timeout: 60000 });
-        
-        if (fs2.existsSync(filePath)) {
-          const buffer = fs2.readFileSync(filePath);
-          
-          if (buffer.length > 64 * 1024 * 1024) {
-            await responder('❌ El video supera los 64MB (límite de WhatsApp).');
-            try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
-          } else {
-            await sock.sendMessage(jid, { video: buffer, caption: '✅ Video de Facebook' }, { quoted: m });
-            try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
-          }
-          fs2.unlinkSync(filePath);
-        } else {
-          await responder('❌ No se pudo descargar el video. Puede que sea privado.');
-          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+
+        await execFileAsync('yt-dlp', [
+          '--no-warnings',
+          '--no-playlist',
+          '-f', 'bv*+ba/b',
+          '--merge-output-format', 'mp4',
+          '-o', filePath,
+          url
+        ], { timeout: 90000, maxBuffer: 10 * 1024 * 1024 });
+
+        if (!fs2.existsSync(filePath)) {
+          throw new Error('No se encontró el video descargado');
         }
+
+        await execFileAsync('ffmpeg', [
+          '-y', '-i', filePath,
+          '-map', '0:v:0',
+          '-map', '0:a?',
+          '-c:v', 'libx264',
+          '-preset', 'veryfast',
+          '-crf', '26',
+          '-pix_fmt', 'yuv420p',
+          '-c:a', 'aac',
+          '-b:a', '128k',
+          '-movflags', '+faststart',
+          fileWA
+        ], { timeout: 120000, maxBuffer: 10 * 1024 * 1024 });
+
+        if (!fs2.existsSync(fileWA)) {
+          throw new Error('No se pudo convertir el video');
+        }
+
+        const buffer = fs2.readFileSync(fileWA);
+        if (!buffer.length) throw new Error('El video convertido está vacío');
+
+        await sock.sendMessage(jid, {
+          video: buffer,
+          mimetype: 'video/mp4',
+          caption: '✅ Video de Facebook'
+        }, { quoted: m });
+
+        try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
       } catch (e) {
         console.log('Error en .facebook:', e.message);
-        await responder('❌ Error al descargar. El video puede ser privado o requerir inicio de sesión.');
+        await responder('❌ No se pudo descargar o convertir el video de Facebook.');
         try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+      } finally {
+        for (const f of [filePath, fileWA]) {
+          try { if (fs2.existsSync(f)) fs2.unlinkSync(f); } catch (e) {}
+        }
       }
       break;
     }
-
 
 
     case 'regalo': {
