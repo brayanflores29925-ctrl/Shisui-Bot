@@ -1231,7 +1231,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     switch (comando) {
 
     // ==========================================
-    // DESCARGAS Y IA BLINDADAS
+    // SISTEMA DE DESCARGA MULTI-API (FALLBACK SILENCIOSO)
     // ==========================================
     case 'play': case 'play2': case 'spotify': case 'sp': {
       try {
@@ -1244,6 +1244,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         let url = query;
         let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0;
 
+        // 1. BÚSQUEDA RÁPIDA (youtube-search-api)
         if (!query.startsWith('http')) {
           try {
             const Youtube = require('youtube-search-api');
@@ -1261,6 +1262,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
           } catch (e) { await responder('❌ Error al buscar.'); break; }
         }
 
+        // 2. OBTENER INFO EXACTA (Vistas y Duración) con yt-dlp
         try {
           const { exec } = require('child_process');
           const { promisify } = require('util');
@@ -1271,49 +1273,89 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
           duration = info.duration_string || duration;
         } catch (e) {}
 
+        // 3. ENVIAR TARJETA
         const txt = '➩ Audio › *' + title + '*\n\n' +
                     '❖ Canal › *' + channel + '*\n' +
                     '⧖ Duración › *' + duration + '*\n' +
                     (views ? '❀ Vistas › *' + views.toLocaleString() + '*\n' : '') +
-                    '⏳ Preparando audio...';
+                    '⏳ Descargando audio, esto puede tardar unos minutos...';
                     
         if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
         else await sock.sendMessage(jid, { text: txt }, { quoted: m });
 
+        // 4. CADENA DE APIS PARA DESCARGAR AUDIO
         let bufferFinal = null;
-        const filePath = '/tmp/aud_' + Date.now() + '.m4a';
+        const filePathBase = '/tmp/aud_' + Date.now();
         
-        // INTENTO 1: yt-dlp (Validando peso)
+        // API 1: yt-direct (Rápido, InnerTube, sin dependencias)
         try {
-          const { exec } = require('child_process');
-          const { promisify } = require('util');
-          const execAsync = promisify(exec);
-          await execAsync('yt-dlp --extractor-args "youtube:player_client=ios,android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePath + '" "' + url + '"', { timeout: 45000 });
-          
-          if (fs2.existsSync(filePath)) {
-             const stats = fs2.statSync(filePath);
-             if (stats.size > 5000) bufferFinal = fs2.readFileSync(filePath);
-             fs2.unlinkSync(filePath);
+          const ytdl = require('yt-direct');
+          const video = await ytdl(url, { quality: 'audio', format: 'm4a' });
+          await video.download(filePathBase + '.m4a');
+          if (fs2.existsSync(filePathBase + '.m4a')) {
+            bufferFinal = fs2.readFileSync(filePathBase + '.m4a');
+            fs2.unlinkSync(filePathBase + '.m4a');
           }
-        } catch (e) {}
+        } catch (e) { console.log('Fallo API 1 (yt-direct):', e.message); }
 
-        // INTENTO 2: API externa (Si yt-dlp falla o da archivo vacío)
+        // API 2: @denzy-official/youtube_scraper
         if (!bufferFinal) {
           try {
-            const res = await fetch('https://api.paxsenix.biz.id/dl/ytmp3?url=' + encodeURIComponent(url));
-            const json = await res.json();
-            if (json.status && json.result && json.result.download) {
-              const r = await fetch(json.result.download);
-              bufferFinal = Buffer.from(await r.arrayBuffer());
+            const yt = require('@denzy-official/youtube_scraper');
+            const res = await yt.ytmp3(url);
+            if (res && res.download && res.download.url) {
+              const rFetch = await fetch(res.download.url);
+              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
             }
-          } catch(e) {}
+          } catch (e) { console.log('Fallo API 2 (denzy):', e.message); }
         }
 
+        // API 3: shadowx-ytdl
+        if (!bufferFinal) {
+          try {
+            const ytdl = require('shadowx-ytdl');
+            const res = await ytdl.downloadAudio(url, 128);
+            if (res && res.download && res.download.downloadUrl) {
+              const rFetch = await fetch(res.download.downloadUrl);
+              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
+            }
+          } catch (e) { console.log('Fallo API 3 (shadowx):', e.message); }
+        }
+
+        // API 4: cloud-ytdl
+        if (!bufferFinal) {
+          try {
+            const ytdl = require('cloud-ytdl');
+            const stream = ytdl(url, { filter: 'audioonly' });
+            const chunks = [];
+            for await (const chunk of stream) chunks.push(chunk);
+            bufferFinal = Buffer.concat(chunks);
+          } catch (e) { console.log('Fallo API 4 (cloud-ytdl):', e.message); }
+        }
+
+        // API 5: yt-dlp (Último recurso)
+        if (!bufferFinal) {
+          try {
+            const { exec } = require('child_process');
+            const { promisify } = require('util');
+            const execAsync = promisify(exec);
+            const fMp4 = filePathBase + '.mp4';
+            const fM4a = filePathBase + '.m4a';
+            await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + fMp4 + '" "' + url + '"', { timeout: 60000 });
+            if (fs2.existsSync(fMp4)) {
+              await execAsync('ffmpeg -y -i "' + fMp4 + '" -vn -acodec copy "' + fM4a + '"', { timeout: 20000 });
+              if (fs2.existsSync(fM4a)) { bufferFinal = fs2.readFileSync(fM4a); fs2.unlinkSync(fM4a); }
+              fs2.unlinkSync(fMp4);
+            }
+          } catch (e) { console.log('Fallo API 5 (yt-dlp):', e.message); }
+        }
+
+        // 5. ENVIAR EL AUDIO (Con validación de peso)
         if (bufferFinal && bufferFinal.length > 5000) {
           await sock.sendMessage(jid, { audio: bufferFinal, mimetype: 'audio/mp4' }, { quoted: m });
           try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
         } else {
-          await responder('❌ El archivo está vacío o bloqueado.');
+          await responder('❌ No se pudo descargar el audio (todos los servidores fallaron o el archivo está vacío).');
           try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
         }
 
@@ -1321,6 +1363,9 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
       break;
     }
 
+    // ==========================================
+    // SISTEMA DE DESCARGA DE VIDEO MULTI-API
+    // ==========================================
     case 'playvideo': case 'video': case 'v': {
       try {
         const query = cuerpo.slice(cmd.length).trim();
@@ -1332,6 +1377,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         let url = query;
         let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0;
 
+        // 1. BÚSQUEDA RÁPIDA
         if (!query.startsWith('http')) {
           try {
             const Youtube = require('youtube-search-api');
@@ -1349,6 +1395,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
           } catch (e) { await responder('❌ Error al buscar.'); break; }
         }
 
+        // 2. INFO EXACTA
         try {
           const { exec } = require('child_process');
           const { promisify } = require('util');
@@ -1359,53 +1406,77 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
           duration = info.duration_string || duration;
         } catch (e) {}
 
+        // 3. TARJETA
         const txt = '➩ Video › *' + title + '*\n\n' +
                     '❖ Canal › *' + channel + '*\n' +
                     '⧖ Duración › *' + duration + '*\n' +
                     (views ? '❀ Vistas › *' + views.toLocaleString() + '*\n' : '') +
-                    '⏳ Preparando video...';
+                    '⏳ Descargando video, esto puede tardar unos minutos...';
                     
         if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
         else await sock.sendMessage(jid, { text: txt }, { quoted: m });
 
+        // 4. CADENA DE APIS PARA DESCARGAR VIDEO
         let bufferFinal = null;
-        const filePath = '/tmp/vid_' + Date.now() + '.mp4';
-        
-        // INTENTO 1: yt-dlp (Validando peso)
-        try {
-          const { exec } = require('child_process');
-          const { promisify } = require('util');
-          const execAsync = promisify(exec);
-          await execAsync('yt-dlp --extractor-args "youtube:player_client=ios,android" -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]" -o "' + filePath + '" "' + url + '"', { timeout: 45000 });
-          
-          if (fs2.existsSync(filePath)) {
-             const stats = fs2.statSync(filePath);
-             if (stats.size > 5000) bufferFinal = fs2.readFileSync(filePath);
-             fs2.unlinkSync(filePath);
-          }
-        } catch (e) {}
+        const fileBase = '/tmp/vid_' + Date.now();
 
-        // INTENTO 2: API externa
+        // API 1: yt-direct
+        try {
+          const ytdl = require('yt-direct');
+          const video = await ytdl(url, { quality: '360p', format: 'mp4' });
+          await video.download(fileBase + '.mp4');
+          if (fs2.existsSync(fileBase + '.mp4')) {
+            bufferFinal = fs2.readFileSync(fileBase + '.mp4');
+            fs2.unlinkSync(fileBase + '.mp4');
+          }
+        } catch (e) { console.log('Fallo API 1 (yt-direct):', e.message); }
+
+        // API 2: @denzy-official/youtube_scraper
         if (!bufferFinal) {
           try {
-            const res = await fetch('https://api.paxsenix.biz.id/dl/ytmp4?url=' + encodeURIComponent(url));
-            const json = await res.json();
-            if (json.status && json.result && json.result.download) {
-              const r = await fetch(json.result.download);
-              bufferFinal = Buffer.from(await r.arrayBuffer());
+            const yt = require('@denzy-official/youtube_scraper');
+            const res = await yt.ytmp4(url);
+            if (res && res.download && res.download.url) {
+              const rFetch = await fetch(res.download.url);
+              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
             }
-          } catch(e) {}
+          } catch (e) { console.log('Fallo API 2 (denzy):', e.message); }
         }
 
+        // API 3: shadowx-ytdl
+        if (!bufferFinal) {
+          try {
+            const ytdl = require('shadowx-ytdl');
+            const res = await ytdl.downloadVideo(url, 360);
+            if (res && res.download && res.download.downloadUrl) {
+              const rFetch = await fetch(res.download.downloadUrl);
+              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
+            }
+          } catch (e) { console.log('Fallo API 3 (shadowx):', e.message); }
+        }
+
+        // API 4: cloud-ytdl
+        if (!bufferFinal) {
+          try {
+            const ytdl = require('cloud-ytdl');
+            const stream = ytdl(url, { quality: 'highest' });
+            const chunks = [];
+            for await (const chunk of stream) chunks.push(chunk);
+            bufferFinal = Buffer.concat(chunks);
+          } catch (e) { console.log('Fallo API 4 (cloud-ytdl):', e.message); }
+        }
+
+        // 5. CONVERTIR Y ENVIAR (Con validación de peso)
         if (bufferFinal && bufferFinal.length > 5000) {
           if (bufferFinal.length > 64 * 1024 * 1024) {
-             await responder('❌ El video supera los 64MB.');
+            await responder('❌ El video supera los 64MB (límite de WhatsApp).');
+            try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
           } else {
-             await sock.sendMessage(jid, { video: bufferFinal, caption: '✅ ' + title }, { quoted: m });
-             try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
+            await sock.sendMessage(jid, { video: bufferFinal, caption: '✅ ' + title }, { quoted: m });
+            try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
           }
         } else {
-          await responder('❌ El archivo está vacío o bloqueado.');
+          await responder('❌ No se pudo descargar el video (todos los servidores fallaron o el archivo está vacío).');
           try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
         }
 
@@ -1413,35 +1484,64 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
       break;
     }
 
+    // ==========================================
+    // SISTEMA DE IA MULTI-API (ALGOCHAT + KEYLESS)
+    // ==========================================
     case 'ia': case 'chatgpt': case 'gpt': {
       try {
         const prompt = cuerpo.slice(cmd.length).trim();
         if (!prompt) { await responder('Uso: #' + cmd + ' <pregunta>'); break; }
         
         try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
-        
-        const res = await fetch('https://api.paxsenix.biz.id/ai/gpt4?text=' + encodeURIComponent(prompt));
-        const json = await res.json();
-        
-        if (json.status && json.answer) {
-          await sock.sendMessage(jid, { text: json.answer }, { quoted: m });
+
+        let respuesta = null;
+
+        // API 1: algochat-ai (Gemini, sin API key)
+        try {
+          const algochat = require('algochat-ai');
+          respuesta = await algochat.chat(prompt);
+        } catch (e) { console.log('Fallo API 1 (algochat):', e.message); }
+
+        // API 2: keylessai (OpenAI-compatible, sin API key)
+        if (!respuesta) {
+          try {
+            const res = await fetch('https://keylessai.thryx.workers.dev/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'user', content: prompt }] })
+            });
+            const data = await res.json();
+            if (data.choices && data.choices[0] && data.choices[0].message) {
+              respuesta = data.choices[0].message.content;
+            }
+          } catch (e) { console.log('Fallo API 2 (keylessai):', e.message); }
+        }
+
+        // API 3: Pollinations (Respaldo final)
+        if (!respuesta) {
+          try {
+            const res = await fetch('https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai');
+            const text = await res.text();
+            if (text) respuesta = text.trim();
+          } catch (e) { console.log('Fallo API 3 (pollinations):', e.message); }
+        }
+
+        if (respuesta) {
+          await sock.sendMessage(jid, { text: respuesta }, { quoted: m });
           try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
         } else {
-          await responder('❌ La IA no pudo responder.');
+          await responder('❌ La IA no pudo responder (todos los servidores fallaron).');
           try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
         }
-      } catch (e) {
-        console.log('Error IA:', e.message);
-        await responder('❌ Error de conexión con la IA.');
-        try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
-      }
+
+      } catch (e) { console.log('Error IA:', e.message); }
       break;
     }
 
 
 
     // ==========================================
-    // BUSQUEDA Y DESCARGA A PRUEBA DE FALLOS
+    // DESCARGAS Y IA BLINDADAS
     // ==========================================
     case 'facebook': case 'fb': {
       try {
