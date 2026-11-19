@@ -45,8 +45,10 @@
     "tiktok-api-wangyi": "^1.0.1",
     "tiktok-hks": "^1.0.4",
     "tiktok-video-scraper": "^1.0.0",
+    "untube": "^4.0.4",
     "youtube-search-api": "^2.0.1",
-    "youtube-sr": "^4.3.12"
+    "youtube-sr": "^4.3.12",
+    "yt-direct": "^1.1.1"
   },
   "optionalDependencies": {
     "ffmpeg-static": "^5.2.0"
