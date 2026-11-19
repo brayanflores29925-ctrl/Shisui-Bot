@@ -1458,6 +1458,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         
         // Reacción de "trabajando" para no mandar mensaje de texto
         try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+        await responder('⏳ Buscando información y preparando tu audio...');
 
         const fs2 = require('fs');
         let bufferFinal = null;
@@ -1465,6 +1466,8 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         let thumbFinal = null;
         let canalFinal = null;
         let duracionFinal = null;
+        let vistasFinal = null;
+        let enlaceFinal = null;
         const descargarArchivo = async (url) => {
           const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
           if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1486,6 +1489,8 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             thumbFinal = res.metadata ? res.metadata.thumbnail : null;
             canalFinal = res.metadata?.author?.name || null;
             duracionFinal = res.metadata?.timestamp || res.metadata?.duration?.timestamp || null;
+            vistasFinal = res.metadata?.views || res.metadata?.viewCount || null;
+            enlaceFinal = res.metadata?.url || res.metadata?.webpage_url || null;
           }
         } catch (e) {}
 
@@ -1506,6 +1511,8 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
                 thumbFinal = (res.metadata && res.metadata.thumbnail) || video.thumbnail || video.image || null;
                 canalFinal = res.metadata?.author?.name || video.author?.name || null;
                 duracionFinal = res.metadata?.timestamp || video.timestamp || null;
+                vistasFinal = res.metadata?.views || res.metadata?.viewCount || video.views || video.viewCount || null;
+                enlaceFinal = res.metadata?.url || res.metadata?.webpage_url || video.url || null;
               }
             }
           } catch (e) { console.log('ShadowX audio:', e.message); }
@@ -1524,6 +1531,8 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             thumbFinal = info.thumbnail || null;
             canalFinal = info.channel || info.uploader || null;
             duracionFinal = info.duration_string || null;
+            vistasFinal = info.view_count || null;
+            enlaceFinal = info.webpage_url || null;
             
             await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 18000 });
             if (fs2.existsSync(filePath)) {
@@ -1534,7 +1543,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         }
 
         if (bufferFinal) {
-          const infoExtraFinal = [canalFinal ? '👤 ' + canalFinal : '', duracionFinal ? '⏱️ ' + duracionFinal : ''].filter(Boolean).join('\n');
+          const infoExtraFinal = [canalFinal ? '👤 ' + canalFinal : '', duracionFinal ? '⏱️ ' + duracionFinal : '', vistasFinal ? '👁️ ' + Number(vistasFinal).toLocaleString('es-HN') + ' visualizaciones' : '', enlaceFinal ? '🔗 ' + enlaceFinal : ''].filter(Boolean).join('\n');
           const captionInfoFinal = '➩ Audio › *' + tituloFinal + '*' + (infoExtraFinal ? '\n' + infoExtraFinal : '');
           // MENSAJE 1: Foto + Texto
           if (thumbFinal) {
@@ -1573,12 +1582,15 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
         
         try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+        await responder('⏳ Buscando información y preparando tu video...');
 
         let bufferFinal = null;
         let tituloFinal = query;
         let thumbFinal = null;
         let canalFinal = null;
         let duracionFinal = null;
+        let vistasFinal = null;
+        let enlaceFinal = null;
         const descargarArchivo = async (url) => {
           const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
           if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1600,6 +1612,8 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             thumbFinal = res.metadata ? res.metadata.thumbnail : null;
             canalFinal = res.metadata?.author?.name || null;
             duracionFinal = res.metadata?.timestamp || res.metadata?.duration?.timestamp || null;
+            vistasFinal = res.metadata?.views || res.metadata?.viewCount || null;
+            enlaceFinal = res.metadata?.url || res.metadata?.webpage_url || null;
           }
         } catch (e) {}
 
@@ -1626,6 +1640,8 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
                 thumbFinal = (res.metadata && res.metadata.thumbnail) || (video && (video.thumbnail || video.image)) || null;
                 canalFinal = res.metadata?.author?.name || video?.author?.name || null;
                 duracionFinal = res.metadata?.timestamp || video?.timestamp || null;
+                vistasFinal = res.metadata?.views || res.metadata?.viewCount || video?.views || video?.viewCount || null;
+                enlaceFinal = res.metadata?.url || res.metadata?.webpage_url || video?.url || null;
               }
             }
           } catch (e) { console.log('ShadowX video:', e.message); }
@@ -1644,6 +1660,8 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             thumbFinal = info.thumbnail || null;
             canalFinal = info.channel || info.uploader || null;
             duracionFinal = info.duration_string || null;
+            vistasFinal = info.view_count || null;
+            enlaceFinal = info.webpage_url || null;
             
             await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 45000 });
             if (require('fs').existsSync(filePath)) {
@@ -1654,7 +1672,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         }
 
         if (bufferFinal) {
-          const infoExtraFinal = [canalFinal ? '👤 ' + canalFinal : '', duracionFinal ? '⏱️ ' + duracionFinal : ''].filter(Boolean).join('\n');
+          const infoExtraFinal = [canalFinal ? '👤 ' + canalFinal : '', duracionFinal ? '⏱️ ' + duracionFinal : '', vistasFinal ? '👁️ ' + Number(vistasFinal).toLocaleString('es-HN') + ' visualizaciones' : '', enlaceFinal ? '🔗 ' + enlaceFinal : ''].filter(Boolean).join('\n');
           const captionInfoFinal = '➩ Video › *' + tituloFinal + '*' + (infoExtraFinal ? '\n' + infoExtraFinal : '');
           if (thumbFinal) {
             try {
