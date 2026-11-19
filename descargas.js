@@ -5,7 +5,8 @@ const path = require('path')
 const { execFile } = require('child_process')
 
 const ESPERA_MS = 20000
-const ultimoUso = new Map()
+const ultimoUsoInfo = new Map()
+const ultimoUsoDescarga = new Map()
 
 function entornoYt() {
   const dir = path.join(process.cwd(), 'tmp-ytdlp')
@@ -34,9 +35,6 @@ function traducirError(msg) {
   }
   if (/Cannot parse data|Unable to extract|Unsupported URL/i.test(m)) {
     return 'No pude leer ese enlace. Prueba con el enlace directo del video, o puede que esté privado.'
-  }
-  if (/max-filesize|larger than/i.test(m)) {
-    return 'El archivo pesa más de 50 MB.'
   }
   if (/HTTP Error 429|Too Many Requests/i.test(m)) {
     return 'Hay demasiadas solicitudes. Intenta más tarde.'
@@ -110,15 +108,16 @@ function hace(info) {
 
 async function bajarMiniatura(url) {
   try {
-    const control = new AbortController()
-    const t = setTimeout(() => control.abort(), 15000)
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: control.signal, redirect: 'follow' })
-    clearTimeout(t)
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(5000),
+      redirect: 'follow'
+    })
     if (!res.ok) return null
     const tipo = String(res.headers.get('content-type') || '')
-    if (!/jpe?g|png/i.test(tipo)) return null
+    if (!/jpe?g|png|webp/i.test(tipo)) return null
     const buf = Buffer.from(await res.arrayBuffer())
-    return buf.length < 3 * 1024 * 1024 ? buf : null
+    return buf.length > 0 && buf.length < 3 * 1024 * 1024 ? buf : null
   } catch {
     return null
   }
@@ -126,12 +125,12 @@ async function bajarMiniatura(url) {
 
 async function informacion(tipo, entrada, usuario) {
   const ahora = Date.now()
-  const previo = ultimoUso.get(usuario) || 0
+  const previo = ultimoUsoInfo.get(usuario) || 0
   if (usuario && ahora - previo < ESPERA_MS) {
     const falta = Math.ceil((ESPERA_MS - (ahora - previo)) / 1000)
     return { ok: false, espera: true, error: 'Espera ' + falta + ' segundos antes de pedir otra descarga.' }
   }
-  if (usuario) ultimoUso.set(usuario, ahora)
+  if (usuario) ultimoUsoInfo.set(usuario, ahora)
   try {
     const bajo = entrada.toLowerCase()
     const esUrl = bajo.startsWith('http://') || bajo.startsWith('https://')
@@ -141,7 +140,7 @@ async function informacion(tipo, entrada, usuario) {
       '--js-runtimes', 'node:' + process.execPath,
       '--cache-dir', path.join(process.cwd(), 'tmp-ytdlp', 'cache'),
       objetivo
-    ], 90000)
+    ], 45000)
     let datos = JSON.parse(salida)
     if (datos.entries) datos = datos.entries[0]
     if (!datos) return { ok: false }
@@ -156,17 +155,8 @@ async function informacion(tipo, entrada, usuario) {
     const enlace = datos.webpage_url || datos.original_url || ''
     if (enlace) lineas.push('❐ Enlace › ' + enlace)
     lineas.push('', '⏳ Espera un momento mientras preparo tu ' + palabra + '...')
-    const candidatas = (datos.thumbnails || [])
-      .filter(x => x.url && (x.url.includes('.jpg') || x.url.includes('.jpeg')))
-      .map(x => x.url)
-      .reverse()
-      .slice(0, 3)
-    if (datos.thumbnail) candidatas.push(datos.thumbnail)
-    let miniatura = null
-    for (const u of candidatas) {
-      miniatura = await bajarMiniatura(u)
-      if (miniatura) break
-    }
+    const miniaturaUrl = datos.thumbnail || (datos.thumbnails || []).slice(-1)[0]?.url
+    const miniatura = miniaturaUrl ? await bajarMiniatura(miniaturaUrl) : null
     return { ok: true, texto: lineas.join('\n'), miniatura, objetivo: enlace || entrada }
   } catch (e) {
     console.log('Info yt-dlp:', e.message)
@@ -176,20 +166,19 @@ async function informacion(tipo, entrada, usuario) {
 
 async function descargar(tipo, entrada, apikey, usuario) {
   const ahora = Date.now()
-  const previo = ultimoUso.get(usuario) || 0
+  const previo = ultimoUsoDescarga.get(usuario) || 0
   if (usuario && ahora - previo < ESPERA_MS) {
     const falta = Math.ceil((ESPERA_MS - (ahora - previo)) / 1000)
     return { ok: false, error: 'Espera ' + falta + ' segundos antes de pedir otra descarga.' }
   }
-  if (usuario) ultimoUso.set(usuario, ahora)
+  if (usuario) ultimoUsoDescarga.set(usuario, ahora)
 
   const esUrl = /^https?:\/\//i.test(entrada)
   const dir = os.tmpdir()
   const prefijo = 'dl_' + Date.now() + '_' + Math.floor(Math.random() * 1e6)
   const base = path.join(dir, prefijo)
   const comunes = [
-    '--no-playlist', '--no-warnings', '--no-progress', '--js-runtimes', 'node:' + process.execPath, '--cache-dir', path.join(process.cwd(), 'tmp-ytdlp', 'cache'),
-    '--max-filesize', '50M',
+    '--no-playlist', '--no-warnings', '--no-progress', '--socket-timeout', '15', '--retries', '2', '--fragment-retries', '2', '--concurrent-fragments', '4', '--js-runtimes', 'node:' + process.execPath, '--cache-dir', path.join(process.cwd(), 'tmp-ytdlp', 'cache'),
     '-o', base + '.%(ext)s',
     '--print-to-file', '%(title)s', base + '.titulo'
   ]
@@ -229,7 +218,7 @@ async function descargar(tipo, entrada, apikey, usuario) {
     if (tipo === 'pinterest' && archivos[0] && /\.(jpe?g|png|webp|gif)$/i.test(archivos[0])) tipoResultado = 'image'
     if (!archivos.length) {
       limpiar()
-      return { ok: false, error: 'No pude descargarlo. Puede que sea muy pesado (más de 50 MB) o no esté disponible.' }
+      return { ok: false, error: 'No pude descargarlo. Puede que no esté disponible o que el servidor haya rechazado la solicitud.' }
     }
     let titulo = ''
     try { titulo = fs.readFileSync(base + '.titulo', 'utf8').split('\n')[0].trim().slice(0, 200) } catch {}
@@ -250,22 +239,32 @@ async function descargar(tipo, entrada, apikey, usuario) {
   }
 }
 
-async function bajarMedia(url, maxMB = 60) {
+async function bajarMedia(url, maxMB = null) {
   if (url.startsWith('file:')) {
     const ruta = url.slice(5)
     try {
       const buf = fs.readFileSync(ruta)
-      if (buf.length > maxMB * 1024 * 1024) throw new Error('El archivo pesa más de ' + maxMB + ' MB')
+      if (maxMB && buf.length > maxMB * 1024 * 1024) {
+        throw new Error('El archivo supera el límite solicitado de ' + maxMB + ' MB')
+      }
       return buf
     } finally {
       try { fs.unlinkSync(ruta) } catch {}
     }
   }
-  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, redirect: 'follow' })
+
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(60000)
+  })
   if (!res.ok) throw new Error('HTTP ' + res.status + ' al bajar el archivo')
+  const tipo = String(res.headers.get('content-type') || '').toLowerCase()
+  if (/text\/html|application\/json/.test(tipo)) {
+    throw new Error('El enlace no devolvió un archivo multimedia')
+  }
   return Buffer.from(await res.arrayBuffer())
 }
-
 
 async function buscarImagenes(consulta, limite = 3) {
   if (!consulta || /^https?:\/\//i.test(consulta)) {
