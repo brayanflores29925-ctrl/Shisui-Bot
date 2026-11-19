@@ -3480,16 +3480,43 @@ case 'llama': {
   }
   break;
 }
-case 'chatgpt': {
+case 'ia': case 'chatgpt': {
   const prompt = cuerpo.slice(cmd.length).trim();
   if (!prompt) { await responder('Uso: #chatgpt <pregunta>'); break; }
-  await responder('🤖 Consultando a ChatGPT...');
+
+  await responder('🤖 Consultando a la IA...');
   try {
-    const respuestaIA = await consultarGroq(prompt);
+    let respuestaIA;
+    try {
+      respuestaIA = await consultarGroq(prompt);
+      console.log('ChatGPT: respuesta obtenida de Groq');
+    } catch (errorGroq) {
+      console.log('Groq falló, usando respaldo público:', errorGroq.message);
+
+      const res = await fetch('https://vireonix.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(30000),
+        body: JSON.stringify({
+          model: 'auto',
+          messages: [
+            { role: 'system', content: 'Eres Levi Bot, un asistente útil. Responde en español claro y directamente.' },
+            { role: 'user', content: prompt }
+          ]
+        })
+      });
+
+      if (!res.ok) throw new Error('Respaldo HTTP ' + res.status);
+      const data = await res.json();
+      respuestaIA = data.choices?.[0]?.message?.content?.trim();
+      if (!respuestaIA) throw new Error('El respaldo no devolvió respuesta');
+      console.log('ChatGPT: respuesta obtenida de Vireonix');
+    }
+
     await sock.sendMessage(jid, { text: '🤖 ' + respuestaIA }, { quoted: m });
   } catch (e) {
     console.log('Error .chatgpt:', e.message);
-    await responder('❌ Error con la IA. Comprueba que GROQ_API_KEY esté configurada.');
+    await responder('❌ Groq y la API de respaldo no están disponibles. Intenta más tarde.');
   }
   break;
 }
