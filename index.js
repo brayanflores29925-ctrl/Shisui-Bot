@@ -75,6 +75,7 @@ const {
 const pino = require('pino')
 const readline = require('readline')
 const { generarMenu } = require('./menu')
+const capacidad = require('./capacidad')
 const extras = require('./extras')
 const admin = require('./admin')
 const rapido = require('./rapido')
@@ -124,7 +125,10 @@ const EMOJIS = {
   consejo: '💡', party: '🎉', tag: '📣', aviso: '📢', kick: '👢', ban: '👢',
   fix: '🔧', status: '📊', bot: '🤖'
 }
-const MAX_SUBBOTS = 5
+function maxSubs() {
+  const n = Number(leerConfig().maxSubs)
+  return Number.isInteger(n) && n >= 0 && n <= 100 ? n : 5
+}
 const subSockets = {}
 const subEstado = {}
 const codeReciente = {}
@@ -6484,6 +6488,10 @@ case 'kick': {
       }
 
       case 'code': {
+        if (leerConfig().subsApagados && !esDueno(m)) {
+          await responder('⚠️ Por ahora no se están aceptando sub bots nuevos.')
+          break
+        }
   // --- TIMEOUT DE VINCULACION ---
   const senderCode = m.key.participant || m.key.remoteJid;
   let numCode = cuerpo.slice(cmd.length).trim().replace(/[^0-9]/g, '');
@@ -6529,8 +6537,12 @@ case 'kick': {
           await responder('ℹ️ Ese número ya está vinculado o tiene un código pendiente. Para desvincularlo escribe #delcode ' + telCode)
           break
         }
-        if (subsAct.length >= MAX_SUBBOTS) {
+        if (subsAct.length >= maxSubs()) {
           await responder('⚠️ Ya no hay cupos para más sub bots por ahora.')
+          break
+        }
+        if (capacidad.estimar(subsAct.length).extra < 1) {
+          await responder('⚠️ El servidor no tiene memoria para otro sub bot ahora. Intenta más tarde.')
           break
         }
         codeReciente[solicitante] = ahoraCode
@@ -6585,17 +6597,87 @@ case 'kick': {
         break
       }
 
-      case 'subs': {
+      case 'subs':
+      case 'maxsubs': {
         if (!esDueno(m)) {
           await responder('⛔ Solo el dueño del bot puede usar este comando.')
           break
         }
-        const listaSubs = leerConfig().subbots || []
+        const cfgSb = leerConfig()
+        const listaSb = cfgSb.subbots || []
+        const subArgs = comando === 'maxsubs' ? ['max'].concat(args) : args
+        const accionSb = (subArgs[0] || '').toLowerCase()
+        if (accionSb === 'on' || accionSb === 'off') {
+          if (accionSb === 'off') cfgSb.subsApagados = true
+          else delete cfgSb.subsApagados
+          guardarConfig(cfgSb)
+          await responder(accionSb === 'off'
+            ? '⛔ Ya no se aceptan sub bots nuevos. Los actuales siguen funcionando. Actívalo con #subs on'
+            : '✅ Se aceptan sub bots nuevos otra vez.')
+          break
+        }
+        if (accionSb === 'max') {
+          const nuevoMax = Number(subArgs[1])
+          const forzar = (subArgs[2] || '').toLowerCase() === 'forzar'
+          if (!Number.isInteger(nuevoMax) || nuevoMax < 0 || nuevoMax > 100) {
+            const cp = capacidad.estimar(listaSb.length)
+            await responder(
+              'Uso: #maxsubs <número de 0 a 100>\nAhora: ' + listaSb.length + '/' + maxSubs() +
+              '\n\n💾 Memoria: ' + cp.usadoMB + ' de ' + cp.limiteMB + ' MB\n📦 Cada sub bot usa ~' + cp.porSub + ' MB\n➕ Caben unos ' + cp.extra + ' más'
+            )
+            break
+          }
+          const v = capacidad.veredicto(listaSb.length, nuevoMax)
+          const detalle =
+            '💾 Memoria del ' + v.origen + ': ' + v.usadoMB + ' de ' + v.limiteMB + ' MB\n📦 Cada sub bot usa ~' + v.porSub +
+            ' MB\n➕ Caben unos ' + v.extra + ' más (pides ' + v.nuevos + ')'
+          if (v.estado === 'no' && !forzar) {
+            await responder(
+              '🚫 Probablemente el servidor NO aguante ' + nuevoMax + ' sub bots.\n\n' + detalle +
+              '\n\nNo cambié el límite. Si quieres intentarlo igual: #maxsubs ' + nuevoMax + ' forzar'
+            )
+            break
+          }
+          cfgSb.maxSubs = nuevoMax
+          guardarConfig(cfgSb)
+          const titulo = v.estado === 'ok'
+            ? '✅ Límite cambiado. Debería aguantar.'
+            : (v.estado === 'justo' ? '⚠️ Límite cambiado, pero va a quedar justo.' : '⚠️ Límite cambiado a la fuerza. Puede que el bot se caiga.')
+          await responder(
+            titulo + '\n\n' + detalle +
+            (nuevoMax < listaSb.length ? '\n\nℹ️ Los que ya están siguen; no entran nuevos hasta que bajen del límite.' : '') +
+            '\n\nTip: sube de a poco y vigila #status.'
+          )
+          break
+        }
+        if (accionSb === 'quitar') {
+          const objetivoSb = String(subArgs[1] || '').toLowerCase()
+          if (objetivoSb === 'todos') {
+            if (String(subArgs[2] || '').toLowerCase() !== 'confirmar') {
+              await responder('⚠️ Esto desvincula a los ' + listaSb.length + ' sub bots.\nPara confirmar: #subs quitar todos confirmar')
+              break
+            }
+            for (const n of listaSb.slice()) await quitarSubBot(n)
+            await responder('✅ Se desvincularon todos los sub bots.')
+            break
+          }
+          const numSb = objetivoSb.split('').filter(ch => ch >= '0' && ch <= '9').join('')
+          if (!numSb || !listaSb.includes(numSb)) {
+            await responder('Uso: #subs quitar <número>\nO: #subs quitar todos confirmar')
+            break
+          }
+          await quitarSubBot(numSb)
+          await responder('✅ Sub bot desvinculado: ' + numSb)
+          break
+        }
+        const cabecera = listaSb.length
+          ? '🤖 Sub bots (' + listaSb.length + '/' + maxSubs() + '):\n' + listaSb.map(n => '• ' + n + (subEstado[n]?.vinculado ? ' ✅' : ' ⏳')).join('\n')
+          : 'No hay sub bots vinculados. Límite: ' + maxSubs()
+        const capa = capacidad.estimar(listaSb.length)
         await responder(
-          listaSubs.length
-            ? '🤖 Sub bots (' + listaSubs.length + '/' + MAX_SUBBOTS + '):\n' +
-              listaSubs.map(n => '• ' + n + (subEstado[n]?.vinculado ? ' ✅' : ' ⏳')).join('\n')
-            : 'No hay sub bots vinculados.'
+          cabecera + '\n\n' + (cfgSb.subsApagados ? '⛔ Nuevos: apagados' : '✅ Nuevos: se aceptan') +
+          '\n💾 Memoria: ' + capa.usadoMB + ' de ' + capa.limiteMB + ' MB · caben unos ' + capa.extra + ' más' +
+          '\n\nUso:\n#subs on / off\n#maxsubs <número>\n#subs quitar <número>\n#subs quitar todos confirmar'
         )
         break
       }
