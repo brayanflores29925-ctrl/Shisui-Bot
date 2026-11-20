@@ -1289,6 +1289,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         
         let bufferFinal = null;
         let mimeFinal = 'audio/mp4';
+        const erroresMotores = [];
         const filePathBase = '/tmp/aud_' + Date.now();
         
         // MOTOR 1: primesave-dl (Maneja YouTube, TikTok, FB, etc.)
@@ -1302,7 +1303,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               bufferFinal = Buffer.from(await rFetch.arrayBuffer());
             }
           }
-        } catch (e) { console.log('Fallo Motor 1 (primesave):', e.message); }
+        } catch (e) { erroresMotores.push('Motor 1: ' + e.message); console.log('Fallo Motor 1 (primesave):', e.message); }
 
         // MOTOR 2: tsun-dls (Alternativa para YouTube)
         if (!bufferFinal) {
@@ -1313,7 +1314,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               const rFetch = await fetch(res.download);
               bufferFinal = Buffer.from(await rFetch.arrayBuffer());
             }
-          } catch (e) { console.log('Fallo Motor 2 (tsun):', e.message); }
+          } catch (e) { erroresMotores.push('Motor 2: ' + e.message); console.log('Fallo Motor 2 (tsun):', e.message); }
         }
 
         // MOTOR 3: @hydralerne/youtube-api (Rápido y directo)
@@ -1326,7 +1327,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               const rFetch = await fetch(streamUrl);
               bufferFinal = Buffer.from(await rFetch.arrayBuffer());
             }
-          } catch (e) { console.log('Fallo Motor 3 (hydra):', e.message); }
+          } catch (e) { erroresMotores.push('Motor 3: ' + e.message); console.log('Fallo Motor 3 (hydra):', e.message); }
         }
 
         // MOTOR 4: yt-dlp (Respaldo directo de audio)
@@ -1354,14 +1355,16 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               mimeFinal = ext === 'webm' ? 'audio/webm' : ext === 'opus' || ext === 'ogg' ? 'audio/ogg' : 'audio/mp4';
               fs2.unlinkSync(rutaAudio);
             }
-          } catch (e) { console.log('Fallo Motor 4 (yt-dlp):', e.message); }
+          } catch (e) { erroresMotores.push('Motor 4: ' + e.message); console.log('Fallo Motor 4 (yt-dlp):', e.message); }
         }
 
         if (bufferFinal && bufferFinal.length > 5000) {
           await sock.sendMessage(jid, { audio: bufferFinal, mimetype: mimeFinal }, { quoted: m });
           try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
         } else {
-          await responder('❌ No se pudo descargar el audio (todos los servidores fallaron o el archivo está vacío).');
+          if (bufferFinal && bufferFinal.length <= 5000) erroresMotores.push('El archivo recibido está vacío o es demasiado pequeño.');
+          if (!bufferFinal) erroresMotores.push('Ningún motor entregó un archivo.');
+          await responder('❌ No se pudo descargar el audio.\\n\\n' + erroresMotores.join('\\n').slice(0, 2500));
           try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
         }
 
