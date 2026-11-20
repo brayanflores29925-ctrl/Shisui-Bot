@@ -1362,14 +1362,14 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
         if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
         
-        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) { erroresVideo.push('Denzy: ' + e.message); }
+        const erroresVideo = [];
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
 
         let bufferFinal = null;
         let tituloFinal = query;
         let thumbFinal = null;
         let canalFinal = null;
         let duracionFinal = null;
-        const erroresVideo = [];
         const descargarArchivo = async (url) => {
           const r = await fetch(url, { signal: AbortSignal.timeout(60000) });
           if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1392,7 +1392,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             canalFinal = res.metadata?.author?.name || null;
             duracionFinal = res.metadata?.timestamp || res.metadata?.duration?.timestamp || null;
           }
-        } catch (e) { erroresVideo.push('yt-dlp: ' + e.message); }
+        } catch (e) { erroresVideo.push('Denzy: ' + e.message); }
 
         // API 2: ShadowX
         if (!bufferFinal) {
