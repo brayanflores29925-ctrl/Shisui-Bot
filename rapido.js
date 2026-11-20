@@ -29,6 +29,7 @@ function correr(cmd, args, timeout) {
 function baseArgs() {
   return [
     '--no-warnings', '--no-progress', '--no-playlist',
+    '--extractor-args', 'youtube:player_client=default,-web_embedded',
     '--js-runtimes', 'node:' + process.execPath,
     '--cache-dir', path.join(process.cwd(), 'tmp-ytdlp', 'cache'),
     '--socket-timeout', '20', '--retries', '3'
