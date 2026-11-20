@@ -1255,7 +1255,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               title = v.title || query;
               thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail.thumbnails?.[0]?.url || v.thumbnail.thumbnails?.[1]?.url || null) : null;
               channel = v.channelTitle || 'Desconocido';
-              duration = v.length ? v.length.text : 'Desconocido';
+              duration = v.length?.simpleText || v.length?.accessibility?.accessibilityData?.label || (typeof v.length === 'string' ? v.length : 'Desconocido');
             } else {
               await responder('❌ No encontré resultados.'); break;
             }
@@ -1267,7 +1267,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
           const { exec } = require('child_process');
           const { promisify } = require('util');
           const execAsync = promisify(exec);
-          const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + url + '"', { timeout: 20000 });
+          const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + url + '"', { timeout: 8000 });
           const info = JSON.parse(stdout.trim().split('\n')[0]);
           views = info.view_count || 0;
           duration = info.duration_string || duration;
@@ -1288,6 +1288,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         
         
         let bufferFinal = null;
+        let mimeFinal = 'audio/mp4';
         const filePathBase = '/tmp/aud_' + Date.now();
         
         // MOTOR 1: primesave-dl (Maneja YouTube, TikTok, FB, etc.)
@@ -1328,26 +1329,36 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
           } catch (e) { console.log('Fallo Motor 3 (hydra):', e.message); }
         }
 
-        // MOTOR 4: yt-dlp (Último recurso de respaldo)
+        // MOTOR 4: yt-dlp (Respaldo directo de audio)
         if (!bufferFinal) {
           try {
             const { exec } = require('child_process');
             const { promisify } = require('util');
             const execAsync = promisify(exec);
             const fs2 = require('fs');
-            const fMp4 = filePathBase + '.mp4';
-            const fM4a = filePathBase + '.m4a';
-            await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + fMp4 + '" "' + url + '"', { timeout: 60000 });
-            if (fs2.existsSync(fMp4)) {
-              await execAsync('ffmpeg -y -i "' + fMp4 + '" -vn -acodec copy "' + fM4a + '"', { timeout: 20000 });
-              if (fs2.existsSync(fM4a)) { bufferFinal = fs2.readFileSync(fM4a); fs2.unlinkSync(fM4a); }
-              fs2.unlinkSync(fMp4);
+            const prefijo = filePathBase.split('/').pop() + '.';
+
+            await execAsync(
+              'yt-dlp --no-playlist --no-part --no-warnings --no-update --socket-timeout 15 -f "bestaudio[ext=m4a]/bestaudio" -o "' + filePathBase + '.%(ext)s" "' + url + '"',
+              { timeout: 45000 }
+            );
+
+            const archivo = fs2.readdirSync('/tmp').find(n =>
+              n.startsWith(prefijo) && /\.(m4a|webm|opus|ogg)$/i.test(n)
+            );
+
+            if (archivo) {
+              const rutaAudio = '/tmp/' + archivo;
+              bufferFinal = fs2.readFileSync(rutaAudio);
+              const ext = archivo.split('.').pop().toLowerCase();
+              mimeFinal = ext === 'webm' ? 'audio/webm' : ext === 'opus' || ext === 'ogg' ? 'audio/ogg' : 'audio/mp4';
+              fs2.unlinkSync(rutaAudio);
             }
           } catch (e) { console.log('Fallo Motor 4 (yt-dlp):', e.message); }
         }
 
         if (bufferFinal && bufferFinal.length > 5000) {
-          await sock.sendMessage(jid, { audio: bufferFinal, mimetype: 'audio/mp4' }, { quoted: m });
+          await sock.sendMessage(jid, { audio: bufferFinal, mimetype: mimeFinal }, { quoted: m });
           try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
         } else {
           await responder('❌ No se pudo descargar el audio (todos los servidores fallaron o el archivo está vacío).');
