@@ -1267,6 +1267,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
 
         // API 1: Denzy
+        if (cmd !== 'play') {
         try {
           const yt = require('@denzy-official/youtube_scraper');
           const res = await conTiempo(yt.ytmp3(query), 10000);
@@ -1278,6 +1279,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             duracionFinal = res.metadata?.timestamp || res.metadata?.duration?.timestamp || null;
           }
         } catch (e) {}
+        }
 
         // API 2: ShadowX
         if (!bufferFinal) {
@@ -1382,6 +1384,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
 
         // API 1: Denzy
+        if (!['playvideo', 'video', 'v'].includes(cmd)) {
         try {
           const yt = require('@denzy-official/youtube_scraper');
           const res = await conTiempo(yt.ytmp4(query), 10000);
@@ -1393,6 +1396,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             duracionFinal = res.metadata?.timestamp || res.metadata?.duration?.timestamp || null;
           }
         } catch (e) { erroresVideo.push('Denzy: ' + e.message); }
+        }
 
         // API 2: ShadowX
         if (!bufferFinal) {
