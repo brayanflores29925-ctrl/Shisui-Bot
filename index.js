@@ -1323,20 +1323,32 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
           } catch (e) { erroresMotores.push('Motor 2: ' + e.message); console.log('Fallo Motor 2 (tsun):', e.message); }
         }
 
-        // MOTOR 3: @hydralerne/youtube-api (Rápido y directo)
+        // MOTOR 3: @hydralerne/youtube-api
         if (!bufferFinal || bufferFinal.length <= 5000) {
           try {
             const hydra = require('@hydralerne/youtube-api');
-            const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
-            const streamUrl = await hydra.getAudioStream(videoId, 'highest');
-            if (streamUrl) {
-              const rFetch = await fetch(streamUrl);
-              if (!rFetch.ok) throw new Error('HTTP ' + rFetch.status);
-              const recibido = Buffer.from(await rFetch.arrayBuffer());
-              if (recibido.length <= 5000) throw new Error('Archivo vacío o demasiado pequeño');
-              bufferFinal = recibido;
-            }
-          } catch (e) { erroresMotores.push('Motor 3: ' + e.message); console.log('Fallo Motor 3 (hydra):', e.message); }
+            const videoId = new URL(url).searchParams.get('v') || url.match(/youtu\.be\/([^?&/]+)/)?.[1];
+            if (!videoId) throw new Error('No se pudo obtener el ID del video');
+
+            const info = await hydra.getData(videoId);
+            const formatos = Array.isArray(info?.formats) ? info.formats : [];
+            const formato = formatos
+              .filter(f => f.url && f.hasAudio && !f.hasVideo)
+              .sort((a, b) => (b.audioBitrate || b.bitrate || 0) - (a.audioBitrate || a.bitrate || 0))[0];
+
+            if (!formato) throw new Error('La API no entregó un formato de audio');
+
+            const rFetch = await fetch(formato.url);
+            if (!rFetch.ok) throw new Error('HTTP ' + rFetch.status);
+            const recibido = Buffer.from(await rFetch.arrayBuffer());
+            if (recibido.length <= 5000) throw new Error('Audio vacío o demasiado pequeño');
+
+            bufferFinal = recibido;
+            mimeFinal = formato.mimeType?.split(';')[0] || 'audio/mp4';
+          } catch (e) {
+            erroresMotores.push('Motor 3: ' + e.message);
+            console.log('Fallo Motor 3 (hydra):', e.message);
+          }
         }
 
         // MOTOR 4: yt-dlp (Respaldo directo de audio)
@@ -1466,17 +1478,33 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
           } catch (e) { console.log('Fallo Motor 2 (tsun):', e.message); }
         }
 
-        // MOTOR 3: @hydralerne/youtube-api (Rápido y directo)
-        if (!bufferFinal) {
+        // MOTOR 3: @hydralerne/youtube-api
+        if (!bufferFinal || bufferFinal.length <= 5000) {
           try {
             const hydra = require('@hydralerne/youtube-api');
-            const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
-            const streamUrl = await hydra.getVideoStream(videoId, 'highest');
-            if (streamUrl) {
-              const rFetch = await fetch(streamUrl);
-              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
-            }
-          } catch (e) { console.log('Fallo Motor 3 (hydra):', e.message); }
+            const videoId = new URL(url).searchParams.get('v') || url.match(/youtu\.be\/([^?&/]+)/)?.[1];
+            if (!videoId) throw new Error('No se pudo obtener el ID del video');
+
+            const info = await hydra.getData(videoId);
+            const formatos = Array.isArray(info?.formats) ? info.formats : [];
+            const formato = formatos
+              .filter(f => f.url && f.hasVideo && f.hasAudio)
+              .sort((a, b) =>
+                ((parseInt(b.qualityLabel) || 0) - (parseInt(a.qualityLabel) || 0)) ||
+                ((b.bitrate || 0) - (a.bitrate || 0))
+              )[0];
+
+            if (!formato) throw new Error('La API no entregó un formato de video con audio');
+
+            const rFetch = await fetch(formato.url);
+            if (!rFetch.ok) throw new Error('HTTP ' + rFetch.status);
+            const recibido = Buffer.from(await rFetch.arrayBuffer());
+            if (recibido.length <= 5000) throw new Error('Video vacío o demasiado pequeño');
+
+            bufferFinal = recibido;
+          } catch (e) {
+            console.log('Fallo Motor 3 (hydra):', e.message);
+          }
         }
 
         // MOTOR 4: yt-dlp (Último recurso de respaldo)
