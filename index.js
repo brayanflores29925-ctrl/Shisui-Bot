@@ -1300,38 +1300,47 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             const audioOpt = res.options.find(o => o.type === 'Audio');
             if (audioOpt && audioOpt.url) {
               const rFetch = await fetch(audioOpt.url);
-              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
+              if (!rFetch.ok) throw new Error('HTTP ' + rFetch.status);
+              const recibido = Buffer.from(await rFetch.arrayBuffer());
+              if (recibido.length <= 5000) throw new Error('Archivo vacío o demasiado pequeño');
+              bufferFinal = recibido;
             }
           }
         } catch (e) { erroresMotores.push('Motor 1: ' + e.message); console.log('Fallo Motor 1 (primesave):', e.message); }
 
         // MOTOR 2: tsun-dls (Alternativa para YouTube)
-        if (!bufferFinal) {
+        if (!bufferFinal || bufferFinal.length <= 5000) {
           try {
             const tsun = require('tsun-dls');
             const res = await tsun.youtube(url, 'audio');
             if (res && res.download) {
               const rFetch = await fetch(res.download);
-              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
+              if (!rFetch.ok) throw new Error('HTTP ' + rFetch.status);
+              const recibido = Buffer.from(await rFetch.arrayBuffer());
+              if (recibido.length <= 5000) throw new Error('Archivo vacío o demasiado pequeño');
+              bufferFinal = recibido;
             }
           } catch (e) { erroresMotores.push('Motor 2: ' + e.message); console.log('Fallo Motor 2 (tsun):', e.message); }
         }
 
         // MOTOR 3: @hydralerne/youtube-api (Rápido y directo)
-        if (!bufferFinal) {
+        if (!bufferFinal || bufferFinal.length <= 5000) {
           try {
             const hydra = require('@hydralerne/youtube-api');
             const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
             const streamUrl = await hydra.getAudioStream(videoId, 'highest');
             if (streamUrl) {
               const rFetch = await fetch(streamUrl);
-              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
+              if (!rFetch.ok) throw new Error('HTTP ' + rFetch.status);
+              const recibido = Buffer.from(await rFetch.arrayBuffer());
+              if (recibido.length <= 5000) throw new Error('Archivo vacío o demasiado pequeño');
+              bufferFinal = recibido;
             }
           } catch (e) { erroresMotores.push('Motor 3: ' + e.message); console.log('Fallo Motor 3 (hydra):', e.message); }
         }
 
         // MOTOR 4: yt-dlp (Respaldo directo de audio)
-        if (!bufferFinal) {
+        if (!bufferFinal || bufferFinal.length <= 5000) {
           try {
             const { exec } = require('child_process');
             const { promisify } = require('util');
@@ -1364,7 +1373,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         } else {
           if (bufferFinal && bufferFinal.length <= 5000) erroresMotores.push('El archivo recibido está vacío o es demasiado pequeño.');
           if (!bufferFinal) erroresMotores.push('Ningún motor entregó un archivo.');
-          await responder('❌ No se pudo descargar el audio.\\n\\n' + erroresMotores.join('\\n').slice(0, 2500));
+          await responder('❌ No se pudo descargar el audio.\n\n' + erroresMotores.join('\n').slice(0, 2500));
           try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
         }
 
