@@ -1236,313 +1236,239 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     case 'play': case 'play2': case 'spotify': case 'sp': {
       try {
         const query = cuerpo.slice(cmd.length).trim();
+        const conTiempo = (promesa, ms) => new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('Tiempo agotado')), ms);
+          Promise.resolve(promesa).then(
+            valor => { clearTimeout(timer); resolve(valor); },
+            error => { clearTimeout(timer); reject(error); }
+          );
+        });
+
         if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
         
+        // Reacción de "trabajando" para no mandar mensaje de texto
         try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
 
         const fs2 = require('fs');
-        let url = query;
-        let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0;
+        let bufferFinal = null;
+        let tituloFinal = query;
+        let thumbFinal = null;
+        let canalFinal = null;
+        let duracionFinal = null;
+        const descargarArchivo = async (url) => {
+          const r = await fetch(url);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const tipo = (r.headers.get('content-type') || '').toLowerCase();
+          if (/text\/html|application\/json/.test(tipo)) throw new Error('Respuesta no válida');
+          const b = Buffer.from(await r.arrayBuffer());
+          if (b.length < 1024) throw new Error('Archivo vacío o incompleto');
+          return b;
+        };
 
-        // 1. BÚSQUEDA RÁPIDA (youtube-search-api)
-        if (!query.startsWith('http')) {
-          try {
-            const Youtube = require('youtube-search-api');
-            const results = await Youtube.GetListByKeyword(query, false, 1);
-            if (results && results.items && results.items.length > 0) {
-              const v = results.items[0];
-              url = 'https://www.youtube.com/watch?v=' + v.id;
-              title = v.title || query;
-              thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail.thumbnails?.[0]?.url || v.thumbnail.thumbnails?.[1]?.url || null) : null;
-              channel = v.channelTitle || 'Desconocido';
-              duration = v.length?.simpleText || v.length?.accessibility?.accessibilityData?.label || (typeof v.length === 'string' ? v.length : 'Desconocido');
-            } else {
-              await responder('❌ No encontré resultados.'); break;
-            }
-          } catch (e) { await responder('❌ Error al buscar.'); break; }
-        }
 
-        // 2. OBTENER INFO EXACTA (Vistas y Duración) con yt-dlp
+        // API 1: Denzy
         try {
-          const { exec } = require('child_process');
-          const { promisify } = require('util');
-          const execAsync = promisify(exec);
-          const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + url + '"', { timeout: 8000 });
-          const info = JSON.parse(stdout.trim().split('\n')[0]);
-          views = info.view_count || 0;
-          duration = info.duration_string || duration;
+          const yt = require('@denzy-official/youtube_scraper');
+          const res = await conTiempo(yt.ytmp3(query), 12000);
+          if (res && res.download && res.download.url) {
+            bufferFinal = await descargarArchivo(res.download.url);
+            tituloFinal = (res.metadata && res.metadata.title) ? res.metadata.title : query;
+            thumbFinal = res.metadata ? res.metadata.thumbnail : null;
+            canalFinal = res.metadata?.author?.name || null;
+            duracionFinal = res.metadata?.timestamp || res.metadata?.duration?.timestamp || null;
+          }
         } catch (e) {}
 
-        // 3. ENVIAR TARJETA
-        const txt = '➩ Audio › *' + title + '*\n\n' +
-                    '❖ Canal › *' + channel + '*\n' +
-                    '⧖ Duración › *' + duration + '*\n' +
-                    (views ? '❀ Vistas › *' + views.toLocaleString() + '*\n' : '') +
-                    '⏳ Descargando audio, esto puede tardar unos minutos...';
-                    
-        if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
-        else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-
-        // 4. CADENA DE APIS PARA DESCARGAR AUDIO
-        
-        
-        
-        let bufferFinal = null;
-        let mimeFinal = 'audio/mp4';
-        const erroresMotores = [];
-        const filePathBase = '/tmp/aud_' + Date.now();
-        
-        // MOTOR 1: primesave-dl (Maneja YouTube, TikTok, FB, etc.)
-        try {
-          const downloader = require('primesave-dl');
-          const res = await downloader(url);
-          if (res.success && res.options) {
-            const audioOpt = res.options.find(o => o.type === 'Audio');
-            if (audioOpt && audioOpt.url) {
-              const rFetch = await fetch(audioOpt.url);
-              if (!rFetch.ok) throw new Error('HTTP ' + rFetch.status);
-              const recibido = Buffer.from(await rFetch.arrayBuffer());
-              if (recibido.length <= 5000) throw new Error('Archivo vacío o demasiado pequeño');
-              bufferFinal = recibido;
-            }
-          }
-        } catch (e) { erroresMotores.push('Motor 1: ' + e.message); console.log('Fallo Motor 1 (primesave):', e.message); }
-
-        // MOTOR 2: tsun-dls (Alternativa para YouTube)
-        if (!bufferFinal || bufferFinal.length <= 5000) {
+        // API 2: ShadowX
+        if (!bufferFinal) {
           try {
-            const tsun = require('tsun-dls');
-            const res = await tsun.youtube(url, 'audio');
-            if (res && res.download) {
-              const rFetch = await fetch(res.download);
-              if (!rFetch.ok) throw new Error('HTTP ' + rFetch.status);
-              const recibido = Buffer.from(await rFetch.arrayBuffer());
-              if (recibido.length <= 5000) throw new Error('Archivo vacío o demasiado pequeño');
-              bufferFinal = recibido;
+            const ytdl = require('shadowx-ytdl');
+            const busqueda = await conTiempo(ytdl.searchYouTube(query), 10000);
+            const video = busqueda && busqueda.status && Array.isArray(busqueda.results)
+              ? busqueda.results.find(v => v.type === 'video' && v.url)
+              : null;
+
+            if (video) {
+              const res = await conTiempo(ytdl.downloadAudio(video.url, 128), 15000);
+              if (res && res.status && res.download && res.download.status && res.download.downloadUrl) {
+                bufferFinal = await descargarArchivo(res.download.downloadUrl);
+                tituloFinal = (res.metadata && res.metadata.title) || video.title || query;
+                thumbFinal = (res.metadata && res.metadata.thumbnail) || video.thumbnail || video.image || null;
+                canalFinal = res.metadata?.author?.name || video.author?.name || null;
+                duracionFinal = res.metadata?.timestamp || video.timestamp || null;
+              }
             }
-          } catch (e) { erroresMotores.push('Motor 2: ' + e.message); console.log('Fallo Motor 2 (tsun):', e.message); }
+          } catch (e) { console.log('ShadowX audio:', e.message); }
         }
 
-        // MOTOR 3: @hydralerne/youtube-api
-        if (!bufferFinal || bufferFinal.length <= 5000) {
-          try {
-            const hydra = require('@hydralerne/youtube-api');
-            const videoId = new URL(url).searchParams.get('v') || url.match(/youtu\.be\/([^?&/]+)/)?.[1];
-            if (!videoId) throw new Error('No se pudo obtener el ID del video');
-
-            const info = await hydra.getData(videoId);
-            const formatos = Array.isArray(info?.formats) ? info.formats : [];
-            const formato = formatos
-              .filter(f => f.url && f.hasAudio && !f.hasVideo)
-              .sort((a, b) => (b.audioBitrate || b.bitrate || 0) - (a.audioBitrate || a.bitrate || 0))[0];
-
-            if (!formato) throw new Error('La API no entregó un formato de audio');
-
-            const rFetch = await fetch(formato.url);
-            if (!rFetch.ok) throw new Error('HTTP ' + rFetch.status);
-            const recibido = Buffer.from(await rFetch.arrayBuffer());
-            if (recibido.length <= 5000) throw new Error('Audio vacío o demasiado pequeño');
-
-            bufferFinal = recibido;
-            mimeFinal = formato.mimeType?.split(';')[0] || 'audio/mp4';
-          } catch (e) {
-            erroresMotores.push('Motor 3: ' + e.message);
-            console.log('Fallo Motor 3 (hydra):', e.message);
-          }
-        }
-
-        // MOTOR 4: yt-dlp (Respaldo directo de audio)
-        if (!bufferFinal || bufferFinal.length <= 5000) {
+        // API 3: yt-dlp
+        if (!bufferFinal) {
           try {
             const { exec } = require('child_process');
             const { promisify } = require('util');
             const execAsync = promisify(exec);
-            const fs2 = require('fs');
-            const prefijo = filePathBase.split('/').pop() + '.';
-
-            await execAsync(
-              'yt-dlp --no-playlist --no-part --no-warnings --no-update --socket-timeout 15 -f "bestaudio[ext=m4a]/bestaudio" -o "' + filePathBase + '.%(ext)s" "' + url + '"',
-              { timeout: 45000 }
-            );
-
-            const archivo = fs2.readdirSync('/tmp').find(n =>
-              n.startsWith(prefijo) && /\.(m4a|webm|opus|ogg)$/i.test(n)
-            );
-
-            if (archivo) {
-              const rutaAudio = '/tmp/' + archivo;
-              bufferFinal = fs2.readFileSync(rutaAudio);
-              const ext = archivo.split('.').pop().toLowerCase();
-              mimeFinal = ext === 'webm' ? 'audio/webm' : ext === 'opus' || ext === 'ogg' ? 'audio/ogg' : 'audio/mp4';
-              fs2.unlinkSync(rutaAudio);
+            const filePath = '/tmp/fb_' + Date.now() + '.m4a';
+            const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query + '"', { timeout: 25000 });
+            const info = JSON.parse(stdout.trim().split('\n')[0]);
+            tituloFinal = info.title || query;
+            thumbFinal = info.thumbnail || null;
+            canalFinal = info.channel || info.uploader || null;
+            duracionFinal = info.duration_string || null;
+            
+            await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 25000 });
+            if (fs2.existsSync(filePath)) {
+              bufferFinal = fs2.readFileSync(filePath);
+              fs2.unlinkSync(filePath);
             }
-          } catch (e) { erroresMotores.push('Motor 4: ' + e.message); console.log('Fallo Motor 4 (yt-dlp):', e.message); }
+          } catch (e) {}
         }
 
-        if (bufferFinal && bufferFinal.length > 5000) {
-          await sock.sendMessage(jid, { audio: bufferFinal, mimetype: mimeFinal }, { quoted: m });
+        if (bufferFinal) {
+          const infoExtraFinal = [canalFinal ? '👤 ' + canalFinal : '', duracionFinal ? '⏱️ ' + duracionFinal : ''].filter(Boolean).join('\n');
+          const captionInfoFinal = '➩ Audio › *' + tituloFinal + '*' + (infoExtraFinal ? '\n' + infoExtraFinal : '');
+          // MENSAJE 1: Foto + Texto
+          if (thumbFinal) {
+            try {
+              await sock.sendMessage(jid, { image: { url: thumbFinal }, caption: captionInfoFinal }, { quoted: m });
+            } catch (e) {
+              await sock.sendMessage(jid, { text: captionInfoFinal }, { quoted: m });
+            }
+          } else {
+            await sock.sendMessage(jid, { text: captionInfoFinal }, { quoted: m });
+          }
+          // MENSAJE 2: El Audio
+          await sock.sendMessage(jid, { audio: bufferFinal, mimetype: 'audio/mp4' }, { quoted: m });
+          
+          // Cambiamos la reacción a "Listo"
           try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
         } else {
-          if (bufferFinal && bufferFinal.length <= 5000) erroresMotores.push('El archivo recibido está vacío o es demasiado pequeño.');
-          if (!bufferFinal) erroresMotores.push('Ningún motor entregó un archivo.');
-          await responder('❌ No se pudo descargar el audio.\n\n' + erroresMotores.join('\n').slice(0, 2500));
+          await responder('❌ No se pudo descargar el audio.');
           try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
         }
-
       } catch (e) { console.log('Error play:', e.message); }
       break;
     }
 
-    // ==========================================
-    // SISTEMA DE DESCARGA DE VIDEO MULTI-API
-    // ==========================================
     case 'playvideo': case 'video': case 'v': {
       try {
         const query = cuerpo.slice(cmd.length).trim();
+        const conTiempo = (promesa, ms) => new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('Tiempo agotado')), ms);
+          Promise.resolve(promesa).then(
+            valor => { clearTimeout(timer); resolve(valor); },
+            error => { clearTimeout(timer); reject(error); }
+          );
+        });
+
         if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
         
         try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
 
-        const fs2 = require('fs');
-        let url = query;
-        let title = query, thumb = null, channel = 'Desconocido', duration = 'Desconocido', views = 0;
+        let bufferFinal = null;
+        let tituloFinal = query;
+        let thumbFinal = null;
+        let canalFinal = null;
+        let duracionFinal = null;
+        const descargarArchivo = async (url) => {
+          const r = await fetch(url);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const tipo = (r.headers.get('content-type') || '').toLowerCase();
+          if (/text\/html|application\/json/.test(tipo)) throw new Error('Respuesta no válida');
+          const b = Buffer.from(await r.arrayBuffer());
+          if (b.length < 1024) throw new Error('Archivo vacío o incompleto');
+          return b;
+        };
 
-        // 1. BÚSQUEDA RÁPIDA
-        if (!query.startsWith('http')) {
-          try {
-            const Youtube = require('youtube-search-api');
-            const results = await Youtube.GetListByKeyword(query, false, 1);
-            if (results && results.items && results.items.length > 0) {
-              const v = results.items[0];
-              url = 'https://www.youtube.com/watch?v=' + v.id;
-              title = v.title || query;
-              thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail.thumbnails?.[0]?.url || v.thumbnail.thumbnails?.[1]?.url || null) : null;
-              channel = v.channelTitle || 'Desconocido';
-              duration = v.length ? v.length.text : 'Desconocido';
-            } else {
-              await responder('❌ No encontré resultados.'); break;
-            }
-          } catch (e) { await responder('❌ Error al buscar.'); break; }
-        }
 
-        // 2. INFO EXACTA
+        // API 1: Denzy
         try {
-          const { exec } = require('child_process');
-          const { promisify } = require('util');
-          const execAsync = promisify(exec);
-          const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "' + url + '"', { timeout: 20000 });
-          const info = JSON.parse(stdout.trim().split('\n')[0]);
-          views = info.view_count || 0;
-          duration = info.duration_string || duration;
+          const yt = require('@denzy-official/youtube_scraper');
+          const res = await conTiempo(yt.ytmp4(query), 12000);
+          if (res && res.download && res.download.url) {
+            bufferFinal = await descargarArchivo(res.download.url);
+            tituloFinal = (res.metadata && res.metadata.title) ? res.metadata.title : query;
+            thumbFinal = res.metadata ? res.metadata.thumbnail : null;
+            canalFinal = res.metadata?.author?.name || null;
+            duracionFinal = res.metadata?.timestamp || res.metadata?.duration?.timestamp || null;
+          }
         } catch (e) {}
 
-        // 3. TARJETA
-        const txt = '➩ Video › *' + title + '*\n\n' +
-                    '❖ Canal › *' + channel + '*\n' +
-                    '⧖ Duración › *' + duration + '*\n' +
-                    (views ? '❀ Vistas › *' + views.toLocaleString() + '*\n' : '') +
-                    '⏳ Descargando video, esto puede tardar unos minutos...';
-                    
-        if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
-        else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-
-        // 4. CADENA DE APIS PARA DESCARGAR VIDEO
-        
-        
-        
-        let bufferFinal = null;
-        const fileBase = '/tmp/vid_' + Date.now();
-        
-        // MOTOR 1: primesave-dl (Maneja YouTube, TikTok, FB, etc.)
-        try {
-          const downloader = require('primesave-dl');
-          const res = await downloader(url);
-          if (res.success && res.options) {
-            const videoOpt = res.options.find(o => o.type === 'Video');
-            if (videoOpt && videoOpt.url) {
-              const rFetch = await fetch(videoOpt.url);
-              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
-            }
-          }
-        } catch (e) { console.log('Fallo Motor 1 (primesave):', e.message); }
-
-        // MOTOR 2: tsun-dls (Alternativa para YouTube)
+        // API 2: ShadowX
         if (!bufferFinal) {
           try {
-            const tsun = require('tsun-dls');
-            const res = await tsun.youtube(url, 'video');
-            if (res && res.download) {
-              const rFetch = await fetch(res.download);
-              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
+            const ytdl = require('shadowx-ytdl');
+            let enlace = query;
+            let video = null;
+
+            if (!/^https?:\/\//i.test(query)) {
+              const busqueda = await conTiempo(ytdl.searchYouTube(query), 10000);
+              video = busqueda && busqueda.status && Array.isArray(busqueda.results)
+                ? busqueda.results.find(v => v.type === 'video' && v.url)
+                : null;
+              if (video) enlace = video.url;
             }
-          } catch (e) { console.log('Fallo Motor 2 (tsun):', e.message); }
+
+            if (/^https?:\/\//i.test(enlace)) {
+              const res = await conTiempo(ytdl.downloadVideo(enlace, 360), 15000);
+              if (res && res.status && res.download && res.download.status && res.download.downloadUrl) {
+                bufferFinal = await descargarArchivo(res.download.downloadUrl);
+                tituloFinal = (res.metadata && res.metadata.title) || (video && video.title) || query;
+                thumbFinal = (res.metadata && res.metadata.thumbnail) || (video && (video.thumbnail || video.image)) || null;
+                canalFinal = res.metadata?.author?.name || video?.author?.name || null;
+                duracionFinal = res.metadata?.timestamp || video?.timestamp || null;
+              }
+            }
+          } catch (e) { console.log('ShadowX video:', e.message); }
         }
-
-        // MOTOR 3: @hydralerne/youtube-api
-        if (!bufferFinal || bufferFinal.length <= 5000) {
-          try {
-            const hydra = require('@hydralerne/youtube-api');
-            const videoId = new URL(url).searchParams.get('v') || url.match(/youtu\.be\/([^?&/]+)/)?.[1];
-            if (!videoId) throw new Error('No se pudo obtener el ID del video');
-
-            const info = await hydra.getData(videoId);
-            const formatos = Array.isArray(info?.formats) ? info.formats : [];
-            const formato = formatos
-              .filter(f => f.url && f.hasVideo && f.hasAudio)
-              .sort((a, b) =>
-                ((parseInt(b.qualityLabel) || 0) - (parseInt(a.qualityLabel) || 0)) ||
-                ((b.bitrate || 0) - (a.bitrate || 0))
-              )[0];
-
-            if (!formato) throw new Error('La API no entregó un formato de video con audio');
-
-            const rFetch = await fetch(formato.url);
-            if (!rFetch.ok) throw new Error('HTTP ' + rFetch.status);
-            const recibido = Buffer.from(await rFetch.arrayBuffer());
-            if (recibido.length <= 5000) throw new Error('Video vacío o demasiado pequeño');
-
-            bufferFinal = recibido;
-          } catch (e) {
-            console.log('Fallo Motor 3 (hydra):', e.message);
-          }
-        }
-
-        // MOTOR 4: yt-dlp (Último recurso de respaldo)
+        
+        // API 3: yt-dlp
         if (!bufferFinal) {
           try {
             const { exec } = require('child_process');
             const { promisify } = require('util');
             const execAsync = promisify(exec);
-            const fs2 = require('fs');
-            const fPath = fileBase + '.mp4';
-            await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + fPath + '" "' + url + '"', { timeout: 60000 });
-            if (fs2.existsSync(fPath)) { bufferFinal = fs2.readFileSync(fPath); fs2.unlinkSync(fPath); }
-          } catch (e) { console.log('Fallo Motor 4 (yt-dlp):', e.message); }
+            const filePath = '/tmp/fb_v_' + Date.now() + '.mp4';
+            const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query + '"', { timeout: 25000 });
+            const info = JSON.parse(stdout.trim().split('\n')[0]);
+            tituloFinal = info.title || query;
+            thumbFinal = info.thumbnail || null;
+            canalFinal = info.channel || info.uploader || null;
+            duracionFinal = info.duration_string || null;
+            
+            await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 60000 });
+            if (require('fs').existsSync(filePath)) {
+              bufferFinal = require('fs').readFileSync(filePath);
+              require('fs').unlinkSync(filePath);
+            }
+          } catch (e) {}
         }
 
-        if (bufferFinal && bufferFinal.length > 5000) {
-          if (bufferFinal.length > 64 * 1024 * 1024) {
+        if (bufferFinal) {
+          const infoExtraFinal = [canalFinal ? '👤 ' + canalFinal : '', duracionFinal ? '⏱️ ' + duracionFinal : ''].filter(Boolean).join('\n');
+          const captionInfoFinal = '➩ Video › *' + tituloFinal + '*' + (infoExtraFinal ? '\n' + infoExtraFinal : '');
+          if (bufferFinal.length > Number.MAX_SAFE_INTEGER) {
             await responder('❌ El video supera los 64MB (límite de WhatsApp).');
             try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
           } else {
-            await sock.sendMessage(jid, { video: bufferFinal, caption: '✅ ' + title }, { quoted: m });
+            // MENSAJE 1: Foto + Texto
+            if (thumbFinal) {
+              await sock.sendMessage(jid, { image: { url: thumbFinal }, caption: captionInfoFinal }, { quoted: m });
+            } else {
+              await sock.sendMessage(jid, { text: captionInfoFinal }, { quoted: m });
+            }
+            // MENSAJE 2: El Video
+            await sock.sendMessage(jid, { video: bufferFinal, caption: '✅ ' + tituloFinal + (infoExtraFinal ? '\n' + infoExtraFinal : '') }, { quoted: m });
+            
             try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
           }
         } else {
-          await responder('❌ No se pudo descargar el video (todos los servidores fallaron o el archivo está vacío).');
+          await responder('❌ No se pudo descargar el video.');
           try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
         }
-
-      } catch (e) {
-        console.log('Error video:', e);
-        try { await responder('❌ Ocurrió un error al preparar el video. Intenta nuevamente.'); } catch (_) {}
-      }
+      } catch (e) { console.log('Error video:', e.message); }
       break;
     }
-
-    // ==========================================
-    // SISTEMA DE IA MULTI-API (ALGOCHAT + KEYLESS)
-    // ==========================================
+    
     case 'ia': case 'chatgpt': case 'gpt': {
       try {
         const prompt = cuerpo.slice(cmd.length).trim();
