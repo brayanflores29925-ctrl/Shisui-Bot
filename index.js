@@ -1285,49 +1285,50 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
         // 4. CADENA DE APIS PARA DESCARGAR AUDIO
         
+        
+        
         let bufferFinal = null;
         const filePathBase = '/tmp/aud_' + Date.now();
         
-        // MOTOR 1: untube (Rápido, portado de yt-dlp)
+        // MOTOR 1: primesave-dl (Maneja YouTube, TikTok, FB, etc.)
         try {
-          const untube = require('untube');
-          const fs2 = require('fs');
-          const stream = untube(url, { format: 'highestaudio', filter: 'audioonly' });
-          const writeStream = fs2.createWriteStream(filePathBase + '.webm');
-          await new Promise((resolve, reject) => {
-            stream.pipe(writeStream);
-            writeStream.on('finish', resolve);
-            writeStream.on('error', reject);
-            stream.on('error', reject);
-          });
-          if (fs2.existsSync(filePathBase + '.webm')) {
-            bufferFinal = fs2.readFileSync(filePathBase + '.webm');
-            fs2.unlinkSync(filePathBase + '.webm');
+          const downloader = require('primesave-dl');
+          const res = await downloader(url);
+          if (res.success && res.options) {
+            const audioOpt = res.options.find(o => o.type === 'Audio');
+            if (audioOpt && audioOpt.url) {
+              const rFetch = await fetch(audioOpt.url);
+              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
+            }
           }
-        } catch (e) { console.log('Fallo Motor 1 (untube):', e.message); }
+        } catch (e) { console.log('Fallo Motor 1 (primesave):', e.message); }
 
-        // MOTOR 2: @distube/ytdl-core (Respaldo)
+        // MOTOR 2: tsun-dls (Alternativa para YouTube)
         if (!bufferFinal) {
           try {
-            const { Ytdl, Quality } = require('@distube/ytdl-core');
-            const fs2 = require('fs');
-            const yt = new Ytdl();
-            const stream = yt.download(url, { quality: Quality.HighestAudio, filter: { hasAudio: true, hasVideo: false } });
-            const writeStream = fs2.createWriteStream(filePathBase + '.webm');
-            await new Promise((resolve, reject) => {
-              stream.pipe(writeStream);
-              writeStream.on('finish', resolve);
-              writeStream.on('error', reject);
-              stream.on('error', reject);
-            });
-            if (fs2.existsSync(filePathBase + '.webm')) {
-              bufferFinal = fs2.readFileSync(filePathBase + '.webm');
-              fs2.unlinkSync(filePathBase + '.webm');
+            const tsun = require('tsun-dls');
+            const res = await tsun.youtube(url, 'audio');
+            if (res && res.download) {
+              const rFetch = await fetch(res.download);
+              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
             }
-          } catch (e) { console.log('Fallo Motor 2 (distube):', e.message); }
+          } catch (e) { console.log('Fallo Motor 2 (tsun):', e.message); }
         }
 
-        // MOTOR 3: yt-dlp (Último recurso)
+        // MOTOR 3: @hydralerne/youtube-api (Rápido y directo)
+        if (!bufferFinal) {
+          try {
+            const hydra = require('@hydralerne/youtube-api');
+            const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+            const streamUrl = await hydra.getAudioStream(videoId, 'highest');
+            if (streamUrl) {
+              const rFetch = await fetch(streamUrl);
+              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
+            }
+          } catch (e) { console.log('Fallo Motor 3 (hydra):', e.message); }
+        }
+
+        // MOTOR 4: yt-dlp (Último recurso de respaldo)
         if (!bufferFinal) {
           try {
             const { exec } = require('child_process');
@@ -1342,7 +1343,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               if (fs2.existsSync(fM4a)) { bufferFinal = fs2.readFileSync(fM4a); fs2.unlinkSync(fM4a); }
               fs2.unlinkSync(fMp4);
             }
-          } catch (e) { console.log('Fallo Motor 3 (yt-dlp):', e.message); }
+          } catch (e) { console.log('Fallo Motor 4 (yt-dlp):', e.message); }
         }
 
         if (bufferFinal && bufferFinal.length > 5000) {
@@ -1412,49 +1413,50 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
         // 4. CADENA DE APIS PARA DESCARGAR VIDEO
         
+        
+        
         let bufferFinal = null;
         const fileBase = '/tmp/vid_' + Date.now();
         
-        // MOTOR 1: untube (Rápido, portado de yt-dlp)
+        // MOTOR 1: primesave-dl (Maneja YouTube, TikTok, FB, etc.)
         try {
-          const untube = require('untube');
-          const fs2 = require('fs');
-          const stream = untube(url, { format: 'highestvideo', filter: 'videoonly' });
-          const writeStream = fs2.createWriteStream(fileBase + '.mp4');
-          await new Promise((resolve, reject) => {
-            stream.pipe(writeStream);
-            writeStream.on('finish', resolve);
-            writeStream.on('error', reject);
-            stream.on('error', reject);
-          });
-          if (fs2.existsSync(fileBase + '.mp4')) {
-            bufferFinal = fs2.readFileSync(fileBase + '.mp4');
-            fs2.unlinkSync(fileBase + '.mp4');
+          const downloader = require('primesave-dl');
+          const res = await downloader(url);
+          if (res.success && res.options) {
+            const videoOpt = res.options.find(o => o.type === 'Video');
+            if (videoOpt && videoOpt.url) {
+              const rFetch = await fetch(videoOpt.url);
+              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
+            }
           }
-        } catch (e) { console.log('Fallo Motor 1 (untube):', e.message); }
+        } catch (e) { console.log('Fallo Motor 1 (primesave):', e.message); }
 
-        // MOTOR 2: @distube/ytdl-core (Respaldo)
+        // MOTOR 2: tsun-dls (Alternativa para YouTube)
         if (!bufferFinal) {
           try {
-            const { Ytdl, Quality } = require('@distube/ytdl-core');
-            const fs2 = require('fs');
-            const yt = new Ytdl();
-            const stream = yt.download(url, { quality: Quality.HighestVideo, filter: { hasVideo: true, hasAudio: false } });
-            const writeStream = fs2.createWriteStream(fileBase + '.mp4');
-            await new Promise((resolve, reject) => {
-              stream.pipe(writeStream);
-              writeStream.on('finish', resolve);
-              writeStream.on('error', reject);
-              stream.on('error', reject);
-            });
-            if (fs2.existsSync(fileBase + '.mp4')) {
-              bufferFinal = fs2.readFileSync(fileBase + '.mp4');
-              fs2.unlinkSync(fileBase + '.mp4');
+            const tsun = require('tsun-dls');
+            const res = await tsun.youtube(url, 'video');
+            if (res && res.download) {
+              const rFetch = await fetch(res.download);
+              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
             }
-          } catch (e) { console.log('Fallo Motor 2 (distube):', e.message); }
+          } catch (e) { console.log('Fallo Motor 2 (tsun):', e.message); }
         }
 
-        // MOTOR 3: yt-dlp (Último recurso)
+        // MOTOR 3: @hydralerne/youtube-api (Rápido y directo)
+        if (!bufferFinal) {
+          try {
+            const hydra = require('@hydralerne/youtube-api');
+            const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+            const streamUrl = await hydra.getVideoStream(videoId, 'highest');
+            if (streamUrl) {
+              const rFetch = await fetch(streamUrl);
+              bufferFinal = Buffer.from(await rFetch.arrayBuffer());
+            }
+          } catch (e) { console.log('Fallo Motor 3 (hydra):', e.message); }
+        }
+
+        // MOTOR 4: yt-dlp (Último recurso de respaldo)
         if (!bufferFinal) {
           try {
             const { exec } = require('child_process');
@@ -1464,7 +1466,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             const fPath = fileBase + '.mp4';
             await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + fPath + '" "' + url + '"', { timeout: 60000 });
             if (fs2.existsSync(fPath)) { bufferFinal = fs2.readFileSync(fPath); fs2.unlinkSync(fPath); }
-          } catch (e) { console.log('Fallo Motor 3 (yt-dlp):', e.message); }
+          } catch (e) { console.log('Fallo Motor 4 (yt-dlp):', e.message); }
         }
 
         if (bufferFinal && bufferFinal.length > 5000) {
@@ -1547,27 +1549,49 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     // DESCARGAS Y IA BLINDADAS
     // ==========================================
     case 'facebook': case 'fb': {
-      try {
-        const url = cuerpo.slice(cmd.length).trim();
-        if (!url || !url.includes('facebook.com')) {
-          await responder('Uso: #facebook <enlace>');
-          break;
-        }
+      
         
-        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
-        await responder('📥 Descargando video de Facebook...');
-        
-        const { exec } = require('child_process');
-        const { promisify } = require('util');
-        const execAsync = promisify(exec);
-        const fs2 = require('fs');
-        
-        const fileOriginal = '/tmp/fb_orig_' + Date.now() + '.mp4';
-        const fileFinal = '/tmp/fb_final_' + Date.now() + '.mp4';
-        
-        await execAsync('yt-dlp --no-warnings -f "bv*+ba/b" -o "' + fileOriginal + '" "' + url + '"', { timeout: 60000 });
-        
-        if (fs2.existsSync(fileOriginal)) {
+        try {
+          const fs2 = require('fs');
+          const fileOriginal = '/tmp/fb_orig_' + Date.now() + '.mp4';
+          
+          // MOTOR 1: primesave-dl (Maneja Facebook)
+          let bufferFinal = null;
+          try {
+            const downloader = require('primesave-dl');
+            const res = await downloader(url);
+            if (res.success && res.options) {
+              const videoOpt = res.options.find(o => o.type === 'Video');
+              if (videoOpt && videoOpt.url) {
+                const rFetch = await fetch(videoOpt.url);
+                bufferFinal = Buffer.from(await rFetch.arrayBuffer());
+                fs2.writeFileSync(fileOriginal, bufferFinal);
+              }
+            }
+          } catch (e) { console.log('Fallo Motor 1 FB (primesave):', e.message); }
+
+          // MOTOR 2: tsun-dls (Alternativa para Facebook)
+          if (!fs2.existsSync(fileOriginal)) {
+            try {
+              const tsun = require('tsun-dls');
+              const res = await tsun.facebook(url);
+              if (res && res.download) {
+                const rFetch = await fetch(res.download);
+                bufferFinal = Buffer.from(await rFetch.arrayBuffer());
+                fs2.writeFileSync(fileOriginal, bufferFinal);
+              }
+            } catch (e) { console.log('Fallo Motor 2 FB (tsun):', e.message); }
+          }
+
+          // MOTOR 3: yt-dlp (Respaldo)
+          if (!fs2.existsSync(fileOriginal)) {
+            const { exec } = require('child_process');
+            const { promisify } = require('util');
+            const execAsync = promisify(exec);
+            await execAsync('yt-dlp --no-warnings -f "bv*+ba/b" -o "' + fileOriginal + '" "' + url + '"', { timeout: 60000 });
+          }
+          
+          if (fs2.existsSync(fileOriginal)) {
           await execAsync('ffmpeg -y -i "' + fileOriginal + '" -c:v libx264 -preset veryfast -crf 28 -c:a aac -b:a 128k -movflags +faststart "' + fileFinal + '"', { timeout: 60000 });
           
           if (fs2.existsSync(fileFinal)) {
