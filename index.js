@@ -1415,6 +1415,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
             if (/^https?:\/\//i.test(enlace)) {
               const res = await conTiempo(ytdl.downloadVideo(enlace, 360), 12000);
+              resShadowVideo = res;
               if (res && res.status && res.download && res.download.status && res.download.downloadUrl) {
                 bufferFinal = await descargarArchivo(res.download.downloadUrl);
                 tituloFinal = (res.metadata && res.metadata.title) || (video && video.title) || query;
@@ -1445,7 +1446,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
               bufferFinal = require('fs').readFileSync(filePath);
               require('fs').unlinkSync(filePath);
             }
-          } catch (e) {}
+          } catch (e) { erroresVideo.push('yt-dlp: ' + e.message); }
         }
 
         if (bufferFinal) {
