@@ -1362,13 +1362,14 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
         if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
         
-        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) { erroresVideo.push('Denzy: ' + e.message); }
 
         let bufferFinal = null;
         let tituloFinal = query;
         let thumbFinal = null;
         let canalFinal = null;
         let duracionFinal = null;
+        const erroresVideo = [];
         const descargarArchivo = async (url) => {
           const r = await fetch(url, { signal: AbortSignal.timeout(60000) });
           if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1391,7 +1392,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             canalFinal = res.metadata?.author?.name || null;
             duracionFinal = res.metadata?.timestamp || res.metadata?.duration?.timestamp || null;
           }
-        } catch (e) {}
+        } catch (e) { erroresVideo.push('yt-dlp: ' + e.message); }
 
         // API 2: ShadowX
         if (!bufferFinal) {
@@ -1418,7 +1419,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
                 duracionFinal = res.metadata?.timestamp || video?.timestamp || null;
               }
             }
-          } catch (e) { console.log('ShadowX video:', e.message); }
+          } catch (e) { erroresVideo.push('ShadowX: ' + e.message); }
         }
         
         // API 3: yt-dlp
@@ -1435,7 +1436,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             canalFinal = info.channel || info.uploader || null;
             duracionFinal = info.duration_string || null;
             
-            await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 45000 });
+            await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + filePath + '" "' + info.webpage_url + '"', { timeout: 45000 });
             if (require('fs').existsSync(filePath)) {
               bufferFinal = require('fs').readFileSync(filePath);
               require('fs').unlinkSync(filePath);
@@ -1462,7 +1463,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
           }
         } else {
-          await responder('❌ No se pudo descargar el video.');
+          await responder('❌ Error de video:\n' + (erroresVideo.join('\n').slice(0, 700) || 'No se recibió ningún archivo.'));
           try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
         }
       } catch (e) { console.log('Error video:', e.message); }
