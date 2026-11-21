@@ -1535,6 +1535,14 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
       const { promisify } = require('util');
       const execFileAsync = promisify(execFile);
 
+      const conTiempoFB = (promesa, ms) => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Tiempo agotado')), ms);
+        Promise.resolve(promesa).then(
+          valor => { clearTimeout(timer); resolve(valor); },
+          error => { clearTimeout(timer); reject(error); }
+        );
+      });
+
       const idArchivo = Date.now();
       const fileOriginal = `/tmp/fb_orig_${idArchivo}.mp4`;
       const fileFinal = `/tmp/fb_final_${idArchivo}.mp4`;
@@ -1568,7 +1576,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         // MOTOR 1: primesave-dl
         try {
           const downloader = require('primesave-dl');
-          const res = await downloader(urlFB);
+          const res = await conTiempoFB(downloader(urlFB), 15000);
           const videoOpt = res?.options?.find(o =>
             o.type === 'Video' && o.url
           );
@@ -1582,7 +1590,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
         if (!fs2.existsSync(fileOriginal)) {
           try {
             const tsun = require('tsun-dls');
-            const res = await tsun.facebook(urlFB);
+            const res = await conTiempoFB(tsun.facebook(urlFB), 15000);
 
             if (typeof res?.download === 'string') {
               await guardarVideo(res.download);
