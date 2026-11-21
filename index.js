@@ -1267,7 +1267,6 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
 
         // API 1: Denzy
-        if (cmd !== 'play') {
         try {
           const yt = require('@denzy-official/youtube_scraper');
           const res = await conTiempo(yt.ytmp3(query), 10000);
@@ -1279,7 +1278,6 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
             duracionFinal = res.metadata?.timestamp || res.metadata?.duration?.timestamp || null;
           }
         } catch (e) {}
-        }
 
         // API 2: ShadowX
         if (!bufferFinal) {
@@ -1532,80 +1530,135 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     // DESCARGAS Y IA BLINDADAS
     // ==========================================
     case 'facebook': case 'fb': {
-      
-        
+      const fs2 = require('fs');
+      const { execFile } = require('child_process');
+      const { promisify } = require('util');
+      const execFileAsync = promisify(execFile);
+
+      const idArchivo = Date.now();
+      const fileOriginal = `/tmp/fb_orig_${idArchivo}.mp4`;
+      const fileFinal = `/tmp/fb_final_${idArchivo}.mp4`;
+      const urlFB = cuerpo.slice(cmd.length).trim().split(/\s+/)[0];
+
+      try {
+        if (!urlFB) {
+          await responder('Uso: .fb <enlace de Facebook>');
+          break;
+        }
+
+        const guardarVideo = async (enlace) => {
+          const respuesta = await fetch(enlace, {
+            signal: AbortSignal.timeout(45000)
+          });
+
+          if (!respuesta.ok) throw new Error('HTTP ' + respuesta.status);
+
+          const tipo = (respuesta.headers.get('content-type') || '').toLowerCase();
+          if (tipo.includes('text/html') || tipo.includes('application/json')) {
+            throw new Error('La API no entregó un archivo de video');
+          }
+
+          const buffer = Buffer.from(await respuesta.arrayBuffer());
+          if (buffer.length < 1024) throw new Error('Video vacío');
+          if (buffer.length > 64 * 1024 * 1024) throw new Error('Video supera 64 MB');
+
+          fs2.writeFileSync(fileOriginal, buffer);
+        };
+
+        // MOTOR 1: primesave-dl
         try {
-          const fs2 = require('fs');
-          const fileOriginal = '/tmp/fb_orig_' + Date.now() + '.mp4';
-          
-          // MOTOR 1: primesave-dl (Maneja Facebook)
-          let bufferFinal = null;
+          const downloader = require('primesave-dl');
+          const res = await downloader(urlFB);
+          const videoOpt = res?.options?.find(o =>
+            o.type === 'Video' && o.url
+          );
+
+          if (videoOpt?.url) await guardarVideo(videoOpt.url);
+        } catch (e) {
+          console.log('Fallo Motor 1 FB (primesave):', e.message);
+        }
+
+        // MOTOR 2: tsun-dls
+        if (!fs2.existsSync(fileOriginal)) {
           try {
-            const downloader = require('primesave-dl');
-            const res = await downloader(url);
-            if (res.success && res.options) {
-              const videoOpt = res.options.find(o => o.type === 'Video');
-              if (videoOpt && videoOpt.url) {
-                const rFetch = await fetch(videoOpt.url);
-                bufferFinal = Buffer.from(await rFetch.arrayBuffer());
-                fs2.writeFileSync(fileOriginal, bufferFinal);
-              }
-            }
-          } catch (e) { console.log('Fallo Motor 1 FB (primesave):', e.message); }
+            const tsun = require('tsun-dls');
+            const res = await tsun.facebook(urlFB);
 
-          // MOTOR 2: tsun-dls (Alternativa para Facebook)
-          if (!fs2.existsSync(fileOriginal)) {
-            try {
-              const tsun = require('tsun-dls');
-              const res = await tsun.facebook(url);
-              if (res && res.download) {
-                const rFetch = await fetch(res.download);
-                bufferFinal = Buffer.from(await rFetch.arrayBuffer());
-                fs2.writeFileSync(fileOriginal, bufferFinal);
-              }
-            } catch (e) { console.log('Fallo Motor 2 FB (tsun):', e.message); }
-          }
-
-          // MOTOR 3: yt-dlp (Respaldo)
-          if (!fs2.existsSync(fileOriginal)) {
-            const { exec } = require('child_process');
-            const { promisify } = require('util');
-            const execAsync = promisify(exec);
-            await execAsync('yt-dlp --no-warnings -f "bv*+ba/b" -o "' + fileOriginal + '" "' + url + '"', { timeout: 60000 });
-          }
-          
-          if (fs2.existsSync(fileOriginal)) {
-          await execAsync('ffmpeg -y -i "' + fileOriginal + '" -c:v libx264 -preset veryfast -crf 28 -c:a aac -b:a 128k -movflags +faststart "' + fileFinal + '"', { timeout: 60000 });
-          
-          if (fs2.existsSync(fileFinal)) {
-            const stats = fs2.statSync(fileFinal);
-            if (stats.size > 64 * 1024 * 1024) {
-              await responder('❌ El video de Facebook pesa más de 64MB.');
-              try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
-            } else {
-              const buffer = fs2.readFileSync(fileFinal);
-              await sock.sendMessage(jid, { video: buffer, caption: '✅ Video de Facebook' }, { quoted: m });
-              try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
+            if (typeof res?.download === 'string') {
+              await guardarVideo(res.download);
             }
-            fs2.unlinkSync(fileFinal);
-          } else {
-            await responder('❌ Error al convertir el video con ffmpeg.');
+          } catch (e) {
+            console.log('Fallo Motor 2 FB (tsun):', e.message);
           }
-          fs2.unlinkSync(fileOriginal);
+        }
+
+        // MOTOR 3: yt-dlp
+        if (!fs2.existsSync(fileOriginal)) {
+          try {
+            await execFileAsync('yt-dlp', [
+              '--no-warnings',
+              '--no-playlist',
+              '-f', 'bv*+ba/b',
+              '--merge-output-format', 'mp4',
+              '-o', fileOriginal,
+              urlFB
+            ], { timeout: 60000 });
+          } catch (e) {
+            console.log('Fallo Motor 3 FB (yt-dlp):', e.message);
+          }
+        }
+
+        if (!fs2.existsSync(fileOriginal)) {
+          await responder('❌ No se pudo descargar el video de Facebook.');
+          break;
+        }
+
+        // Conversión con FFmpeg; si falla, se intenta enviar el original
+        let archivoEnvio = fileOriginal;
+
+        try {
+          await execFileAsync('ffmpeg', [
+            '-y', '-i', fileOriginal,
+            '-c:v', 'libx264',
+            '-preset', 'veryfast',
+            '-crf', '28',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-movflags', '+faststart',
+            fileFinal
+          ], { timeout: 60000 });
+
+          if (fs2.existsSync(fileFinal)) archivoEnvio = fileFinal;
+        } catch (e) {
+          console.log('Aviso: FFmpeg no pudo convertir el video:', e.message);
+        }
+
+        const stats = fs2.statSync(archivoEnvio);
+
+        if (stats.size > 64 * 1024 * 1024) {
+          await responder('❌ El video supera el límite de 64 MB.');
         } else {
-          await responder('❌ No se pudo descargar el video (puede ser privado).');
-          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+          const buffer = fs2.readFileSync(archivoEnvio);
+          await sock.sendMessage(
+            jid,
+            { video: buffer, caption: '✅ Video de Facebook' },
+            { quoted: m }
+          );
         }
       } catch (e) {
-        console.log('Error en facebook:', e.message);
-        await responder('❌ Error al descargar o convertir el video.');
+        console.log('Error en descarga Facebook:', e);
+        await responder('❌ Error al descargar o enviar el video de Facebook.');
+      } finally {
+        for (const archivo of [fileOriginal, fileFinal]) {
+          try {
+            if (fs2.existsSync(archivo)) fs2.unlinkSync(archivo);
+          } catch (e) {}
+        }
       }
+
       break;
     }
 
-
-
-    // ==========================================
     // INTERRUPTOR GLOBAL PARA SUBBOTS (BLINDADO)
     // ==========================================
     case 'apagarsubs': case 'subsoff': {
