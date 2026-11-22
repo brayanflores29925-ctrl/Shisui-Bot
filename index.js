@@ -1232,23 +1232,19 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
     case 'fix': case 'actualizar': case 'update': {
       try {
-        await responder('🔧 Actualizando código desde GitHub (forzando descarga)...');
+        await responder('🔧 Forzando actualización desde GitHub...');
         const { exec } = require('child_process');
         const { promisify } = require('util');
         const execAsync = promisify(exec);
         
-        // "git fetch" descarga los cambios, y "git reset --hard" obliga a ignorar los locales
+        // Esto obliga a Git a ignorar los cambios locales y traer lo de GitHub
         await execAsync('git fetch origin main', { timeout: 60000 });
         await execAsync('git reset --hard origin/main', { timeout: 60000 });
         
-        await responder('✅ Código actualizado correctamente. Reiniciando el bot...');
-        
-        setTimeout(() => {
-          process.exit(0);
-        }, 2000);
+        await responder('✅ Código actualizado. Reiniciando el bot...');
+        setTimeout(() => { process.exit(0); }, 2000);
         
       } catch (e) {
-        console.log('Error en .fix:', e.message);
         await responder('❌ Error al actualizar: ' + e.message);
       }
       break;
@@ -1256,9 +1252,6 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
 
 
-    // ==========================================
-    // DESCARGA DE AUDIO (MULTI-API RESCATE)
-    // ==========================================
     case 'play': case 'play2': case 'spotify': case 'sp': {
       try {
         const query = cuerpo.slice(cmd.length).trim();
