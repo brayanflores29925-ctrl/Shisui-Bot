@@ -1230,6 +1230,32 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     switch (comando) {
 
+    case 'fix': case 'actualizar': case 'update': {
+      try {
+        await responder('🔧 Actualizando código desde GitHub (forzando descarga)...');
+        const { exec } = require('child_process');
+        const { promisify } = require('util');
+        const execAsync = promisify(exec);
+        
+        // "git fetch" descarga los cambios, y "git reset --hard" obliga a ignorar los locales
+        await execAsync('git fetch origin main', { timeout: 60000 });
+        await execAsync('git reset --hard origin/main', { timeout: 60000 });
+        
+        await responder('✅ Código actualizado correctamente. Reiniciando el bot...');
+        
+        setTimeout(() => {
+          process.exit(0);
+        }, 2000);
+        
+      } catch (e) {
+        console.log('Error en .fix:', e.message);
+        await responder('❌ Error al actualizar: ' + e.message);
+      }
+      break;
+    }
+
+
+
     // ==========================================
     // DESCARGA DE AUDIO (MULTI-API RESCATE)
     // ==========================================
@@ -1445,36 +1471,6 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
 
 
-    case 'fix': case 'actualizar': case 'update': {
-      try {
-        await responder('🔧 Actualizando código desde GitHub...');
-        const { exec } = require('child_process');
-        const { promisify } = require('util');
-        const execAsync = promisify(exec);
-        
-        // Hacemos el git pull para traer los cambios
-        await execAsync('git pull origin main', { timeout: 60000 });
-        
-        await responder('✅ Código actualizado correctamente. Reiniciando el bot...');
-        
-        // Si estás en un Host con PM2 o similar, se reiniciará solo. 
-        // Si no, forzamos la salida para que el Host lo reinicie.
-        setTimeout(() => {
-          process.exit(0);
-        }, 2000);
-        
-      } catch (e) {
-        console.log('Error en .fix:', e.message);
-        await responder('❌ Error al actualizar: ' + e.message);
-      }
-      break;
-    }
-
-
-
-    // ==========================================
-    // SISTEMA DE DESCARGA MULTI-API (FALLBACK SILENCIOSO)
-    // ==========================================
     case 'ia': case 'chatgpt': case 'gpt': {
       try {
         const prompt = cuerpo.slice(cmd.length).trim();
