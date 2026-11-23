@@ -75,6 +75,7 @@ const {
 const pino = require('pino')
 const readline = require('readline')
 const { generarMenu } = require('./menu')
+const fixcmd = require('./fixcmd')
 const capacidad = require('./capacidad')
 const extras = require('./extras')
 const admin = require('./admin')
@@ -1153,6 +1154,10 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
       return
     }
 
+    if (comando === 'fix' || comando === 'actualizar') {
+      await fixcmd.ejecutar({ sock, m, jid, args, responder, esDueno: esDueno(m) })
+      return
+    }
     const conocido = COMANDOS.has(comando)
     if (conocido) await reaccionar('⏳')
 
