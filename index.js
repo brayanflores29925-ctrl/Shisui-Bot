@@ -1236,6 +1236,59 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     switch (comando) {
 
     // ==========================================
+    // MEJORAR IMAGEN (HD LOCAL CON JIMP)
+    // ==========================================
+    case 'hd': case 'remini': case 'mejorar': {
+      try {
+        // Verificar que esté respondiendo a una imagen
+        const quoted = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        if (!quoted || (!quoted.imageMessage && !quoted.stickerMessage)) {
+          await responder('🖼️ Responde a una imagen o sticker con #hd para mejorarlo.');
+          break;
+        }
+
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+
+        // Descargar la imagen original
+        const buffer = await descargarRespondido(m, sock);
+        if (!buffer) { 
+          await responder('❌ No se pudo descargar la imagen.'); 
+          break; 
+        }
+
+        // Procesar con Jimp
+        const Jimp = require('jimp');
+        const image = await Jimp.read(buffer);
+
+        // 1. Escalar x2 (Duplicar tamaño)
+        image.scale(2);
+
+        // 2. Aplicar un poco de contraste y saturación para que se vea más "HD"
+        image.contrast(0.15);
+        image.brightness(0.05);
+
+        // 3. Guardar como JPG de alta calidad
+        const finalBuffer = await image.getBufferAsync(Jimp.MIME_JPEG);
+
+        // Enviar la imagen mejorada
+        await sock.sendMessage(jid, { 
+          image: finalBuffer, 
+          caption: '✅ *Imagen mejorada (HD)*' 
+        }, { quoted: m });
+
+        try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
+
+      } catch (e) {
+        console.log('Error en .hd:', e.message);
+        await responder('❌ Error al mejorar la imagen: ' + e.message);
+        try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+      }
+      break;
+    }
+
+
+
+    // ==========================================
     // STICKER + AUDIO (SIMULACIÓN DE STICKER CON SONIDO)
     // ==========================================
     case 'stickerconaudio': case 'saudio': case 'sca': {
