@@ -1235,6 +1235,61 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     switch (comando) {
 
+    case 'mediafire': {
+      try {
+        const url = cuerpo.slice(cmd.length).trim();
+        if (!url || !url.includes('mediafire.com')) {
+          await responder('Uso: #mediafire <enlace>');
+          break;
+        }
+
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+        await responder('📥 Analizando enlace...');
+
+        const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const html = await res.text();
+        
+        // Búsqueda segura sin Regex (evita errores de sintaxis)
+        const parts = html.split('href="https://download');
+        if (parts.length < 2) {
+          await responder('❌ No se encontró el enlace de descarga. Puede que el archivo haya sido eliminado o el enlace sea inválido.');
+          break;
+        }
+        const linkEnd = parts[1].indexOf('"');
+        const directLink = 'https://download' + parts[1].substring(0, linkEnd);
+
+        await responder('⬇️ Descargando archivo... (puede tardar)');
+
+        const fileRes = await fetch(directLink);
+        if (!fileRes.ok) throw new Error('HTTP ' + fileRes.status);
+        
+        const buffer = Buffer.from(await fileRes.arrayBuffer());
+        
+        if (buffer.length > 64 * 1024 * 1024) {
+          await responder('❌ El archivo supera los 64MB (límite de WhatsApp).');
+          break;
+        }
+
+        let fileName = 'archivo_mediafire';
+        const disposition = fileRes.headers.get('content-disposition');
+        if (disposition && disposition.includes('filename=')) {
+          fileName = disposition.split('filename=')[1].replace(/"/g, '');
+        } else {
+          const urlParts = url.split('/');
+          if (urlParts.length > 4) fileName = urlParts[4];
+        }
+
+        await sock.sendMessage(jid, { document: buffer, mimetype: fileRes.headers.get('content-type') || 'application/octet-stream', fileName: fileName }, { quoted: m });
+        try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
+      } catch (e) {
+        console.log('Error en .mediafire:', e.message);
+        await responder('❌ Error al descargar: ' + e.message);
+      }
+      break;
+    }
+
+
+
     // ==========================================
     // MEJORAR IMAGEN (HD LOCAL CON JIMP)
     // ==========================================
