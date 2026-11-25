@@ -1235,6 +1235,155 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     switch (comando) {
 
+    // ==========================================
+    // DESCARGAS BLINDADAS CON TIEMPO LÍMITE (TIMEOUT)
+    // ==========================================
+    case 'play': case 'play2': case 'spotify': case 'sp': {
+      try {
+        const query = cuerpo.slice(cmd.length).trim();
+        if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
+        
+        // Reacción inicial
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+
+        const Youtube = require('youtube-search-api');
+        const results = await Youtube.GetListByKeyword(query, false, 1);
+        if (!results.items || results.items.length === 0) { 
+            await responder('❌ No encontré resultados.'); 
+            break; 
+        }
+        
+        const v = results.items[0];
+        const url = 'https://www.youtube.com/watch?v=' + v.id;
+        const title = v.title;
+        const channel = v.channelTitle;
+        const duration = v.length ? v.length.text : 'Desconocido';
+        const thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail) : null;
+
+        // Enviar Tarjeta
+        const txt = '➩ Audio › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⧖ Duración › *' + duration + '*\n⏳ Descargando audio, espera...';
+        if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+        else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+
+        let bufferFinal = null;
+        let exito = false;
+
+        // INTENTO 1: API PAXSENIX con Timeout de 12 segundos
+        try {
+           const controller = new AbortController();
+           const timeoutId = setTimeout(() => controller.abort(), 12000);
+           
+           const res = await fetch('https://api.paxsenix.biz.id/dl/ytmp3?url=' + encodeURIComponent(url), { signal: controller.signal });
+           clearTimeout(timeoutId);
+           
+           const json = await res.json();
+           if (json.status && json.result && json.result.download) {
+               const r = await fetch(json.result.download);
+               bufferFinal = Buffer.from(await r.arrayBuffer());
+               exito = true;
+           }
+        } catch(e) { console.log('Fallo Paxsenix audio:', e.message); }
+
+        // INTENTO 2: YT-DLP (Solo si la API falló)
+        if (!exito) {
+           try {
+             const { exec } = require('child_process');
+             const { promisify } = require('util');
+             const execAsync = promisify(exec);
+             const fs2 = require('fs');
+             const p = '/tmp/aud_' + Date.now() + '.m4a';
+             await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + p + '" "' + url + '"', {timeout: 25000});
+             if (fs2.existsSync(p)) { bufferFinal = fs2.readFileSync(p); fs2.unlinkSync(p); exito = true; }
+           } catch(e) { console.log('Fallo yt-dlp audio:', e.message); }
+        }
+
+        // ENVIAR RESULTADO
+        if (exito && bufferFinal && bufferFinal.length > 5000) {
+          await sock.sendMessage(jid, { audio: bufferFinal, mimetype: 'audio/mp4' }, { quoted: m });
+          try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
+        } else {
+          await responder('❌ No se pudo descargar el audio (los servidores fallaron).');
+          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+        }
+      } catch (e) { console.log('Error play:', e.message); }
+      break;
+    }
+
+    case 'playvideo': case 'video': case 'v': {
+      try {
+        const query = cuerpo.slice(cmd.length).trim();
+        if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
+        
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+
+        const Youtube = require('youtube-search-api');
+        const results = await Youtube.GetListByKeyword(query, false, 1);
+        if (!results.items || results.items.length === 0) { 
+            await responder('❌ No encontré resultados.'); 
+            break; 
+        }
+        
+        const v = results.items[0];
+        const url = 'https://www.youtube.com/watch?v=' + v.id;
+        const title = v.title;
+        const channel = v.channelTitle;
+        const duration = v.length ? v.length.text : 'Desconocido';
+        const thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail) : null;
+
+        const txt = '➩ Video › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⧖ Duración › *' + duration + '*\n⏳ Descargando video, espera...';
+        if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
+        else await sock.sendMessage(jid, { text: txt }, { quoted: m });
+
+        let bufferFinal = null;
+        let exito = false;
+
+        // INTENTO 1: API PAXSENIX con Timeout de 15 segundos
+        try {
+           const controller = new AbortController();
+           const timeoutId = setTimeout(() => controller.abort(), 15000);
+           
+           const res = await fetch('https://api.paxsenix.biz.id/dl/ytmp4?url=' + encodeURIComponent(url), { signal: controller.signal });
+           clearTimeout(timeoutId);
+           
+           const json = await res.json();
+           if (json.status && json.result && json.result.download) {
+               const r = await fetch(json.result.download);
+               bufferFinal = Buffer.from(await r.arrayBuffer());
+               exito = true;
+           }
+        } catch(e) { console.log('Fallo Paxsenix video:', e.message); }
+
+        // INTENTO 2: YT-DLP
+        if (!exito) {
+           try {
+             const { exec } = require('child_process');
+             const { promisify } = require('util');
+             const execAsync = promisify(exec);
+             const fs2 = require('fs');
+             const p = '/tmp/vid_' + Date.now() + '.mp4';
+             await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + p + '" "' + url + '"', {timeout: 40000});
+             if (fs2.existsSync(p)) { bufferFinal = fs2.readFileSync(p); fs2.unlinkSync(p); exito = true; }
+           } catch(e) { console.log('Fallo yt-dlp video:', e.message); }
+        }
+
+        // ENVIAR RESULTADO
+        if (exito && bufferFinal && bufferFinal.length > 5000) {
+          if (bufferFinal.length > 64 * 1024 * 1024) {
+            await responder('❌ El video supera los 64MB.');
+          } else {
+            await sock.sendMessage(jid, { video: bufferFinal, caption: '✅ ' + title }, { quoted: m });
+            try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
+          }
+        } else {
+          await responder('❌ No se pudo descargar el video (los servidores fallaron).');
+          try { await sock.sendMessage(jid, { react: { text: '❌', key: m.key } }); } catch (e) {}
+        }
+      } catch (e) { console.log('Error video:', e.message); }
+      break;
+    }
+
+
+
     case 'mediafire': {
       try {
         const url = cuerpo.slice(cmd.length).trim();
@@ -1426,154 +1575,6 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
 
 
-    case 'play': case 'play2': case 'spotify': case 'sp': {
-      try {
-        const query = cuerpo.slice(cmd.length).trim();
-        if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
-        
-        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
-
-        const Youtube = require('youtube-search-api');
-        const results = await Youtube.GetListByKeyword(query, false, 1);
-        if (!results.items || results.items.length === 0) { await responder('❌ No encontré resultados.'); break; }
-        
-        const v = results.items[0];
-        const url = 'https://www.youtube.com/watch?v=' + v.id;
-        const title = v.title;
-        const channel = v.channelTitle;
-        const duration = v.length ? v.length.text : 'Desconocido';
-        const thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail) : null;
-
-        const txt = '➩ Audio › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⧖ Duración › *' + duration + '*\n⏳ Descargando audio...';
-        if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
-        else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-
-        let bufferFinal = null;
-        
-        // API 1: PAXSENIX
-        try {
-           const res = await fetch('https://api.paxsenix.biz.id/dl/ytmp3?url=' + encodeURIComponent(url));
-           const json = await res.json();
-           if (json.status && json.result && json.result.download) {
-               const r = await fetch(json.result.download);
-               bufferFinal = Buffer.from(await r.arrayBuffer());
-           }
-        } catch(e) { console.log('Fallo API 1 Paxsenix'); }
-
-        // API 2: PRIMESAVE
-        if (!bufferFinal) {
-           try {
-             const downloader = require('primesave-dl');
-             const res = await downloader(url);
-             if (res.success && res.options) {
-               const opt = res.options.find(o => o.type === 'Audio');
-               if (opt && opt.url) { const r = await fetch(opt.url); bufferFinal = Buffer.from(await r.arrayBuffer()); }
-             }
-           } catch(e) { console.log('Fallo API 2 Primesave'); }
-        }
-
-        // API 3: YT-DLP
-        if (!bufferFinal) {
-           try {
-             const { exec } = require('child_process');
-             const { promisify } = require('util');
-             const execAsync = promisify(exec);
-             const fs2 = require('fs');
-             const p = '/tmp/aud_' + Date.now() + '.m4a';
-             await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o "' + p + '" "' + url + '"', {timeout: 40000});
-             if (fs2.existsSync(p)) { bufferFinal = fs2.readFileSync(p); fs2.unlinkSync(p); }
-           } catch(e) { console.log('Fallo API 3 yt-dlp'); }
-        }
-
-        if (bufferFinal && bufferFinal.length > 5000) {
-          await sock.sendMessage(jid, { audio: bufferFinal, mimetype: 'audio/mp4' }, { quoted: m });
-          try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
-        } else {
-          await responder('❌ No se pudo descargar el audio (todos los servidores fallaron).');
-        }
-      } catch (e) { console.log('Error play:', e.message); }
-      break;
-    }
-
-    // ==========================================
-    // DESCARGA DE VIDEO (MULTI-API RESCATE)
-    // ==========================================
-    case 'playvideo': case 'video': case 'v': {
-      try {
-        const query = cuerpo.slice(cmd.length).trim();
-        if (!query) { await responder('Uso: #' + cmd + ' <nombre>'); break; }
-        
-        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
-
-        const Youtube = require('youtube-search-api');
-        const results = await Youtube.GetListByKeyword(query, false, 1);
-        if (!results.items || results.items.length === 0) { await responder('❌ No encontré resultados.'); break; }
-        
-        const v = results.items[0];
-        const url = 'https://www.youtube.com/watch?v=' + v.id;
-        const title = v.title;
-        const channel = v.channelTitle;
-        const duration = v.length ? v.length.text : 'Desconocido';
-        const thumb = v.thumbnail ? (v.thumbnail.url || v.thumbnail) : null;
-
-        const txt = '➩ Video › *' + title + '*\n\n❖ Canal › *' + channel + '*\n⧖ Duración › *' + duration + '*\n⏳ Descargando video...';
-        if (thumb) await sock.sendMessage(jid, { image: { url: thumb }, caption: txt }, { quoted: m });
-        else await sock.sendMessage(jid, { text: txt }, { quoted: m });
-
-        let bufferFinal = null;
-        
-        // API 1: PAXSENIX
-        try {
-           const res = await fetch('https://api.paxsenix.biz.id/dl/ytmp4?url=' + encodeURIComponent(url));
-           const json = await res.json();
-           if (json.status && json.result && json.result.download) {
-               const r = await fetch(json.result.download);
-               bufferFinal = Buffer.from(await r.arrayBuffer());
-           }
-        } catch(e) { console.log('Fallo API 1 Paxsenix Video'); }
-
-        // API 2: PRIMESAVE
-        if (!bufferFinal) {
-           try {
-             const downloader = require('primesave-dl');
-             const res = await downloader(url);
-             if (res.success && res.options) {
-               const opt = res.options.find(o => o.type === 'Video');
-               if (opt && opt.url) { const r = await fetch(opt.url); bufferFinal = Buffer.from(await r.arrayBuffer()); }
-             }
-           } catch(e) { console.log('Fallo API 2 Primesave Video'); }
-        }
-
-        // API 3: YT-DLP
-        if (!bufferFinal) {
-           try {
-             const { exec } = require('child_process');
-             const { promisify } = require('util');
-             const execAsync = promisify(exec);
-             const fs2 = require('fs');
-             const p = '/tmp/vid_' + Date.now() + '.mp4';
-             await execAsync('yt-dlp --extractor-args "youtube:player_client=web_embedded,android" -f "bv*+ba/b" --merge-output-format mp4 -o "' + p + '" "' + url + '"', {timeout: 60000});
-             if (fs2.existsSync(p)) { bufferFinal = fs2.readFileSync(p); fs2.unlinkSync(p); }
-           } catch(e) { console.log('Fallo API 3 yt-dlp Video'); }
-        }
-
-        if (bufferFinal && bufferFinal.length > 5000) {
-          if (bufferFinal.length > 64 * 1024 * 1024) {
-            await responder('❌ El video supera los 64MB.');
-          } else {
-            await sock.sendMessage(jid, { video: bufferFinal, caption: '✅ ' + title }, { quoted: m });
-            try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
-          }
-        } else {
-          await responder('❌ No se pudo descargar el video (todos los servidores fallaron).');
-        }
-      } catch (e) { console.log('Error video:', e.message); }
-      break;
-    }
-
-    // ==========================================
-    // DESCARGA DE FACEBOOK (3 APIS)
-    // ==========================================
     case 'facebook': case 'fb': {
       try {
         const url = cuerpo.slice(cmd.length).trim();
