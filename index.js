@@ -3,7 +3,7 @@ if (!process.env.BOT_CHILD && !process.env.BOT_LOOP) {
   const { spawn } = require('child_process')
 
 // Pre-cargando modelo NSFW para que la primera detección sea rápida
-try { require('./nsfw').cargarModelo().catch(e => console.log('[antiporno] No se pudo cargar modelo:', e.message)) } catch (e) { console.log('[antiporno] nsfw.js no cargó:', e.message) }
+// APAGADO try { require('./nsfw').cargarModelo().catch(e => console.log('[antiporno] No se pudo cargar modelo:', e.message)) } catch (e) { console.log('[antiporno] nsfw.js no cargó:', e.message) }
   const supFs = require('fs')
   const supPath = require('path')
   let hijo = null
@@ -95,7 +95,7 @@ const { textoAVoz } = require('./voz')
 const { informacion, descargar, bajarMedia, buscarImagenes } = require('./descargas')
 const { registrarGrupo, revisarRegistros } = require('./registro-grupos')
 const racha = require('./racha')
-const antiporno = require('./antiporno')
+const antiporno = { procesar: async () => false } // APAGADO
 
 async function consultarGroq(pregunta) {
   if (!groq) throw new Error('Falta configurar GROQ_API_KEY')
