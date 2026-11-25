@@ -1277,6 +1277,17 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     switch (comando) {
 
+    case 'menu': {
+      try {
+        const nsfw = nsfwActivo(jid);
+        await responder(menuActual(nsfw));
+      } catch (e) {
+        console.log('Error mostrando menú:', e.message);
+        await responder('❌ No se pudo mostrar el menú.');
+      }
+      break;
+    }
+
     case 'mediafire': {
       try {
         const url = cuerpo.slice(cmd.length).trim();
