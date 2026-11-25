@@ -1238,7 +1238,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     // ==========================================
     // STICKER + AUDIO (SIMULACIÓN DE STICKER CON SONIDO)
     // ==========================================
-    case 'stickerconaudio': case 'saudio': {
+    case 'stickerconaudio': case 'saudio': case 'sca': {
       try {
         // 1. Verificar que el usuario esté respondiendo a un sticker
         const quoted = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
