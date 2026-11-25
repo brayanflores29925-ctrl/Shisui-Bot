@@ -1235,6 +1235,67 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
     
     switch (comando) {
 
+    // ==========================================
+    // STICKER + AUDIO (SIMULACIÓN DE STICKER CON SONIDO)
+    // ==========================================
+    case 'stickerconaudio': case 'saudio': {
+      try {
+        // 1. Verificar que el usuario esté respondiendo a un sticker
+        const quoted = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        if (!quoted || !quoted.stickerMessage) {
+          await responder('❌ Responde a un sticker animado con este comando.\\nEjemplo: #stickerconaudio nombre de la canción');
+          break;
+        }
+
+        // 2. Obtener el nombre de la canción o el enlace
+        const query = cuerpo.slice(cmd.length).trim();
+        if (!query) { await responder('Uso: #stickerconaudio <nombre de canción>\\nEjemplo: #stickerconaudio feliz navidad'); break; }
+
+        try { await sock.sendMessage(jid, { react: { text: '⏳', key: m.key } }); } catch (e) {}
+
+        const fs2 = require('fs');
+        const { exec } = require('child_process');
+        const { promisify } = require('util');
+        const execAsync = promisify(exec);
+
+        // 3. Descargar el sticker original para reenviarlo
+        const stickerBuffer = await sock.downloadMediaMessage({
+          message: quoted,
+          key: { remoteJid: jid, id: m.message.extendedTextMessage.contextInfo.stanzaId }
+        });
+
+        // 4. Buscar y descargar el audio de YouTube (solo 3 segundos)
+        let url = query;
+        if (!query.startsWith('http')) {
+          const { stdout } = await execAsync('yt-dlp --extractor-args "youtube:player_client=android" --dump-json --no-warnings "ytsearch1:' + query + '"', { timeout: 30000 });
+          const info = JSON.parse(stdout.trim().split('\\n')[0]);
+          url = info.webpage_url;
+        }
+
+        const filePath = '/tmp/audio_corto_' + Date.now() + '.m4a';
+        // Descargamos y recortamos a 3 segundos exactos
+        await execAsync('yt-dlp --extractor-args "youtube:player_client=android" -f 140/bestaudio[ext=m4a]/bestaudio -o - "' + url + '" | ffmpeg -y -i pipe:0 -t 3 -c copy "' + filePath + '"', { timeout: 60000 });
+
+        if (!fs2.existsSync(filePath)) { await responder('❌ No se pudo obtener el audio.'); break; }
+        
+        const audioBuffer = fs2.readFileSync(filePath);
+        fs2.unlinkSync(filePath);
+
+        // 5. Enviar primero el Sticker y luego el Audio
+        await sock.sendMessage(jid, { sticker: stickerBuffer }, { quoted: m });
+        await sock.sendMessage(jid, { audio: audioBuffer, mimetype: 'audio/mp4' }, { quoted: m });
+        
+        try { await sock.sendMessage(jid, { react: { text: '✅', key: m.key } }); } catch (e) {}
+
+      } catch (e) {
+        console.log('Error en .stickerconaudio:', e.message);
+        await responder('❌ Error al procesar el sticker con audio.');
+      }
+      break;
+    }
+
+
+
     case 'fix': case 'actualizar': case 'update': {
       try {
         await responder('🔧 Forzando actualización desde GitHub...');
