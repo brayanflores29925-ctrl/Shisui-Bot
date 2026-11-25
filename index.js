@@ -360,7 +360,34 @@ async function iniciar(opciones = {}) {
   }
 
   sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
-    if (connection === 'open') {
+    
+// --- NATIVE ANTIDELETE LISTENER ---
+sock.ev.on('messages.update', async (updates) => {
+  for (const update of updates) {
+    // Si el mensaje fue revocado (eliminado para todos)
+    if (update.update.message === null) {
+      try {
+        const jid = update.key.remoteJid;
+        const id = update.key.id;
+        if (global.msgCache && global.msgCache[jid] && global.msgCache[jid][id]) {
+          const msgOriginal = global.msgCache[jid][id];
+          
+          // Preparar el mensaje para reenviar
+          const tipo = Object.keys(msgOriginal.message)[0];
+          let textoAviso = '🗑️ *MENSAJE ELIMINADO DETECTADO*\n\n';
+          if (msgOriginal.message.conversation) textoAviso += msgOriginal.message.conversation;
+          else if (msgOriginal.message.extendedTextMessage) textoAviso += msgOriginal.message.extendedTextMessage.text;
+          else textoAviso += 'El usuario intentó borrar un mensaje multimedia (foto/video/audio).';
+          
+          await sock.sendMessage(jid, { text: textoAviso + '\n\n👤 De: @' + (update.key.participant || jid).split('@')[0], mentions: [update.key.participant || jid] });
+        }
+      } catch(e) { console.log('Error antidelete:', e.message); }
+    }
+  }
+});
+// ----------------------------------
+
+if (connection === 'open') {
       // --- BIENVENIDA SUBBOT (SIN SPAM) ---
       try {
         const botNumber = sock.user.id.split(':')[0];
@@ -736,6 +763,21 @@ sock.ev.on('group-participants.update', async (update) => {
 // --------------------------------------------------
 
 sock.ev.on('messages.upsert', async ({ messages }) => {
+
+  // --- NATIVE ANTIDELETE STORE ---
+  try {
+    const msg = messages[0];
+    if (msg.message && !msg.key.fromMe) {
+      const jid = msg.key.remoteJid;
+      if (!global.msgCache[jid]) global.msgCache[jid] = {};
+      global.msgCache[jid][msg.key.id] = msg;
+      // Limitar caché a 100 mensajes por grupo para no saturar la RAM
+      const keys = Object.keys(global.msgCache[jid]);
+      if (keys.length > 100) delete global.msgCache[jid][keys[0]];
+    }
+  } catch(e) {}
+  // -------------------------------
+
 
   // --- FILTRO GLOBAL DE SUBBOTS ---
   try {

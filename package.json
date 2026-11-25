@@ -16,6 +16,7 @@
     "@distube/ytdl-core": "^5.2.1",
     "@heavstaltech/api": "^2.0.3",
     "@hydralerne/youtube-api": "^1.1.5",
+    "@innovatorssoft/baileys": "^7.4.11",
     "@killovsky/gimages": "^1.1.0",
     "@rowix/gifsnap-js": "^0.1.0",
     "@tensorflow/tfjs": "^4.22.0",
