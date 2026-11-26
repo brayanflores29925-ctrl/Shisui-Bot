@@ -1079,6 +1079,21 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
       m.message.videoMessage?.caption ||
       ''
 
+
+    // FIX_EMERGENCIA_ANTES_DE_FILTROS
+    const ordenFix = texto.trim().match(/^(?:[!#./]\\s*)?(fix|actualizar|update)(?:\\s+(.*))?$/i)
+    if (ordenFix) {
+      if (!esDueno(m)) {
+        await sock.sendMessage(m.key.remoteJid, { text: '⛔ Solo el dueño puede actualizar el bot.' }, { quoted: m })
+        return
+      }
+      const jidFix = m.key.remoteJid
+      const argsFix = (ordenFix[2] || '').trim().split(/\\s+/).filter(Boolean)
+      const responderFix = async t => sock.sendMessage(jidFix, { text: String(t) }, { quoted: m })
+      await fixcmd.ejecutar({ sock, m, jid: jidFix, args: argsFix, responder: responderFix, esDueno: true })
+      return
+    }
+
     if (await antiporno.procesar(sock, m, texto, esAdmin, downloadMediaMessage)) return
 
     if (m.key.remoteJid.endsWith('@g.us') && !m.key.fromMe) {
