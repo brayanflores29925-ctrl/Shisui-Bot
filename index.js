@@ -3,7 +3,7 @@ if (!process.env.BOT_CHILD && !process.env.BOT_LOOP) {
   const { spawn } = require('child_process')
 
 // Pre-cargando modelo NSFW para que la primera detección sea rápida
-try { require('./nsfw').cargarModelo().catch(e => console.log('[antiporno] No se pudo cargar modelo:', e.message)) } catch (e) { console.log('[antiporno] nsfw.js no cargó:', e.message) }
+// Carga automática del modelo NSFW desactivada para ahorrar RAM.
   const supFs = require('fs')
   const supPath = require('path')
   let hijo = null
